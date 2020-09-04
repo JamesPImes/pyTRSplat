@@ -1,51 +1,311 @@
-# Copyright (C) 2020, James P. Imes, all rights reserved.
+# Copyright (c) 2020, James P. Imes. All rights reserved.
 
-"""A basic interpreter for parsed PLSSDesc and Tract objects, for
-converting them to a grid, and basic platting."""
+"""Generate plat images of full Townships (6x6 grid) or single Sections
+and incorporate parsed pyTRS PLSSDesc and Tract objects."""
 
-from pyTRS import pyTRS
-from pyTRS import version as pyTRS_version
+# TODO: Add kwargs for specifying lot_definitions for entire T&R's in several
+#  places -- e.g., Plat.from_PLSSDesc()
+
 from PIL import Image, ImageDraw, ImageFont
+from pyTRS import version as pyTRS_version
+from pyTRS.pyTRS import PLSSDesc, Tract
+from grid import TownshipGrid, SectionGrid, plss_to_grids, filter_tracts_by_tr
 
 __version__ = '0.0.1'
 __versionDate__ = '8/31/2020'
 __author__ = 'James P. Imes'
 __email__ = 'jamesimes@gmail.com'
 
-# TODO: Handle sections that didn't generate any lots/QQ's (e.g., m&b etc.).
 
-# TODO: Generate a function for importing an entire section's worth of lot definitions
-#  (from csv maybe?)
+class Settings():
+    """Configurable or default settings for drawing sections / townships
+    and generating Plat objects."""
+
+    DEFAULT_TYPEFACE = r'assets\liberation-fonts-ttf-2.1.1\LiberationSans-Regular.ttf'
+
+    # Default page-size dimensions.
+    LETTER_72ppi = (612, 792)
+    LETTER_200ppi = (1700, 2200)
+    LETTER_300ppi = (1700, 3300)
+    LEGAL_72ppi = (612, 1008)
+    LEGAL_200ppi = (1700, 2800)
+    LEGAL_300ppi = (2550, 4200)
+
+    # These are fully opaque
+    RGBA_RED = (255, 0, 0, 255)
+    RGBA_GREEN = (0, 255, 0, 255)
+    RGBA_BLUE = (0, 0, 255, 255)
+    RGBA_BLACK = (0, 0, 0, 255)
+    RGBA_WHITE = (255, 255, 255, 255)
+
+    # These are partially translucent:
+    RGBA_RED_OVERLAY = (255, 0, 0, 100)
+    RGBA_GREEN_OVERLAY = (0, 255, 0, 100)
+    RGBA_BLUE_OVERLAY = (0, 0, 255, 100)
+    RGBA_BLACK_OVERLAY = (0, 0, 0, 100)
+    RGBA_WHITE_OVERLAY = (255, 255, 255, 100)
+
+    def __init__(self):
+
+        # Dimensions of the image.
+        self.dim = Settings.LETTER_200ppi
+
+        # Font typeface, size, and RGBA values
+        self.headerfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 64)
+        self.tractfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 28)
+        self.secfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 36)
+        self.lotfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 12)
+        self.headerfont_RGBA = Settings.RGBA_BLACK
+        self.tractfont_RGBA = Settings.RGBA_BLACK
+        self.secfont_RGBA = Settings.RGBA_BLACK
+        self.lotfont_RGBA = Settings.RGBA_BLACK
+
+        # Distance between top of image and top of first row of sections.
+        self.y_margin = 180
+
+        # Distance between top section line and the T&R written above it.
+        self.y_twprge_margin = 15
+
+        # px indent for tract text.
+        self.tract_indent = 100
+        # TODO: Update tract_indent for other presets.
+
+        # Distance between bottom section line and the first tract text written.
+        self.px_before_tracts = 40
+        # TODO: Update px_before_tracts for other presets.
+
+        # Bottom margin before triggering 'panic' button.
+        self.bottom_y_margin = 80
+        # TODO: Update bottom_y_margin for other presets.
+
+        self.qq_side = 50  # length of each side for a QQ in px
+        self.sec_line_stroke = 3  # section-line stroke width in px
+        self.ql_stroke = 2  # quarter line stroke width in px
+        self.qql_stroke = 1  # quarter-quarter line stroke width in px
+
+        # RGBA values for color of various sec/Q lines
+        self.sec_line_RGBA = Settings.RGBA_BLACK
+        self.ql_RGBA = Settings.RGBA_BLACK
+        self.qql_RGBA = (128, 128, 128, 100)
+
+        # RGBA value for QQ fill
+        self.qq_fill_RGBA = Settings.RGBA_BLUE_OVERLAY
+
+        # How wide the whited-out centerbox in each section should be:
+        self.centerbox_wh = 60
+
+        # How many px set in from top-left corner of QQ box to write lot numbers
+        self.lot_num_offset_px = 6
+
+        # Whether to write these labels / text:
+        self.write_header = True
+        self.write_tracts = True
+        self.write_section_numbers = True
+        self.write_lot_numbers = False
+
+    @staticmethod
+    def preset(setting : str):
+        """Quick presets for Settings, with 'm', 's', and 'xs'."""
+        if setting == 'm':
+            return Settings.m_preset()
+        elif setting == 's':
+            return Settings.s_preset()
+        elif setting == 'xs':
+            return Settings.xs_preset()
+        else:
+            return Settings()
+
+    @staticmethod
+    def m_preset():
+        """Return a new Settings object with 'medium' defaults."""
+        st = Settings()
+        st.headerfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 32)
+        st.tractfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 20)
+        st.secfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 24)
+        st.lotfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 8)
+
+        st.qq_side = 30  # length of each side for a QQ in px
+        st.sec_line_stroke = 1  # section-line stroke width in px
+        st.ql_stroke = 1  # quarter line stroke width in px
+        st.qql_stroke = 1  # quarter-quarter line stroke width in px
+
+        st.y_margin = 120
+        st.y_twprge_margin = 10
+        st.dim = (st.qq_side * 4 * 6 + st.y_margin * 2,
+                  st.qq_side * 4 * 6 + st.y_margin * 2)
+
+        # RGBA values for color of various sec/Q lines and fonts
+        st.sec_line_RGBA = Settings.RGBA_BLACK
+        st.ql_RGBA = (160, 160, 160, 255)
+        st.qql_RGBA = (224, 224, 224, 224)
+        st.headerfont_RGBA = Settings.RGBA_BLACK
+        st.tractfont_RGBA = Settings.RGBA_BLACK
+        st.secfont_RGBA = Settings.RGBA_BLACK
+
+        # How wide the whited-out centerbox in each section should be:
+        st.centerbox_wh = 40
+
+        # How many px set in from top-left corner of QQ box to write lot numbers
+        st.lot_num_offset_px = 4
+
+        return st
+
+    @staticmethod
+    def s_preset():
+        """Return a new Settings object with 'small' defaults."""
+        st = Settings()
+        st.headerfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 20)
+        st.tractfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 14)
+        st.secfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 14)
+
+        st.qq_side = 20  # length of each side for a QQ in px
+        st.sec_line_stroke = 2  # section-line stroke width in px
+        st.ql_stroke = 1  # quarter line stroke width in px
+        st.qql_stroke = 1  # quarter-quarter line stroke width in px
+
+        st.y_margin = 40
+        st.y_twprge_margin = 4
+        st.dim = (st.qq_side * 4 * 6 + st.y_margin * 2,
+                  st.qq_side * 4 * 6 + st.y_margin * 2)
+
+        # RGBA values for color of various sec/Q lines and fonts
+        st.sec_line_RGBA = Settings.RGBA_BLACK
+        st.ql_RGBA = (128, 128, 128, 255)
+        st.qql_RGBA = (230, 230, 230, 255)
+        st.headerfont_RGBA = Settings.RGBA_BLACK
+        st.tractfont_RGBA = Settings.RGBA_BLACK
+        st.secfont_RGBA = Settings.RGBA_BLACK
+
+        # How wide the whited-out centerbox in each section should be:
+        st.centerbox_wh = 24
+        return st
+
+    @staticmethod
+    def xs_preset():
+        """Return a new Settings object with 'extra-small' defaults."""
+        st = Settings()
+        st.headerfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 18)
+        st.tractfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 14)
+        st.secfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 12)
+
+        st.qq_side = 14  # length of each side for a QQ in px
+        st.sec_line_stroke = 1  # section-line stroke width in px
+        st.ql_stroke = 1  # quarter line stroke width in px
+        st.qql_stroke = 1  # quarter-quarter line stroke width in px
+
+        st.y_margin = 40
+        st.y_twprge_margin = 2
+        st.dim = (st.qq_side * 4 * 6 + st.y_margin * 2,
+                  st.qq_side * 4 * 6 + st.y_margin * 2)
+
+        # RGBA values for color of various sec/Q lines and fonts
+        st.sec_line_RGBA = Settings.RGBA_BLACK
+        st.ql_RGBA = (128, 128, 128, 255)
+        st.qql_RGBA = (230, 230, 230, 255)
+        st.headerfont_RGBA = Settings.RGBA_BLACK
+        st.tractfont_RGBA = Settings.RGBA_BLACK
+        st.secfont_RGBA = (196, 196, 196, 100)
+
+        # How wide the whited-out centerbox in each section should be:
+        st.centerbox_wh = 20
+        return st
 
 
-class Township():
-    """A single Township/Range, and its 36 sections."""
+class Plat():
+    """An object containing an image of a 36-section plat (in `.image`),
+    as well as various attributes for platting on top of it. Notably,
+    `.sec_coords` is a dict of the pixel coordinates for the NWNW corner
+    of each of the 36 sections (keyed by integers 1 - 36, inclusive)."""
 
-    # Sections 1-6, 13-18, and 25-30 (inclusive) are east-to-west (i.e. right-to-left)
-    # -- all other sections are left-to-right.
-    right_to_left_sections = list(range(1,7)) + list(range(13,19)) + list(range(25,31))
-
-    def __init__(self, twp='', rge='', nonstandard_lot_definitions=None):
-
-        # If used, `nonstandard_lot_definitions` must be a dict, keyed
-        # by EACH section (as an integer) that contains nonstandard
-        # lots-to-QQ definitions, thus:
-        #
-        # nonstandard_lot_definitions = {
-        #        1: {'L1': 'SENW', 'L2': 'SWNW', 'L3': 'NESW'},
-        #        25: {'L1': 'N2NE', 'L2': 'N2NW'}
-        #    }
-
-        total_sections = 36
-
+    def __init__(self, twp='', rge='', only_section=None, settings=None):
         self.twp = twp
         self.rge = rge
-        self.TR = twp + rge
-        self.sections = {}
+        self.TR = twp+rge
+        if settings is None:
+            settings = Settings()
+        self.settings = settings
+        dim = settings.dim
 
-        # Sections "snake" from the NE corner of the township west then
-        # down, then they cut back east, then down and west again, etc.,
-        # thus:
+        self.image = Image.new('RGBA', dim, Settings.RGBA_WHITE)
+        self.draw = ImageDraw.Draw(self.image, 'RGBA')
+
+        # A dict of the sections and the (x,y) coords of their NWNW corner:
+        self.sec_coords = {}
+
+        # Draw the standard 36 sections, or the `only_section` (an int).
+        # (If `only_section` is None, then will draw all 36 in 6x6 grid.)
+        self._draw_all_sections(only_section=only_section)
+        self.header = self._gen_header(only_section=only_section)
+
+        if self.settings.write_header:
+            self._write_header()
+
+        # Overlay on which we'll plat QQ's
+        self.overlay = Image.new('RGBA', self.image.size, (255, 255, 255, 0))
+        self.overlay_draw = ImageDraw.Draw(self.overlay, 'RGBA')
+
+    def _gen_header(self, only_section=None):
+        """Generate the text of a header containing the T&R and/or
+        Section number."""
+
+        twptxt = ''
+        if '' not in [self.twp, self.rge]:
+            # If twp and rge were specified
+            twptxt = '{Township/Range Error}'
+
+            twp = str(self.twp)
+            rge = str(self.rge)
+
+            twpNum = '0'
+            rgeNum = '0'
+            NS = 'undefined'
+            EW = 'undefined'
+            twprge_fail = False
+
+            if twp[-1].lower() == 'n':
+                NS = 'North'
+                twpNum = twp[:-1]
+            elif twp[-1].lower() == 's':
+                NS = 'South'
+                twpNum = twp[:-1]
+            else:
+                twprge_fail = True
+
+            if rge[-1].lower() == 'e':
+                EW = 'East'
+                rgeNum = rge[:-1]
+            elif rge[-1].lower() == 'w':
+                EW = 'West'
+                rgeNum = rge[:-1]
+            else:
+                twprge_fail = True
+
+            if 'TRerr' in [twp, rge]:
+                twptxt = '{Township/Range Error}'
+            elif twprge_fail:
+                twptxt = ''
+            else:
+                twptxt = f'Township {twpNum} {NS}, Range {rgeNum} {EW}'
+
+        if only_section is not None:
+            # If we're platting a single section.
+            return f"{twptxt}{', ' * (len(twptxt) > 0)}Section {only_section}"
+        else:
+            return twptxt
+
+    def _draw_all_sections(self, only_section=None):
+        """Draw the 36 sections in the standard 6x6 grid."""
+        w, h = self.settings.dim
+
+        # We'll horizontally center our plat on the page.
+        x_start = (w - (self.settings.qq_side * 4 * 6)) // 2
+
+        # The plat will start this many px below the top of the page.
+        y_start = self.settings.y_margin
+
+        # PLSS sections "snake" from the NE corner of the township west
+        # then down, then they cut back east, then down and west again,
+        # etc., thus:
         #           6   5   4   3   2   1
         #           7   8   9   10  11  12
         #           18  17  16  15  14  13
@@ -54,441 +314,139 @@ class Township():
         #           31  32  33  34  35  36
         #
         # ...so accounting for this is a little trickier:
-        for secNum in range(1, total_sections + 1):
-            x = (secNum - 1) // 6
-            if secNum in Township.right_to_left_sections:
-                y = -secNum % 6
-            else:
-                y = secNum % 6
-            self.sections[secNum] = {
-                'coord': (x, y),
-                'section_data': Section.from_TwpRgeSec(
-                    twp=twp, rge=rge, sec=secNum, defaultNS='n', defaultEW='w')
-            }
+        sec_nums = list(range(6, 0, -1))
+        sec_nums.extend(list(range(7, 13)))
+        sec_nums.extend(list(range(18, 12, -1)))
+        sec_nums.extend(list(range(19, 25)))
+        sec_nums.extend(list(range(30, 24, -1)))
+        sec_nums.extend(list(range(31, 37)))
 
-        if isinstance(nonstandard_lot_definitions, dict):
-            for key, val in nonstandard_lot_definitions.items():
-                try:
-                    self.apply_lot_definitions(key, val)
-                except:
-                    raise Exception('Error: lot_definitions improperly formatted. '
-                                    'See documentation for proper formatting.')
-
-    def apply_lot_definitions(self, section_number : int, lot_definitions : dict):
-        if isinstance(lot_definitions, dict):
-            raise TypeError('lot_definitions must be dict')
-        self.sections[int(section_number)]['section_data'].lot_definitions = lot_definitions
-
-    def filled_sections(self):
-        x_sec = []
-        for secNum, val in self.sections.items():
-            if val['section_data'].has_any():
-                x_sec.append(val['section_data'])
-        return x_sec
-
-
-class Section():
-
-    # A few default lot_definitions, based on standard 36-section
-    # Township grid. (Sections along the north and west boundaries of
-    # the township have 'expected' lot locations. In practice, these
-    # will rarely be the only lots in a township, and they are not
-    # always consistent, even within these sections. Even so, it is
-    # better than nothing.)
-    def_LD_01_thru_05 = {
-        'L1': 'NENE',
-        'L2': 'NWNE',
-        'L3': 'NENW',
-        'L4': 'NWNW'
-    }
-
-    def_LD_06 = {
-        'L1': 'NENE',
-        'L2': 'NWNE',
-        'L3': 'NENW',
-        'L4': 'NWNW',
-        'L5': 'SWNW',
-        'L6': 'NWSW',
-        'L7': 'SWSW',
-    }
-
-    def_LD_07_18_30_31 = {
-        'L1': 'NWNW',
-        'L2': 'SWNW',
-        'L3': 'NWSW',
-        'L4': 'SWSW'
-    }
-
-    # A backstop lot_definitions.
-    def_LD_na = {}
-
-    def __init__(self, trs='', lot_definitions=None):
-        self.trs = trs.lower()
-        twp, rge, sec = pyTRS.break_trs(trs)
-        self.twp = twp
-        self.rge = rge
-        self.sec = sec
-        self.tr = twp+rge
-
-        try:
-            secNum = int(sec)
-        except:
-            secNum = 0
-
-        if lot_definitions is None:
-            if secNum > 0 and secNum <= 5:
-                lot_definitions = Section.def_LD_01_thru_05
-            elif secNum == 6:
-                lot_definitions = Section.def_LD_06
-            elif secNum in [7, 18, 30, 31]:
-                lot_definitions = Section.def_LD_07_18_30_31
-            else:
-                lot_definitions = Section.def_LD_na
-
-        self.lot_definitions = lot_definitions
-
-        # A dict for the 16 aliquot divisions of a standard section,
-        # with (0, 0) being NWNW and (3, 3) being SESE -- i.e. beginning
-        # at the NWNW, and running east and south. The nested dict for
-        # each QQ contains the x,y coordinates in the grid, and whether
-        # that QQ has been included -- i.e. 'val', which is either
-        # 0 ('nothing') or 1 ('something') to track whether the QQ
-        # (or equivalent Lot) was identified in the tract description.
-        self.QQgrid = {
-            'NWNW': {'coord':(0, 0), 'val': 0},
-            'NENW': {'coord':(1, 0), 'val': 0},
-            'NWNE': {'coord':(2, 0), 'val': 0},
-            'NENE': {'coord':(3, 0), 'val': 0},
-            'SWNW': {'coord':(0, 1), 'val': 0},
-            'SENW': {'coord':(1, 1), 'val': 0},
-            'SWNE': {'coord':(2, 1), 'val': 0},
-            'SENE': {'coord':(3, 1), 'val': 0},
-            'NWSW': {'coord':(0, 2), 'val': 0},
-            'NESW': {'coord':(1, 2), 'val': 0},
-            'NWSE': {'coord':(2, 2), 'val': 0},
-            'NESE': {'coord':(3, 2), 'val': 0},
-            'SWSW': {'coord':(0, 3), 'val': 0},
-            'SESW': {'coord':(1, 3), 'val': 0},
-            'SWSE': {'coord':(2, 3), 'val': 0},
-            'SESE': {'coord':(3, 3), 'val': 0}
-        }
-
-    @staticmethod
-    def from_TwpRgeSec(twp='', rge='', sec='', defaultNS='n', defaultEW='w',
-                      lot_definitions=None):
-        """Construct a Section with Twp, Rge, and Section separately."""
-        if isinstance(twp, int):
-            twp = str(twp) + defaultNS
-        if isinstance(rge, int):
-            rge = str(rge) + defaultEW
-        if isinstance(sec, int):
-            sec = str(sec).rjust(2, '0')
-
-        trs = twp + rge + sec
-
-        return Section(trs, lot_definitions=lot_definitions)
-
-    @staticmethod
-    def from_tract(TractObj : pyTRS.Tract, lot_definitions=None):
-        """Create a Section object from a pyTRS.Tract object and
-        incorporate the lotList and QQList."""
-        twp, rge, sec = TractObj.twp, TractObj.rge, TractObj.sec
-        secObj = Section.from_TwpRgeSec(twp, rge, sec, lot_definitions=lot_definitions)
-        secObj.incorporate_tract(TractObj)
-
-        return secObj
-
-    def incorporate_tract(self, TractObj : pyTRS.Tract):
-        self.incorporate_QQList(TractObj.QQList)
-        self.incorporate_lotList(TractObj.lotList)
-
-    def incorporate_lotList(self, lotList : list):
-
-        # QQ equivalents to Lots
-        equiv_qq = []
-
-        # Convert each lot to its equivalent QQ, per the lot_definitions
-        for lot in lotList:
-            # Cull lot divisions (i.e. 'N2 of L1' to just 'L1')
-            lot = lot.split(' ')[-1]
-            try:
-                equiv_qq.append(self.lot_definitions[lot])
-            except:
-                raise Exception(f'Error: Unhandled lot: {lot}. '
-                                f'Define `lot_definitions` for section {self.sec}')
-        final_equiv_qq = []
-
-        # Check if the lot comprises multiple QQ's (e.g., 'L1' --> 'NENE' and 'NWNE')
-        for qq in equiv_qq:
-            qq_unpacked = [qq]
-            if '2' in qq or '½' in qq or qq.lower() == 'all':
-                qq_unpacked = pyTRS.unpack_aliquots(qq)
-            final_equiv_qq.extend(qq_unpacked)
-
-        self.incorporate_QQList(final_equiv_qq)
-
-    def incorporate_QQList(self, QQList : list):
-        for qq in QQList:
-            self.QQgrid[qq]['val'] = 1
-
-    def output_plat(self, includeHeader=False) -> str:
-        """Output a plat (as a string) of the Section grid values."""
-
-        ar = self.output_array()
-        for row in ar:  # TESTING
-            print(row)  # TESTING
-        total_columns = len(ar[0])
-        total_rows = len(ar)
-        box_width = 4
-        box_height = 1
-        total_width = 1 + total_columns * (box_width + 1)
-
-        header = '=' * total_width + '\n' + self.trs.center(total_width)
-
-        plat_txt = '=' * total_width
-        rows_written = 0
-        for row in ar:
-            drawn_row = '|'
-            for col in row:
-                draw = ' ' * box_width
-                if col != 0:
-                    draw = 'X' * box_width
-
-                drawn_row = drawn_row + draw + '|'
-            plat_txt = plat_txt + ( '\n' + drawn_row ) * box_height
-            rows_written += 1
-            if rows_written != total_rows:
-                plat_txt = plat_txt + '\n' + '|'
-                plat_txt = plat_txt + ('-' * box_width + '+') * (total_columns - 1)
-                plat_txt = plat_txt + '-' * box_width + '|'
-
-        plat_txt = plat_txt + '\n' + '=' * total_width
-
-        return (header + '\n') * includeHeader + plat_txt
-
-    def output_array(self) -> list:
-        """Convert the grid to an array (oriented NWNW to SESE)"""
-
-        max_x = 0
-        max_y = 0
-        for qq in self.QQgrid.values():
-            if qq['coord'][0] > max_x:
-                max_x = qq['coord'][0]
-            if qq['coord'][1] > max_y:
-                max_y = qq['coord'][1]
-
-        # Create an array of all zero-values, with equal dimensions as
-        # in the Section.QQgrid (which is 4x4 in a standard section).
-        ar = [[0 for _a in range(max_x + 1)] for _b in range(max_y + 1)]
-
-        for qq in self.QQgrid.values():
-            x = qq['coord'][0]
-            y = qq['coord'][1]
-            if qq['val'] != 0:
-                ar[y][x] = qq['val']
-
-        return ar
-
-    def filled_coords(self) -> list:
-        """Return a list of coordinates in the Section that are filled."""
-        ar = self.output_array()
-        filled = []
-        for y in range(len(ar)):
-            for x in range(len(ar[y])):
-                if ar[y][x] != 0:
-                    filled.append((x,y))
-        return filled
-
-    def has_any(self):
-        """Return a bool, whether at least one QQ is filled."""
-        ar = self.output_array()
-        for i in ar:
-            for j in i:
-                if j != 0:
-                    return True
-        return False
-
-
-def plss_to_grid(PLSSDescObj: pyTRS.PLSSDesc) -> dict:
-    """Generate a dict of all townships (keyed by T&R) in a parsed
-    PLSSDesc object."""
-    tl = PLSSDescObj.parsedTracts
-
-    all_twps = {}
-    # tract_sorter = {}
-    for tractObj in tl:
-        twp, rge, sec = pyTRS.break_trs(tractObj.trs)
-        if twp == 'TRerr' or sec == 'secError':
-            # TODO: handle error parses.
-            print('ruh-roh')
-            continue
-        elif twp+rge not in all_twps:
-            all_twps[twp + rge] = Township(twp=twp, rge=rge)
-            # tract_sorter[twp+rge] = [tractObj]
+        # Generate sections on the plat, and number them.
+        if only_section is not None:
+            # If drawing only one section
+            self._draw_sec((x_start, y_start), section=only_section)
+            self.sec_coords[int(only_section)] = (x_start, y_start)
         else:
-            pass
-            # tract_sorter[twp+rge].append(tractObj)
-        all_twps[twp + rge].sections[int(sec)]['section_data'].incorporate_tract(tractObj)
+            # If drawing all 36 sections
+            for i in range(6):
+                for j in range(6):
+                    sec_num = sec_nums.pop(0)
+                    cur_x = x_start + self.settings.qq_side * 4 * j
+                    cur_y = y_start + self.settings.qq_side * 4 * i
+                    self._draw_sec((cur_x, cur_y), section=sec_num)
+                    self.sec_coords[sec_num] = (cur_x, cur_y)
 
-    return all_twps
+    def _write_header(self, text=None):
+        """Write the T&R at the top of the page."""
 
+        if text is None:
+            text = self.header
 
-########################################################################
-# Platting with PIL
-########################################################################
+        W = self.image.width
+        w, h = self.draw.textsize(text, font=self.settings.headerfont)
 
-def plat_twp(township: Township, output_file=None, RGB=(255, 0, 0), tracts=None) -> Image:
-    """Generate a plat of a Township, and optionally save to
-    output_file. Returns an Image object."""
+        # Center horizontally and write `settings.y_twprge_margin` px above top section
+        text_x = (W - w) / 2
+        text_y = self.settings.y_margin - h - self.settings.y_twprge_margin
+        self.draw.text(
+            (text_x, text_y),
+            text,
+            font=self.settings.headerfont,
+            fill=self.settings.headerfont_RGBA)
 
-    twpfnt = ImageFont.truetype(r'C:\WINDOWS\FONTS\ARIAL.TTF', 48)
-    tractfnt = ImageFont.truetype(r'C:\WINDOWS\FONTS\ARIAL.TTF', 28)
+    def output(self, filepath=None):
+        """Merge the drawn overlay (i.e. filled QQ's) onto the base
+        township plat image and return an Image object. Optionally save
+        to file if `filepath=<filepath>` is specified."""
+        merged = Image.alpha_composite(self.image, self.overlay)
 
-    # RGBA value for the fill of the QQ squares.
-    r, g, b = RGB
-    RGBA = (r, g, b, 100)
+        # TODO: Add the option with *args to specify which layers get
+        #   included in the output. That also will require me to have
+        #   separate layers for QQ's, the grid, labels, etc.
+        #   And that, in turn, will require me to change methods to
+        #   /plat/ onto multiple layers.
 
-    ####################################################################
-    # im_dict is the pixel of the NWNW corner of the respective section,
-    # on the tplat base img. Each QQ square is 47x47 pixels (or nearly).
-    # But some minor tweaks are needed (until I get around to cleaning
-    # up the base image).
+        if filepath is not None:
+            merged.save(filepath)
 
-    im_dict = {
-        1: (1217, 163)
-    }
+        return merged
 
-    for i in range(2, 7):
-        x, y = im_dict[i - 1]
-        im_dict[i] = (x - 47 * 4, y)
-
-    x, y = im_dict[6]
-    im_dict[7] = (x, y + 47 * 4 + 1)
-
-    for i in range(8, 13):
-        x, y = im_dict[i - 1]
-        im_dict[i] = (x + 47 * 4, y)
-
-    x, y = im_dict[12]
-    im_dict[13] = (x, y + 47 * 4 + 1)
-
-    for i in range(14, 19):
-        x, y = im_dict[i - 1]
-        im_dict[i] = (x - 47 * 4, y)
-
-    x, y = im_dict[18]
-    im_dict[19] = (x, y + 47 * 4 + 1)
-
-    for i in range(20, 25):
-        x, y = im_dict[i - 1]
-        im_dict[i] = (x + 47 * 4, y)
-
-    x, y = im_dict[24]
-    im_dict[25] = (x, y + 47 * 4 + 1)
-
-    for i in range(26, 31):
-        x, y = im_dict[i - 1]
-        im_dict[i] = (x - 47 * 4, y)
-
-    x, y = im_dict[30]
-    im_dict[31] = (x, y + 47 * 4 + 1)
-
-    for i in range(32, 37):
-        x, y = im_dict[i - 1]
-        im_dict[i] = (x + 47 * 4, y)
-
-    ####################################################################
-
-    def gen_overlay(image):
-        overlay = Image.new('RGBA', image.size, (255, 255, 255, 0))
-        drawObj = ImageDraw.Draw(overlay, 'RGBA')
-
-        return overlay, drawObj
-
-    def draw_qq(drawObj, section: int, grid_location: tuple, RGBA):
-        """Draw the QQ """
-
-        s_len = 46  # length of square side (in px)
-
-        # Get the pixel location of the NWNW corner of the section:
-        xy_start = im_dict[section]
-        x_start, y_start = xy_start
-
-        x_grid, y_grid = grid_location
-
-        # Get the pixel location of the NWNW corner of the QQ, per the grid_location
-        x_start = x_start + s_len * x_grid
-        y_start = y_start + s_len * y_grid
-
-        # Weird offset in the base image requires some semi-manual tweaking...
-        if y_grid >= 2:
-            y_start += 1
-            if section >= 13:
-                y_start += 1
-            if section >= 31:
-                y_start += 1
-
-        # Draw the QQ
-        drawObj.polygon(
-            [(x_start, y_start), (x_start + s_len, y_start),
-             (x_start + s_len, y_start + s_len), x_start, y_start + s_len],
-            RGBA
-        )
-
-    def plat_section(drawObj, SecObj):
-        """Take the Section object and draw any filled QQ's (per the
-        Section.grid)."""
+    def plat_section(self, SecObj, qq_fill_RGBA=None):
+        """Take the SectionGrid object and fill any ticked QQ's (per the
+        `SectionGrid.QQgrid` values)."""
         secNum = int(SecObj.sec)
         # TODO: Handle secError
         for coord in SecObj.filled_coords():
-            draw_qq(drawObj, secNum, coord, RGBA)
+            self.fill_qq(secNum, coord, qq_fill_RGBA=qq_fill_RGBA)
+        self.write_lots(SecObj)
 
-    def write_twprge(im):
-        """Write the T&R at the top of the page."""
+    @staticmethod
+    def from_section_grid(section : SectionGrid, tracts=None, settings=None):
+        """Return a section-only plat generated from a SectionGrid object."""
+        # TODO: Write this method for a section-only plat, rather than 6x6 grid.
+        platObj = Plat(
+            twp=section.twp,
+            rge=section.rge,
+            settings=settings,
+            only_section=section.sec)
+        platObj.plat_section(section)
+        platObj.write_all_tracts(tracts)
+        return platObj
 
-        if twp != 'TRerr':
-            twpNum, NS, rgeNum, EW = pyTRS.decompile_tr(twp + rge)
-            if NS == 'n':
-                NS = 'North'
-            else:
-                NS = 'South'
-            if EW == 'w':
-                EW = 'West'
-            else:
-                EW = 'East'
-            twptxt = f'Township {twpNum} {NS}, Range {rgeNum} {EW}'
-        else:
-            twptxt = '{Township/Range Error}'
-        text_draw = ImageDraw.Draw(im)
-        W, H = new_plat.size
-        w, h = text_draw.textsize(twptxt, font=twpfnt)
-        text_draw.text(((W - w) / 2, 48), twptxt, font=twpfnt, fill=(0, 0, 0, 100))
+    @staticmethod
+    def from_township_grid(township, tracts=None, settings=None):
+        """Return a Plat object generated from a TownshipGrid object."""
+        twp = township.twp
+        rge = township.rge
+        platObj = Plat(twp=twp, rge=rge, settings=settings)
+        platObj.plat_township(township=township, tracts=tracts)
+        return platObj
 
-    def write_all_tracts(im):
-        if tracts is None:
+    def plat_township(self, township, tracts=None):
+        """Project a TownshipGrid object onto an existing Plat object."""
+
+        # Generate the list of sections that have anything in them.
+        sec_list = township.filled_sections()
+
+        # Plat each Section's filled QQ's onto our new overlay.
+        for sec in sec_list:
+            if self.settings.write_lot_numbers:
+                # If so configured in settings, write lot numbers onto QQ's
+                self.write_lots(sec)
+            self.plat_section(sec)
+
+        # Write the Tract data to the bottom of the plat.
+        self.write_all_tracts(tracts)
+
+        return self.output()
+
+    def write_all_tracts(self, tracts=None):
+        """Write all the tract descriptions at the bottom of the plat."""
+        if tracts is None or not self.settings.write_tracts:
             return
+
+        # Save line space later in by setting this variable:
+        settings = self.settings
+
         y_spacer = 10  # This many px between tracts.
         total_px_written = 0
 
-        text_draw = ImageDraw.Draw(im)
-
         # starting coord for the first tract.
-        start_x = 100
-        start_y = 1350
+        start_x = settings.tract_indent
+        start_y = settings.y_margin + settings.qq_side * 4 * 6 + settings.px_before_tracts
         x, y = (start_x, start_y)
 
-        min_y_margin = 80
-        max_px = im.height - start_y - min_y_margin
+        max_px = self.image.height - start_y - settings.bottom_y_margin
 
         tracts_written = 0
         for tract in tracts:
             # x and y are returned from write_tract(); x stays the same, but y is updated
             last_y = y
-            RGBA = (0, 0, 0, 100)
+            font_RGBA = self.settings.tractfont_RGBA
             if len(tract.lotQQList) == 0:
                 # If no lots/QQs were identified, we'll write the tract in red
-                RGBA = (255, 0, 0, 100)
-            x, y = write_tract(text_draw, (x, y), tract, RGBA=RGBA)
+                font_RGBA = Settings.RGBA_RED
+            x, y = self._write_tract((x, y), tract, font_RGBA=font_RGBA)
             y += y_spacer
             total_px_written = y - start_y
             tracts_written += 1
@@ -499,104 +457,324 @@ def plat_twp(township: Township, output_file=None, RGB=(255, 0, 0), tracts=None)
                 else:
                     # Write a warning that we ran out of space to write tracts.
                     warning = '[AND OTHER TRACTS]'
-                    text_draw.text((x, y), warning, font=tractfnt, fill=(255, 0, 0, 100))
+                    self.draw.text(
+                        (x, y),
+                        warning,
+                        font=self.settings.tractfont,
+                        fill=Settings.RGBA_RED)
                     break
 
-    def write_tract(drawObj, start_xy, TractObj, RGBA = (0, 0, 0, 100)):
+    def _write_tract(self, start_xy, TractObj, font_RGBA=None):
         """Write the parsed Tract object on the page."""
+
+        if font_RGBA is None:
+            font_RGBA = self.settings.tractfont_RGBA
+
         x, y = start_xy
         tract_text = TractObj.quick_desc()
-        w, h = drawObj.textsize(tract_text, font=tractfnt)
-        drawObj.text(start_xy, tract_text, font=tractfnt, fill=RGBA)
+        w, h = self.draw.textsize(tract_text, font=self.settings.tractfont)
+        self.draw.text(
+            start_xy,
+            tract_text,
+            font=self.settings.tractfont,
+            fill=font_RGBA)
         return x, y + h
 
-    def merge_plat(base, overlay):
-        """Merge the drawn overlay (i.e. filled QQ's) onto the base
-        township plat image, draw Township and Tract info, and return
-        as an Image object."""
-        return Image.alpha_composite(base, overlay)
+    #TODO: def write_custom_text(self, start_xy, text, font_RGBA)
 
-    # Get our new plat Image object, the overlay, and a Draw object for the overlay
-    new_plat = Image.open(r'assets/tplat.png').convert('RGBA')
-    overlay, drawObj = gen_overlay(new_plat)
+    def write_lots(self, secObj):
+        """Write lot numbers in the top-left corner of the respective QQs."""
 
-    # Generate the list of sections that have anything in them.
-    sec_list = township.filled_sections()
-    twp = township.twp
-    rge = township.rge
+        def write_lot(lots_within_this_QQ: list, grid_location: tuple):
 
-    # Plat each Section's filled QQ's onto our new overlay.
-    for sec in sec_list:
-        plat_section(drawObj, sec)
+            # Get the pixel location of the NWNW corner of the section:
+            xy_start = self.sec_coords[int(secObj.sec)]
+            x_start, y_start = xy_start
 
-    # Merge the overlay onto the plat.
-    merged = merge_plat(new_plat, overlay)
+            # Break out the grid location of the QQ into x, y
+            x_grid, y_grid = grid_location
 
-    # Write the Township / Range as a header.
-    write_twprge(merged)
+            # Calculate the pixel location of the NWNW corner of the QQ.
+            # (Remember that qq_side is the length of each side of a QQ square.)
+            x_start = x_start + self.settings.qq_side * x_grid
+            y_start = y_start + self.settings.qq_side * y_grid
 
-    # Write the Tract data to the bottom of the plat.
-    write_all_tracts(merged)
+            # Offset x and y, as configured in settings.
+            x_start += self.settings.lot_num_offset_px
+            y_start += self.settings.lot_num_offset_px
 
-    merged = merged.convert('RGB')
+            # And lastly, join the lots into a string, and write the text.
+            self.draw.text(
+                (x_start, y_start),
+                text=', '.join(lots_within_this_QQ),
+                font=self.settings.lotfont,
+                fill=self.settings.lotfont_RGBA
+            )
 
-    # Save the final plat, if output_file was specified.
-    if output_file is not None:
-        merged.save(output_file)
+        # Each coords[y][x] contains a list of which lot(s) are at (x,y)
+        # in this particular section.  For example, 'L1' through 'L4' in
+        # a standard Section 1 correspond to the N2N2 QQ's, respectively
+        # -- so...
+        #       coords[0][0] -> ['L4']    # i.e. (0, 0), or the NWNW
+        #       coords[0][1] -> ['L3']    # i.e. (1, 0), or the NENW
+        #       coords[0][2] -> ['L2']    # i.e. (2, 0), or the NWNE
+        #       coords[0][3] -> ['L1']    # i.e. (3, 0), or the NENE
+        # ... and all other coords would be an empty list...
+        #       coords[2][1] -> []    # i.e. (1,2), or the NESW
+        #       coords[3][3] -> []    # i.e. (3,3), or the SESE
+        #       ...etc.
+        coords = secObj.lots_by_grid()
 
-    return merged
+        for y in range(len(coords)):
+            for x in range(len(coords[y])):
+                lots = coords[y][x]
+                if lots == []:
+                    continue
+                clean_lots = []
+                for lot in lots:
+                    # Delete leading 'L' from each lot, leaving only the digit,
+                    # and append to clean_lots
+                    clean_lots.append(lot.replace('L', ''))
+                write_lot(clean_lots, (x, y))
+
+    def fill_qq(self, section: int, grid_location: tuple, qq_fill_RGBA=None):
+        """Fill in the QQ at the `grid_location` coords, of the specified
+        `section`, on the `plat`, with the color specified in qq_fill_RGBA."""
+
+        if qq_fill_RGBA is None:
+            # If not specified, pull from plat settings.
+            qq_fill_RGBA = self.settings.qq_fill_RGBA
+
+        # Get the pixel location of the NWNW corner of the section:
+        xy_start = self.sec_coords[section]
+        x_start, y_start = xy_start
+
+        # Break out the grid location of the QQ into x, y
+        x_grid, y_grid = grid_location
+
+        # Calculate the pixel location of the NWNW corner of the QQ. (Remember
+        # that qq_side is the length of each side of a QQ square.)
+        x_start = x_start + self.settings.qq_side * x_grid
+        y_start = y_start + self.settings.qq_side * y_grid
+
+        # Draw the QQ
+        self.overlay_draw.polygon(
+            [(x_start, y_start),
+             (x_start + self.settings.qq_side, y_start),
+             (x_start + self.settings.qq_side, y_start + self.settings.qq_side),
+             (x_start, y_start + self.settings.qq_side)],
+            qq_fill_RGBA
+        )
+
+    def _draw_sec(self, xy_start, section=None):
+        """Draw the 4x4 grid of a section with a ImageDraw object, at the
+        specified coordinates. Optionally specify the section number with
+        `section=<int>`. If `settings=<Settings object> is not specified,
+        default settings will be used."""
+
+        x_start, y_start = xy_start
+
+        settings = self.settings
+
+        # Set this attribute to a shorter-named variable, just to save line space.
+        qqs = settings.qq_side
+
+        # We'll draw QQ lines, then Q lines, then Section boundary -- in
+        # that order, so that the color of the higher-order lines overrules
+        # the lower-order lines.
+
+        # Draw the quarter-quarter lines.
+        qq_lines = [
+            [(x_start + qqs * 1, y_start), (x_start + qqs * 1, y_start + qqs * 4)],
+            [(x_start + qqs * 3, y_start), (x_start + qqs * 3, y_start + qqs * 4)],
+            [(x_start, y_start + qqs * 1), (x_start + qqs * 4, y_start + qqs * 1)],
+            [(x_start, y_start + qqs * 3), (x_start + qqs * 4, y_start + qqs * 3)]
+        ]
+
+        for qq_line in qq_lines:
+            self.draw.line(
+                qq_line,
+                fill=settings.qql_RGBA,
+                width=settings.qql_stroke)
+
+        # Draw the quarter lines (which divide the section in half).
+        q_lines = [
+            [(x_start + qqs * 2, y_start), (x_start + qqs * 2, y_start + qqs * 4)],
+            [(x_start, y_start + qqs * 2), (x_start + qqs * 4, y_start + qqs * 2)]
+        ]
+
+        for q_line in q_lines:
+            self.draw.line(
+                q_line,
+                fill=settings.ql_RGBA,
+                width=settings.ql_stroke)
+
+        # Draw a white box in the center of the section.
+        x_center, y_center = (x_start + qqs * 2, y_start + qqs * 2)
+        cbwh = settings.centerbox_wh
+        centerbox = [
+            (x_center - (cbwh // 2), y_center - (cbwh // 2)),
+            (x_center - (cbwh // 2), y_center + (cbwh // 2) + 3),
+            (x_center + (cbwh // 2), y_center + (cbwh // 2)),
+            (x_center + (cbwh // 2), y_center - (cbwh // 2)),
+        ]
+        self.draw.polygon(centerbox, Settings.RGBA_WHITE)
+
+        # Draw the outer bounds of the section.
+        sec_sides = [
+            [(x_start, y_start), (x_start + qqs * 4, y_start)],
+            [(x_start + qqs * 4, y_start), (x_start + qqs * 4, y_start + qqs * 4)],
+            [(x_start + qqs * 4, y_start + qqs * 4), (x_start, y_start + qqs * 4)],
+            [(x_start, y_start + qqs * 4), (x_start, y_start)],
+        ]
+
+        for side in sec_sides:
+            self.draw.line(
+                side,
+                fill=settings.sec_line_RGBA,
+                width=settings.sec_line_stroke)
+
+        # If requested, write in the section number
+        if section is not None and settings.write_section_numbers:
+            # TODO: DEBUG -- Section numbers are printing very slightly
+            #   farther down than they should be. Figure out why.
+            w, h = self.draw.textsize(str(section), font=settings.secfont)
+            self.draw.text(
+                (x_center - (w // 2), y_center - (h // 2)),
+                str(section),
+                fill=settings.secfont_RGBA,
+                font=settings.secfont)
+            print(w, h)
+            print(x_center, y_center)
+            print(x_center - w//2, y_center - h//2)
 
 
-def plat_plss(PLSSDescObj: pyTRS.PLSSDesc, output_file=None):
-    """Generate a plat of a parsed PLSSDesc object, optionally saving to
-    a .pdf at the specified output filepath `output_file=`, and
-    returning a list of .png images of the plats.
-    (lots/QQs must be parsed within the Tracts for this to work.)"""
+class MultiPlat():
+    """An object to create, process, hold, and output one or more Plat
+    objects -- e.g., when there are multiple T&R's from a PLSSDesc obj."""
+    def __init__(self, settings=None):
 
-    twps = plss_to_grid(PLSSDescObj)
-    tracts = PLSSDescObj.parsedTracts
+        if settings is None:
+            settings = Settings()
+        self.settings = settings
 
-    # construct a dict to link Tracts to their respective Twps
-    all_twps = twps.keys()
-    twp_to_tract = {}
-    for k in all_twps:
-        twp_to_tract[k] = []
-    orphan_tracts = []  # Tracts whose T&R isn't found. # TODO: Handle these.
-    for tract in tracts:
-        TR = tract.twp + tract.rge
-        if TR in twp_to_tract.keys():
-            twp_to_tract[TR].append(tract)
+        # A list of generated plats
+        self.plats = []
+
+    @staticmethod
+    def from_multiple(*plat_targets, settings=None):
+        """Generate a cohesive MultiPlat from multiple sources,
+        optionally of different types."""
+        # TODO: Finish writing this method.
+        mp_obj = MultiPlat(settings=settings)
+
+        # A list of generated plats
+        mp_obj.plats = []
+
+        PLSSDesc_objs = []
+        Tract_objs = []
+        for p in plat_targets:
+            if isinstance(p, TownshipGrid):
+                mp_obj.plats.append(Plat.from_township_grid(p, settings=mp_obj.settings))
+            elif isinstance(p, SectionGrid):
+                mp_obj.plats.append(Plat.from_section_grid(p, settings=mp_obj.settings))
+            elif isinstance(p, PLSSDesc):
+                PLSSDesc_objs.append(p)
+            elif isinstance(p, Tract):
+                Tract_objs.append(p)
+        for d in PLSSDesc_objs:
+            Tract_objs.extend(d.parsedTracts)
+        twp_dict = {}
+        for t in Tract_objs:
+            twp_dict = filter_tracts_by_tr(t, twp_dict)
+        for township_key, v in twp_dict.items():
+            # TODO: plat_plss on each t,v
+            pass
+
+    @staticmethod
+    def from_PLSSDesc(PLSSDesc_obj, settings=None):
+        """Generate a MultiPlat from a parsed PLSSDesc object.
+        (lots/QQs must be parsed within the Tracts for this to work.)"""
+
+        mp_obj = MultiPlat(settings=settings)
+
+        # Generate a dict of TownshipGrid objects from the PLSSDesc object.
+        twp_grids = plss_to_grids(PLSSDesc_obj)
+
+        # Get a dict linking the the PLSSDesc object's parsed Tracts to their respective
+        # T&R's (keyed by T&R '000x000y' -- same as the twp_grids dict)
+        twp_to_tract = filter_tracts_by_tr(PLSSDesc_obj.parsedTracts)
+
+        # Generate Plat object of each township, and append it to mp_obj.plats
+        for k, v in twp_grids.items():
+            pl_obj = Plat.from_township_grid(v, tracts=twp_to_tract[k], settings=settings)
+            mp_obj.plats.append(pl_obj)
+
+        return mp_obj
+
+    def show(self, index: int):
+        try:
+            self.plats[index].output().show()
+        except:
+            return None
+
+    def output_to_pdf(self, filepath):
+        """Save all of the Plat images to a PDF at the specified
+        `filepath`."""
+        if not filepath.lower().endswith('.pdf'):
+            raise Exception('Error: filepath should end with `.pdf`')
+            return
+        plat_ims = self.output()
+        if len(plat_ims) == 0:
+            return
+        im1 = plat_ims.pop(0)
+        im1.save(filepath, save_all=True, append_images=plat_ims)
+
+    def output_to_png(self, filepath):
+        """Save all of the Plat images to PNG(s) at the specified
+        `filepath`. IMPORTANT: If there are multiple plats, then each
+        numbers (from '_000') will be added to the end of each, before
+        the file extension."""
+        if not filepath.lower().endswith('.png'):
+            raise Exception('Error: filepath should end with `.png`')
+            return
+        plat_ims = self.output()
+
+        if len(plat_ims) == 0:
+            return
+        elif len(plat_ims) == 1:
+            plat_ims[0].save(filepath)
         else:
-            orphan_tracts.append(tract)
+            i = 0
+            ext = '.png'
+            fp = filepath[:-len(ext)]
+            while len(plat_ims) > 0:
+                filepath = f"{fp}_{str(i).rjust(3,'0')}{ext}"
+                plat_ims.pop(0).save(filepath)
+                i += 1
 
-    plats = []
-    for k, v in twps.items():
-        plats.append(plat_twp(v, tracts=twp_to_tract[k]))
-
-    while output_file is not None:
-        if not output_file.lower().endswith('.pdf'):
-            raise Exception('Error: output_file should end with `.pdf`')
-            break
-        if len(plats) == 0:
-            break
-        im1 = plats[0]
-        if len(plats) > 0:
-            rem_plats = plats[1:]
-        else:
-            rem_plats = []
-        im1.save(output_file, save_all=True, append_images=rem_plats)
-        break
-
-    return plats
+    def output(self):
+        """Return a list of the Plat images."""
+        plat_ims = []
+        for p in self.plats:
+            plat_ims.append(p.output().convert('RGB'))
+        return plat_ims
 
 
-def plat(text, output_file, config='', launch=False):
-    parsed_desc = pyTRS.PLSSDesc(text, config=config, initParseQQ=True)
-    plat_plss(parsed_desc, output_file)
-    if launch:
-        import os
-        os.startfile(output_file)
+########################################################################
+# Platting text directly
+########################################################################
 
-desc_text = 'T154-R97 Sec 14: NE/4, Sec 22: W/2SW, SE/4; T155-R97 Sec 1: Lots 1 - 4, S2N2, T156N-R97W Sections 1 - 36: ALL'
-output = r'C:\Users\James Imes\Desktop\tplat_testing.pdf'
-plat(desc_text, output, config='n,w', launch=True)
+def plat_text(text, config=None, settings=None, output_filepath=None) -> list:
+    """Parse the text of a PLSS land description, and generate plat(s)
+    for the lands described. Optionally output to .png or .pdf with
+    `output_filepath=` (end with '.png' or '.pdf' to specify the output
+    file type).  Returns a list of Image objects of the plats."""
+    descObj = PLSSDesc(text, config=config, initParseQQ=True)
+    mp = MultiPlat.from_PLSSDesc(descObj, settings=settings)
+    if output_filepath is not None:
+        if output_filepath.lower().endswith('.pdf'):
+            mp.output_to_pdf(output_filepath)
+        elif output_filepath.lower().endswith('.png'):
+            mp.output_to_png(output_filepath)
+    return mp
