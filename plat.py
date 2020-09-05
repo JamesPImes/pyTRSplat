@@ -3,13 +3,15 @@
 """Generate plat images of full Townships (6x6 grid) or single Sections
 and incorporate parsed pyTRS PLSSDesc and Tract objects."""
 
-# TODO: Add kwargs for specifying lot_definitions for entire T&R's in several
-#  places -- e.g., Plat.from_PLSSDesc()
+# TODO: Add kwarg for specifying LotDefinitions for Tracts, and
+#  maybe TwpLotDefinitions where appropriate. (Have already implemented
+#  LDDB in at least some places.)
 
 from PIL import Image, ImageDraw, ImageFont
 from pyTRS import version as pyTRS_version
 from pyTRS.pyTRS import PLSSDesc, Tract
 from grid import TownshipGrid, SectionGrid, plss_to_grids, filter_tracts_by_tr
+from grid import LotDefinitions, TwpLotDefinitions, LotDefDB, confirm_file
 
 __version__ = '0.0.1'
 __versionDate__ = '8/31/2020'
@@ -17,7 +19,7 @@ __author__ = 'James P. Imes'
 __email__ = 'jamesimes@gmail.com'
 
 
-class Settings():
+class Settings:
     """Configurable or default settings for drawing sections / townships
     and generating Plat objects."""
 
@@ -211,7 +213,7 @@ class Settings():
         return st
 
 
-class Plat():
+class Plat:
     """An object containing an image of a 36-section plat (in `.image`),
     as well as various attributes for platting on top of it. Notably,
     `.sec_coords` is a dict of the pixel coordinates for the NWNW corner
@@ -644,16 +646,13 @@ class Plat():
                 str(section),
                 fill=settings.secfont_RGBA,
                 font=settings.secfont)
-            print(w, h)
-            print(x_center, y_center)
-            print(x_center - w//2, y_center - h//2)
 
 
-class MultiPlat():
+class MultiPlat:
     """An object to create, process, hold, and output one or more Plat
     objects -- e.g., when there are multiple T&R's from a PLSSDesc obj."""
-    def __init__(self, settings=None):
 
+    def __init__(self, settings=None):
         if settings is None:
             settings = Settings()
         self.settings = settings
@@ -692,19 +691,19 @@ class MultiPlat():
             pass
 
     @staticmethod
-    def from_PLSSDesc(PLSSDesc_obj, settings=None):
+    def from_PLSSDesc(PLSSDesc_obj, settings=None, lddb=None):
         """Generate a MultiPlat from a parsed PLSSDesc object.
         (lots/QQs must be parsed within the Tracts for this to work.)"""
 
         mp_obj = MultiPlat(settings=settings)
 
         # Generate a dict of TownshipGrid objects from the PLSSDesc object.
-        twp_grids = plss_to_grids(PLSSDesc_obj)
+        twp_grids = plss_to_grids(PLSSDesc_obj, lddb=lddb)
 
         # Get a dict linking the the PLSSDesc object's parsed Tracts to their respective
         # T&R's (keyed by T&R '000x000y' -- same as the twp_grids dict)
         twp_to_tract = filter_tracts_by_tr(PLSSDesc_obj.parsedTracts)
-
+#
         # Generate Plat object of each township, and append it to mp_obj.plats
         for k, v in twp_grids.items():
             pl_obj = Plat.from_township_grid(v, tracts=twp_to_tract[k], settings=settings)
@@ -712,7 +711,22 @@ class MultiPlat():
 
         return mp_obj
 
+    @staticmethod
+    def from_text(text, config=None, settings=None, lddb=None):
+        """Parse the text of a PLSS land description, and generate plat(s)
+        for the lands described. Returns a MultiPlat object of the plats."""
+
+        # If the user passed a filepath to a .csv file as `lddb`, create a
+        # LotDefDB object from that file now, and then pass that forward.
+        if confirm_file(lddb, '.csv'):
+            lddb = LotDefDB.from_csv(lddb)
+
+        descObj = PLSSDesc(text, config=config, initParseQQ=True)
+        return MultiPlat.from_PLSSDesc(descObj, settings=settings, lddb=lddb)
+
     def show(self, index: int):
+        """Display one of the plat Images, specifically the one in the
+        `.plats` list at the specified `index`."""
         try:
             self.plats[index].output().show()
         except:
@@ -753,7 +767,7 @@ class MultiPlat():
                 plat_ims.pop(0).save(filepath)
                 i += 1
 
-    def output(self):
+    def output(self) -> list:
         """Return a list of the Plat images."""
         plat_ims = []
         for p in self.plats:
@@ -761,20 +775,52 @@ class MultiPlat():
         return plat_ims
 
 
+class PlatQueue(list):
+    """A list object to hold the objects that will be projected onto a
+    Plat object, or into a MultiPlat object."""
+    def __init__(self, *queue_items):
+        super().__init__()
+        for item in queue_items:
+            if not isinstance(item, tuple):
+                raise TypeError(
+                    'items in a PlatQueue must be tuple, each containing a '
+                    'plattable object, and optionally Tract objects (or None)')
+            self.queue(item)
+
+    def queue(self, plattable, tracts=None):
+        self.append((plattable, tracts))
+
+
+# TODO: Implement PlatQueue objects into Plat and MultiPlat objects:
+#   Add items to be projected onto the plat (together with their Tract
+#   objects). Then add a method for each Plat to project them all at the
+#   same time.
+
+
 ########################################################################
 # Platting text directly
 ########################################################################
 
-def plat_text(text, config=None, settings=None, output_filepath=None) -> list:
+def text_to_plats(text, config=None, settings=None, lddb=None, output_filepath=None) -> list:
     """Parse the text of a PLSS land description, and generate plat(s)
     for the lands described. Optionally output to .png or .pdf with
     `output_filepath=` (end with '.png' or '.pdf' to specify the output
     file type).  Returns a list of Image objects of the plats."""
-    descObj = PLSSDesc(text, config=config, initParseQQ=True)
-    mp = MultiPlat.from_PLSSDesc(descObj, settings=settings)
+
+    mp = MultiPlat.from_text(text=text, config=config, settings=settings, lddb=lddb)
     if output_filepath is not None:
         if output_filepath.lower().endswith('.pdf'):
             mp.output_to_pdf(output_filepath)
         elif output_filepath.lower().endswith('.png'):
             mp.output_to_png(output_filepath)
-    return mp
+    return mp.output()
+
+
+# TODO: Bugfix:
+
+
+lddb_fp = LotDefDB.from_csv(r'C:\Users\James Imes\Box\Programming\pyTRS_plotter\assets\examples\SAMPLE_LDDB.csv')
+set1 = Settings()
+set1.write_lot_numbers = True
+#text_to_plats('T154N-R97W Sec 01: Lots 1 - 3, S2NE, Sec 22: Lots 1 - 8, S2NE', config='cleanQQ', lddb=lddb_fp, settings=set1)[0].show()
+text_to_plats('T154N-R97W Sec 01: Lots 1 - 3, S2NE, Sec 25: Lots 1 - 8', config='cleanQQ', lddb=lddb_fp, settings=set1)[0].show()
