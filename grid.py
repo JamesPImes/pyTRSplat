@@ -157,6 +157,21 @@ class LotDefinitions(dict):
         for lot, definition in dct.items():
             self.set_lot(lot, definition)
 
+    def lots_by_QQname(self) -> dict:
+        """Get a dict, with QQ's as keys, and whose values are each a
+        list of the lot(s) that correspond with those QQ's. Note that it
+        is possible for more than 1 lot per QQ, so the values are all
+        lists."""
+        ret_dict = {}
+        for k, v in self.items():
+            list_of_qqs = _smooth_QQs(v)
+            for qq in list_of_qqs:
+                if qq in ret_dict.keys():
+                    ret_dict[qq].append(k)
+                else:
+                    ret_dict[qq] = [k]
+        return ret_dict
+
 
 class TwpLotDefinitions(dict):
     """A dict of LotDefinition objects (i.e. a nested dict) for an
@@ -282,6 +297,8 @@ class SectionGrid:
         #   ('n' or 's' for twp; and 'e' or 'w' for rge). Without doing
         #   so, various functionality may break.
 
+        twp = twp.lower()
+        rge = rge.lower()
         self.twp = twp
         self.rge = rge
 
@@ -363,15 +380,9 @@ class SectionGrid:
         list of the lot(s) that correspond with those QQ's. Note that it
         is possible for more than 1 lot per QQ, so the values are all
         lists."""
-        ret_dict = {}
-        # TODO: Handle lots whose corresponding aliquots are > QQ (e.g. 'L1' -> 'N2NE')
-        #   Need to break these down into QQs.
-        for k, v in self.lot_definitions.items():
-            if v in ret_dict.keys():
-                ret_dict[v].append(k)
-            else:
-                ret_dict[v] = [k]
-        return ret_dict
+
+        # This functionality is handled by LotDefinitions object.
+        return self.lot_definitions.lots_by_QQname()
 
     def lots_by_grid(self) -> list:
         """Convert the `lot_definitions` into a grid (nested list) of
@@ -399,7 +410,7 @@ class SectionGrid:
         """Create a SectionGrid object from a pyTRS.Tract object and
         incorporate the lotList and QQList."""
         twp, rge, sec = TractObj.twp, TractObj.rge, TractObj.sec
-        secObj = SectionGrid.from_TwpRgeSec(twp, rge, sec, ld=ld)
+        secObj = SectionGrid(sec=sec, twp=twp, rge=rge, ld=ld)
         secObj.incorporate_tract(TractObj)
 
         return secObj
@@ -415,29 +426,55 @@ class SectionGrid:
         # QQ equivalents to Lots
         equiv_qq = []
 
-        # Convert each lot to its equivalent QQ, per the lot_definitions
+        # Convert each lot to its equivalent QQ, per the lot_definitions, and
+        # add them to the equiv_qq list.
         for lot in lotList:
-            # Cull lot divisions (i.e. 'N2 of L1' to just 'L1')
-            lot = lot.split(' ')[-1]
-            try:
-                equiv_qq.append(self.lot_definitions[lot])
-            except:
+            # First remove any divisions in the lot (e.g., 'N2 of L1' -> 'L1')
+            lot = _lot_without_div(lot)
+
+            eq_qqs_from_lot = self._unpack_ld(lot)
+            if eq_qqs_from_lot is None:
                 self.unhandled_lots.append(lot)
-        final_equiv_qq = []
+                continue
+            equiv_qq.extend(eq_qqs_from_lot)
 
-        # Ensure each equivalent QQ identified so far is in the expected format
-        # and is broken out into QQ chunks maximum (e.g., a 'L1' that is defined
-        # as 'N2NE4' should be converted to 'NENE' and 'NWNE')
-        for qq in equiv_qq:
-            qq_unpacked = _smooth_QQs(qq)
-            final_equiv_qq.extend(qq_unpacked)
-
-        self.incorporate_QQList(final_equiv_qq)
+        self.incorporate_QQList(equiv_qq)
 
     def incorporate_QQList(self, QQList : list):
         """Incorporate all QQs in the QQList into the grid."""
+
+        # `qq` can be fed in as 'NENE' or 'NENE,NWNE'. So we need to break it
+        # into components before incorporating.
         for qq in QQList:
-            self.QQgrid[qq]['val'] = 1
+            for qq_ in qq.replace(' ', '').split(','):
+                self.QQgrid[qq_]['val'] = 1
+
+    def _unpack_ld(self, lot) -> list:
+        """Pass a lot number (string 'L1' or int 1), and get a list of the
+        corresponding / properly formatted QQ(s) from the
+        `.lot_definitions` of this SectionGrid object. Returns None if
+        the lot is undefined, or defined with invalid QQ's."""
+
+        equiv_aliquots = []
+        # Cull lot divisions (i.e. 'N2 of L1' to just 'L1')
+        lot = _lot_without_div(lot)
+
+        # Get the raw definition from the LotDefinitions object.
+        # If undefined in the LD obj, return None.
+        raw_ldef = self.lot_definitions.get(lot, None)
+        if raw_ldef is None:
+            return None
+
+        # Ensure the raw lot definition is in the expected format and is
+        # broken out into QQ chunks (e.g., a 'L1' that is defined as
+        # 'N2NE4' should be converted to 'NENE' and 'NWNE').  And add
+        # the resulting QQ(s) to the list of aliquots.
+        equiv_aliquots.extend(_smooth_QQs(raw_ldef))
+
+        if len(equiv_aliquots) == 0:
+            return None
+
+        return equiv_aliquots
 
     def output_plat(self, include_header=False) -> str:
         """Output a plat (as a string) of the Section grid values."""
@@ -602,10 +639,34 @@ def confirm_file(fp, extension=None) -> bool:
     return os.path.splitext(fp)[1].lower() == extension.lower()
 
 
+########################################################################
+# Misc. tools for formatting / reformatting lots and QQs
+########################################################################
+
 def _smooth_QQs(aliquot_text) -> list:
     """Ensure the input aliquot text is in a list of properly formatted
     QQ's. (Expects already parsed data that consists only of standard
     aliquot divisions -- e.g., 'NENE' or 'N2NE' or 'S½SE¼' or 'ALL',
-    etc.  Does NOT convert lots to QQ."""
-    scrubbed = pyTRS.scrub_aliquots(aliquot_text, cleanQQ=True)
-    return pyTRS.unpack_aliquots(scrubbed)
+    etc.)  Does NOT convert lots to QQ."""
+    qq_l = []
+    for aliq in aliquot_text.replace(' ', '').split(','):
+        scrubbed = pyTRS.scrub_aliquots(aliq, cleanQQ=True)
+        qq_l.extend(pyTRS.unpack_aliquots(scrubbed))
+    return qq_l
+
+
+def _lot_without_div(lot) -> str:
+    """Cull lot divisions.
+        ex: 'N2 of L1' -> 'L1'"""
+    # If only an int is fed in, return it as a formatted lot str
+    # (i.e. 1 -> 'L1')
+    if isinstance(lot, int):
+        return f"L{lot}"
+    return lot.split(' ')[-1].upper()
+
+
+def _lot_without_L(lot) -> str:
+    """Cull leading 'L' from lot.  Also cull lot divisions, if any.
+        ex: 'N2 of L1' -> '1'"""
+    lot = _lot_without_div(lot)
+    return lot.replace('L', '')

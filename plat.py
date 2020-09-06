@@ -7,6 +7,9 @@ and incorporate parsed pyTRS PLSSDesc and Tract objects."""
 #  maybe TwpLotDefinitions where appropriate. (Have already implemented
 #  LDDB in at least some places.)
 
+# TODO:
+
+
 from PIL import Image, ImageDraw, ImageFont
 from pyTRS import version as pyTRS_version
 from pyTRS.pyTRS import PLSSDesc, Tract
@@ -22,6 +25,8 @@ __email__ = 'jamesimes@gmail.com'
 class Settings:
     """Configurable or default settings for drawing sections / townships
     and generating Plat objects."""
+
+    # TODO: Write a method for saving/loading Settings presets to/from file.
 
     DEFAULT_TYPEFACE = r'assets\liberation-fonts-ttf-2.1.1\LiberationSans-Regular.ttf'
 
@@ -214,10 +219,11 @@ class Settings:
 
 
 class Plat:
-    """An object containing an image of a 36-section plat (in `.image`),
-    as well as various attributes for platting on top of it. Notably,
+    """An object containing an Image of a 36-section (in `.image`), as
+    well as various attributes for platting on top of it. Notably,
     `.sec_coords` is a dict of the pixel coordinates for the NWNW corner
-    of each of the 36 sections (keyed by integers 1 - 36, inclusive)."""
+    of each of the 36 sections (keyed by integers 1 - 36, inclusive).
+    NOTE: May plat a single section, with `only_section=<int>` at init."""
 
     def __init__(self, twp='', rge='', only_section=None, settings=None):
         self.twp = twp
@@ -235,7 +241,8 @@ class Plat:
         self.sec_coords = {}
 
         # Draw the standard 36 sections, or the `only_section` (an int).
-        # (If `only_section` is None, then will draw all 36 in 6x6 grid.)
+        # (If `only_section` is None, then will draw all 36 in 6x6 grid.
+        # If specified, will draw only that section.)
         self._draw_all_sections(only_section=only_section)
         self.header = self._gen_header(only_section=only_section)
 
@@ -296,7 +303,8 @@ class Plat:
             return twptxt
 
     def _draw_all_sections(self, only_section=None):
-        """Draw the 36 sections in the standard 6x6 grid."""
+        """Draw the 36 sections in the standard 6x6 grid; or draw a
+        single section if `only_section=<int>` is specified."""
         w, h = self.settings.dim
 
         # We'll horizontally center our plat on the page.
@@ -323,7 +331,7 @@ class Plat:
         sec_nums.extend(list(range(30, 24, -1)))
         sec_nums.extend(list(range(31, 37)))
 
-        # Generate sections on the plat, and number them.
+        # Generate section(s) on the plat, and number them.
         if only_section is not None:
             # If drawing only one section
             self._draw_sec((x_start, y_start), section=only_section)
@@ -339,7 +347,7 @@ class Plat:
                     self.sec_coords[sec_num] = (cur_x, cur_y)
 
     def _write_header(self, text=None):
-        """Write the T&R at the top of the page."""
+        """Write the header at the top of the page."""
 
         if text is None:
             text = self.header
@@ -703,7 +711,7 @@ class MultiPlat:
         # Get a dict linking the the PLSSDesc object's parsed Tracts to their respective
         # T&R's (keyed by T&R '000x000y' -- same as the twp_grids dict)
         twp_to_tract = filter_tracts_by_tr(PLSSDesc_obj.parsedTracts)
-#
+
         # Generate Plat object of each township, and append it to mp_obj.plats
         for k, v in twp_grids.items():
             pl_obj = Plat.from_township_grid(v, tracts=twp_to_tract[k], settings=settings)
@@ -816,11 +824,17 @@ def text_to_plats(text, config=None, settings=None, lddb=None, output_filepath=N
     return mp.output()
 
 
-# TODO: Bugfix:
 
-
-lddb_fp = LotDefDB.from_csv(r'C:\Users\James Imes\Box\Programming\pyTRS_plotter\assets\examples\SAMPLE_LDDB.csv')
-set1 = Settings()
-set1.write_lot_numbers = True
-#text_to_plats('T154N-R97W Sec 01: Lots 1 - 3, S2NE, Sec 22: Lots 1 - 8, S2NE', config='cleanQQ', lddb=lddb_fp, settings=set1)[0].show()
-text_to_plats('T154N-R97W Sec 01: Lots 1 - 3, S2NE, Sec 25: Lots 1 - 8', config='cleanQQ', lddb=lddb_fp, settings=set1)[0].show()
+########################################################################
+# Sample / testing:
+#
+# lddb_fp = LotDefDB.from_csv(r'C:\Users\James Imes\Box\Programming\pyTRS_plotter\assets\examples\SAMPLE_LDDB.csv')
+# set1 = Settings()
+# set1.write_lot_numbers = True
+# descrip = 'T154N-R97W Sec 01: Lots 1 - 3, S2NE, Sec 25: Lots 1 - 8'
+# # As a list:
+# ttp = text_to_plats(descrip, config='cleanQQ', lddb=lddb_fp, settings=set1)
+# ttp[0].show()
+# # Or as a MultiPlat object:
+# mp = MultiPlat.from_text(descrip, config='cleanQQ', lddb=lddb_fp, settings=set1)
+# mp.show(0)
