@@ -7,6 +7,9 @@ and incorporate parsed pyTRS PLSSDesc and Tract objects."""
 #  maybe TwpLotDefinitions where appropriate. (Have already implemented
 #  LDDB in at least some places.)
 
+# TODO: `platObj.text_cursor` (or other specified cursor) should be
+#  updated while tracts are being written.
+
 
 from PIL import Image, ImageDraw, ImageFont
 from pyTRS import version as pyTRS_version
