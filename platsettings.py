@@ -1,0 +1,443 @@
+
+from PIL import ImageFont
+
+class Settings:
+    """Configurable or default settings for drawing sections / townships
+    and generating Plat objects."""
+
+    DEFAULT_TYPEFACE = r'assets/liberation-fonts-ttf-2.1.1/LiberationSans-Regular.ttf'
+    PRESET_DIRECTORY = r'assets/presets/'
+
+    # Default page-size dimensions.
+    LETTER_72ppi = (612, 792)
+    LETTER_200ppi = (1700, 2200)
+    LETTER_300ppi = (1700, 3300)
+    LEGAL_72ppi = (612, 1008)
+    LEGAL_200ppi = (1700, 2800)
+    LEGAL_300ppi = (2550, 4200)
+
+    # These are fully opaque
+    RGBA_RED = (255, 0, 0, 255)
+    RGBA_GREEN = (0, 255, 0, 255)
+    RGBA_BLUE = (0, 0, 255, 255)
+    RGBA_BLACK = (0, 0, 0, 255)
+    RGBA_WHITE = (255, 255, 255, 255)
+
+    # These are partially translucent:
+    RGBA_RED_OVERLAY = (255, 0, 0, 100)
+    RGBA_GREEN_OVERLAY = (0, 255, 0, 100)
+    RGBA_BLUE_OVERLAY = (0, 0, 255, 100)
+    RGBA_BLACK_OVERLAY = (0, 0, 0, 100)
+    RGBA_WHITE_OVERLAY = (255, 255, 255, 100)
+
+    # These attributes are string-type. When creating a Settings object
+    # from a text file (or saving one to a text file), that data will
+    # also be stored as text. But we don't want to interpret any other
+    # attributes as strings, so we keep track here of the only attribs
+    # that SHOULD be strings.
+    __stringTypeAtts__ = [
+        'headerfont_typeface', 'tractfont_typeface', 'secfont_typeface',
+        'lotfont_typeface'
+    ]
+
+    # These are the attributes that will get included when outputting a
+    # Settings object to text file (i.e. creating a preset).
+    __setAtts__ = [
+        'dim', 'headerfont_typeface', 'secfont_typeface', 'lotfont_typeface',
+        'headerfont_size', 'tractfont_size', 'secfont_size', 'lotfont_size',
+        'headerfont_RGBA', 'tractfont_RGBA', 'secfont_RGBA', 'lotfont_RGBA',
+        'y_top_marg', 'y_bottom_marg', 'bottom_text_indent',
+        'y_px_before_tracts', 'qq_side', 'sec_line_stroke', 'ql_stroke',
+        'qql_stroke', 'sec_line_RGBA', 'ql_RGBA', 'qql_RGBA', 'qq_fill_RGBA',
+        'centerbox_wh', 'lot_num_offset_px', 'write_header', 'write_tracts',
+        'write_section_numbers', 'write_lot_numbers'
+    ]
+
+    def __init__(self):
+
+        # Dimensions of the image.
+        self.dim = Settings.LETTER_200ppi
+
+        # Font typeface, size, and RGBA values
+        self.headerfont_typeface = Settings.DEFAULT_TYPEFACE
+        self.tractfont_typeface = Settings.DEFAULT_TYPEFACE
+        self.secfont_typeface = Settings.DEFAULT_TYPEFACE
+        self.lotfont_typeface = Settings.DEFAULT_TYPEFACE
+        self.headerfont_size = 64
+        self.tractfont_size = 28
+        self.secfont_size = 36
+        self.lotfont_size = 12
+        self.headerfont_RGBA = Settings.RGBA_BLACK
+        self.tractfont_RGBA = Settings.RGBA_BLACK
+        self.secfont_RGBA = Settings.RGBA_BLACK
+        self.lotfont_RGBA = Settings.RGBA_BLACK
+
+        # Default font objects will be replaced shortly.
+        self.headerfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE)
+        self.tractfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE)
+        self.secfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE)
+        self.lotfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE)
+
+        # Construct ImageFont objects from the above settings:
+        self._update_fonts()
+
+        # Distance between top of image and top of first row of sections.
+        self.y_top_marg = 180
+
+        # Distance between top section line and the T&R written above it.
+        self.y_header_marg = 15
+
+        # Bottom margin before triggering 'panic' button.
+        self.y_bottom_marg = 80
+
+        # px indent for tract text.
+        self.bottom_text_indent = 100
+
+        # Distance between bottom section line and the first tract text written.
+        self.y_px_before_tracts = 40
+
+        self.qq_side = 50  # length of each side for a QQ in px
+        self.sec_line_stroke = 3  # section-line stroke width in px
+        self.ql_stroke = 2  # quarter line stroke width in px
+        self.qql_stroke = 1  # quarter-quarter line stroke width in px
+
+        # RGBA values for color of various sec/Q lines
+        self.sec_line_RGBA = Settings.RGBA_BLACK
+        self.ql_RGBA = Settings.RGBA_BLACK
+        self.qql_RGBA = (128, 128, 128, 100)
+
+        # RGBA value for QQ fill
+        self.qq_fill_RGBA = Settings.RGBA_BLUE_OVERLAY
+
+        # How wide the whited-out centerbox in each section should be:
+        self.centerbox_wh = 60
+
+        # How many px set in from top-left corner of QQ box to write lot numbers
+        self.lot_num_offset_px = 6
+
+        # Whether to write these labels / text:
+        self.write_header = True
+        self.write_tracts = True
+        self.write_section_numbers = True
+        self.write_lot_numbers = False
+
+    def set_font(self, purpose, typeface:str, size:int):
+        """Set the font for the respective purpose.
+            `purpose` -> either 'header', 'tract', 'sec', or 'lot'
+            `typeface` -> filepath (str) to font
+            `size` -> int of font size"""
+
+        if purpose.lower() not in ['header', 'tract', 'sec', 'lot']:
+            # Failure.
+            return -1
+
+        fnt = ImageFont.truetype(typeface, size)
+        setattr(self, f"{purpose.lower()}font", fnt)
+
+    def _update_fonts(self):
+        """Construct ImageFont objects from the current font settings,
+        and set them to the appropriate attributes."""
+        self.set_font('header', self.headerfont_typeface, self.headerfont_size)
+        self.set_font('tract', self.tractfont_typeface, self.tractfont_size)
+        self.set_font('sec', self.secfont_typeface, self.secfont_size)
+        self.set_font('lot', self.lotfont_typeface, self.lotfont_size)
+
+    @staticmethod
+    def from_file(fp):
+        """Compile and return a Config object from .txt file"""
+        # Return codes:
+        # a Config object --> success
+        # 1 --> Filename with extension other than `.txt` entered
+        # 2 --> Could not open file at `filepath`
+
+        if fp[-4:].lower() != '.txt':
+            print('Error: filename must be .txt file')
+            return 1
+
+        try:
+            with open(fp, 'r') as file:
+                settingLines = file.readlines()
+        except:
+            print(f'Error: Could not open file: {fp}')
+            return 2
+
+        setObj = Settings()
+
+        for line in settingLines:
+            # Ignore data stored in angle brackets
+            if line[0] == '<':
+                continue
+
+            # For each line, parse the 'attrib=val' pair, and commit to
+            # the setObj, using ._set_str_to_values()
+            setObj._set_str_to_val(line.strip('\n'))
+
+        # Remember to construct the font objects.
+        setObj._update_fonts()
+
+        return setObj
+
+    def _set_str_to_val(self, attrib_val):
+        """Take in a string of an attribute/value pair (in the format
+        'attribute=value') and set the appropriate value of the attribute."""
+
+        def try_2_4_tuple(text):
+            """Check if the text represents a 2-item or 4-item tuple of ints.
+            If so, return that tuple. If not, return None."""
+            txt = text.replace(' ', '')
+            txtlist = txt.split(',')
+
+            # If len is neither 2 nor 4, we can rule out this attempt.
+            if len(txtlist) not in [2, 4]:
+                return None
+
+            # If any element cannot be converted to an int, we can rule
+            # out this attempt.
+            tl_ints = []
+            try:
+                for txt in txtlist:
+                    tl_ints.append(int(txt))
+            except:
+                return None
+
+            # Success. This was a 2-item or 4-item tuple of ints
+            return tuple(tl_ints)
+
+        def try_int(text):
+            """Check if the text represents an int. If so, return that int.
+            If not, return None."""
+            try:
+                return int(text)
+            except:
+                return None
+
+        def try_bool(text):
+            """Convert string to its appropriate bool (i.e. 'True' -> True).
+            Returns None if neither True nor False."""
+            if text == 'True':
+                return True
+            elif text == 'False':
+                return False
+            else:
+                return None
+
+        # split attribute/value pair by '='
+        components = attrib_val.split('=', maxsplit=1)
+
+        # If only one component was found in the text, the input was
+        # improperly formatted, and we return without setting anything.
+        try:
+            if components[1] == '':
+                return None
+        except:
+            if len(components) == 1:
+                return None
+
+        att_name, val_text = components
+
+        # If this is a string-type attribute (e.g., filepath to font
+        # typefaces), set the val_text to the attribute, and return 0.
+        if att_name in Settings.__stringTypeAtts__:
+            setattr(self, att_name, val_text)
+            return 0
+
+        # Run each of our 'try' functions on `val_text` until we get a
+        # hit, at which point, we set the converted value to the
+        # att_name and return 0.
+        for attempt in [try_2_4_tuple, try_int, try_bool]:
+            val = attempt(val_text)
+            if val is not None:
+                setattr(self, att_name, val)
+                return 0
+
+        # If we haven't set our attribute/value by now, return error code -1
+        return -1
+
+    def save_to_file(self, filepath):
+        """Save this Settings object to .txt file"""
+        # Return codes:
+        # 0 --> Success
+        # 1 --> Filename with extension other than `.txt` entered
+        # 2 --> Could not open file at `filepath`
+
+        if filepath[-4:].lower() != '.txt':
+            print('Error: filename must be .txt file')
+            return 1
+
+        try:
+            file = open(filepath, 'w')
+        except:
+            print(f'Error: Could not open file: {filepath}.')
+            return 2
+
+        # These are the attributes we'll write to the file:
+        attsToWrite = Settings.__setAtts__
+
+        def attrib_text(att):
+            """Get the output text for the attribute (`att`) from `self`"""
+            val = getattr(self, att, None)
+            if val is None:
+                return ''
+
+            if isinstance(val, int):
+                val = str(val)
+            elif isinstance(val, (tuple, list)):
+                # Convert each element of list/tuple to string; join w/ commas
+                val_joiner = []
+                for elem in val:
+                    val_joiner.append(str(elem))
+                val = ','.join(val_joiner)
+
+            text = f"{att}={val}\n"
+
+            return text
+
+        for att in attsToWrite:
+            file.write(attrib_text(att))
+
+        file.close()
+        return 0
+
+    @staticmethod
+    def preset(name: str):
+        """Load a saved preset."""
+
+        try:
+            presets = Settings.list_presets()
+            if name in presets:
+                fp = f"{Settings.PRESET_DIRECTORY}{name}.txt"
+                return Settings.from_file(fp)
+            else:
+                raise Exception(f"'{name}' is not a saved preset.")
+        except:
+            raise Exception(f"Could not find or access preset '{name}'")
+
+
+    @staticmethod
+    def list_presets() -> list:
+        import os
+        files = os.listdir(Settings.PRESET_DIRECTORY)
+        presets = []
+        for f in files:
+            if f.lower().endswith('.txt'):
+                presets.append(f[:-4])
+        return presets
+
+    def save_preset(self, name: str):
+        """Save this Settings object as a preset."""
+        fp = f"{Settings.PRESET_DIRECTORY}{name}.txt"
+        try:
+            self.save_to_file(fp)
+        except:
+            raise Exception(f"Could not find or write to filepath '{fp}'")
+
+    @staticmethod
+    def __restore_default():
+        """Restore the default preset Setting object to default.txt"""
+        st = Settings()
+        st.save_preset('default')
+
+    @staticmethod
+    def m_preset():
+        """Return a new Settings object with 'medium' defaults."""
+        st = Settings()
+        st.headerfont_size = 32
+        st.tractfont_size = 20
+        st.secfont_size = 24
+        st.lotfont_size = 8
+
+        st.qq_side = 30  # length of each side for a QQ in px
+        st.sec_line_stroke = 1  # section-line stroke width in px
+        st.ql_stroke = 1  # quarter line stroke width in px
+        st.qql_stroke = 1  # quarter-quarter line stroke width in px
+
+        st.y_top_marg = 120
+        st.y_header_marg = 10
+        st.y_bottom_marg = st.qq_side
+        st.bottom_text_indent = st.qq_side
+        st.write_tracts = False
+        st.dim = (st.qq_side * 4 * 6 + st.y_top_marg * 2,
+                  st.qq_side * 4 * 6 + st.y_top_marg * 2)
+
+        # RGBA values for color of various sec/Q lines and fonts
+        st.sec_line_RGBA = Settings.RGBA_BLACK
+        st.ql_RGBA = (160, 160, 160, 255)
+        st.qql_RGBA = (224, 224, 224, 224)
+        st.headerfont_RGBA = Settings.RGBA_BLACK
+        st.tractfont_RGBA = Settings.RGBA_BLACK
+        st.secfont_RGBA = Settings.RGBA_BLACK
+
+        # How wide the whited-out centerbox in each section should be:
+        st.centerbox_wh = 40
+
+        # How many px set in from top-left corner of QQ box to write lot numbers
+        st.lot_num_offset_px = 4
+
+        return st
+
+    @staticmethod
+    def s_preset():
+        """Return a new Settings object with 'small' defaults."""
+        st = Settings()
+        st.headerfont_size = 20
+        st.tractfont_size = 14
+        st.secfont_size = 14
+        st.lotfont_size = 1
+
+        st.qq_side = 20  # length of each side for a QQ in px
+        st.sec_line_stroke = 2  # section-line stroke width in px
+        st.ql_stroke = 1  # quarter line stroke width in px
+        st.qql_stroke = 1  # quarter-quarter line stroke width in px
+        st.y_bottom_marg = st.qq_side
+        st.bottom_text_indent = st.qq_side
+        st.write_tracts = False
+
+        st.y_top_marg = 40
+        st.y_header_marg = 4
+        st.dim = (st.qq_side * 4 * 6 + st.y_top_marg * 2,
+                  st.qq_side * 4 * 6 + st.y_top_marg * 2)
+
+        # RGBA values for color of various sec/Q lines and fonts
+        st.sec_line_RGBA = Settings.RGBA_BLACK
+        st.ql_RGBA = (128, 128, 128, 255)
+        st.qql_RGBA = (230, 230, 230, 255)
+        st.headerfont_RGBA = Settings.RGBA_BLACK
+        st.tractfont_RGBA = Settings.RGBA_BLACK
+        st.secfont_RGBA = Settings.RGBA_BLACK
+
+        # How wide the whited-out centerbox in each section should be:
+        st.centerbox_wh = 24
+        return st
+
+    @staticmethod
+    def xs_preset():
+        """Return a new Settings object with 'extra-small' defaults."""
+        st = Settings()
+        st.headerfont_size = 18
+        st.tractfont_size = 14
+        st.secfont_size = 12
+
+        st.qq_side = 14  # length of each side for a QQ in px
+        st.sec_line_stroke = 1  # section-line stroke width in px
+        st.ql_stroke = 1  # quarter line stroke width in px
+        st.qql_stroke = 1  # quarter-quarter line stroke width in px
+        st.y_bottom_marg = st.qq_side
+        st.write_tracts = False
+        st.bottom_text_indent = st.qq_side
+
+        st.y_top_marg = 40
+        st.y_header_marg = 2
+        st.dim = (st.qq_side * 4 * 6 + st.y_top_marg * 2,
+                  st.qq_side * 4 * 6 + st.y_top_marg * 2)
+
+        # RGBA values for color of various sec/Q lines and fonts
+        st.sec_line_RGBA = Settings.RGBA_BLACK
+        st.ql_RGBA = (128, 128, 128, 255)
+        st.qql_RGBA = (230, 230, 230, 255)
+        st.headerfont_RGBA = Settings.RGBA_BLACK
+        st.tractfont_RGBA = Settings.RGBA_BLACK
+        st.secfont_RGBA = (196, 196, 196, 100)
+
+        # How wide the whited-out centerbox in each section should be:
+        st.centerbox_wh = 20
+        return st

@@ -7,215 +7,18 @@ and incorporate parsed pyTRS PLSSDesc and Tract objects."""
 #  maybe TwpLotDefinitions where appropriate. (Have already implemented
 #  LDDB in at least some places.)
 
-# TODO:
-
 
 from PIL import Image, ImageDraw, ImageFont
 from pyTRS import version as pyTRS_version
 from pyTRS.pyTRS import PLSSDesc, Tract
 from grid import TownshipGrid, SectionGrid, plss_to_grids, filter_tracts_by_tr
 from grid import LotDefinitions, TwpLotDefinitions, LotDefDB, confirm_file
+from platsettings import Settings
 
 __version__ = '0.0.1'
 __versionDate__ = '8/31/2020'
 __author__ = 'James P. Imes'
 __email__ = 'jamesimes@gmail.com'
-
-
-class Settings:
-    """Configurable or default settings for drawing sections / townships
-    and generating Plat objects."""
-
-    # TODO: Write a method for saving/loading Settings presets to/from file.
-
-    DEFAULT_TYPEFACE = r'assets\liberation-fonts-ttf-2.1.1\LiberationSans-Regular.ttf'
-
-    # Default page-size dimensions.
-    LETTER_72ppi = (612, 792)
-    LETTER_200ppi = (1700, 2200)
-    LETTER_300ppi = (1700, 3300)
-    LEGAL_72ppi = (612, 1008)
-    LEGAL_200ppi = (1700, 2800)
-    LEGAL_300ppi = (2550, 4200)
-
-    # These are fully opaque
-    RGBA_RED = (255, 0, 0, 255)
-    RGBA_GREEN = (0, 255, 0, 255)
-    RGBA_BLUE = (0, 0, 255, 255)
-    RGBA_BLACK = (0, 0, 0, 255)
-    RGBA_WHITE = (255, 255, 255, 255)
-
-    # These are partially translucent:
-    RGBA_RED_OVERLAY = (255, 0, 0, 100)
-    RGBA_GREEN_OVERLAY = (0, 255, 0, 100)
-    RGBA_BLUE_OVERLAY = (0, 0, 255, 100)
-    RGBA_BLACK_OVERLAY = (0, 0, 0, 100)
-    RGBA_WHITE_OVERLAY = (255, 255, 255, 100)
-
-    def __init__(self):
-
-        # Dimensions of the image.
-        self.dim = Settings.LETTER_200ppi
-
-        # Font typeface, size, and RGBA values
-        self.headerfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 64)
-        self.tractfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 28)
-        self.secfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 36)
-        self.lotfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 12)
-        self.headerfont_RGBA = Settings.RGBA_BLACK
-        self.tractfont_RGBA = Settings.RGBA_BLACK
-        self.secfont_RGBA = Settings.RGBA_BLACK
-        self.lotfont_RGBA = Settings.RGBA_BLACK
-
-        # Distance between top of image and top of first row of sections.
-        self.y_margin = 180
-
-        # Distance between top section line and the T&R written above it.
-        self.y_twprge_margin = 15
-
-        # px indent for tract text.
-        self.tract_indent = 100
-        # TODO: Update tract_indent for other presets.
-
-        # Distance between bottom section line and the first tract text written.
-        self.px_before_tracts = 40
-        # TODO: Update px_before_tracts for other presets.
-
-        # Bottom margin before triggering 'panic' button.
-        self.bottom_y_margin = 80
-        # TODO: Update bottom_y_margin for other presets.
-
-        self.qq_side = 50  # length of each side for a QQ in px
-        self.sec_line_stroke = 3  # section-line stroke width in px
-        self.ql_stroke = 2  # quarter line stroke width in px
-        self.qql_stroke = 1  # quarter-quarter line stroke width in px
-
-        # RGBA values for color of various sec/Q lines
-        self.sec_line_RGBA = Settings.RGBA_BLACK
-        self.ql_RGBA = Settings.RGBA_BLACK
-        self.qql_RGBA = (128, 128, 128, 100)
-
-        # RGBA value for QQ fill
-        self.qq_fill_RGBA = Settings.RGBA_BLUE_OVERLAY
-
-        # How wide the whited-out centerbox in each section should be:
-        self.centerbox_wh = 60
-
-        # How many px set in from top-left corner of QQ box to write lot numbers
-        self.lot_num_offset_px = 6
-
-        # Whether to write these labels / text:
-        self.write_header = True
-        self.write_tracts = True
-        self.write_section_numbers = True
-        self.write_lot_numbers = False
-
-    @staticmethod
-    def preset(setting : str):
-        """Quick presets for Settings, with 'm', 's', and 'xs'."""
-        if setting == 'm':
-            return Settings.m_preset()
-        elif setting == 's':
-            return Settings.s_preset()
-        elif setting == 'xs':
-            return Settings.xs_preset()
-        else:
-            return Settings()
-
-    @staticmethod
-    def m_preset():
-        """Return a new Settings object with 'medium' defaults."""
-        st = Settings()
-        st.headerfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 32)
-        st.tractfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 20)
-        st.secfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 24)
-        st.lotfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 8)
-
-        st.qq_side = 30  # length of each side for a QQ in px
-        st.sec_line_stroke = 1  # section-line stroke width in px
-        st.ql_stroke = 1  # quarter line stroke width in px
-        st.qql_stroke = 1  # quarter-quarter line stroke width in px
-
-        st.y_margin = 120
-        st.y_twprge_margin = 10
-        st.dim = (st.qq_side * 4 * 6 + st.y_margin * 2,
-                  st.qq_side * 4 * 6 + st.y_margin * 2)
-
-        # RGBA values for color of various sec/Q lines and fonts
-        st.sec_line_RGBA = Settings.RGBA_BLACK
-        st.ql_RGBA = (160, 160, 160, 255)
-        st.qql_RGBA = (224, 224, 224, 224)
-        st.headerfont_RGBA = Settings.RGBA_BLACK
-        st.tractfont_RGBA = Settings.RGBA_BLACK
-        st.secfont_RGBA = Settings.RGBA_BLACK
-
-        # How wide the whited-out centerbox in each section should be:
-        st.centerbox_wh = 40
-
-        # How many px set in from top-left corner of QQ box to write lot numbers
-        st.lot_num_offset_px = 4
-
-        return st
-
-    @staticmethod
-    def s_preset():
-        """Return a new Settings object with 'small' defaults."""
-        st = Settings()
-        st.headerfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 20)
-        st.tractfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 14)
-        st.secfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 14)
-
-        st.qq_side = 20  # length of each side for a QQ in px
-        st.sec_line_stroke = 2  # section-line stroke width in px
-        st.ql_stroke = 1  # quarter line stroke width in px
-        st.qql_stroke = 1  # quarter-quarter line stroke width in px
-
-        st.y_margin = 40
-        st.y_twprge_margin = 4
-        st.dim = (st.qq_side * 4 * 6 + st.y_margin * 2,
-                  st.qq_side * 4 * 6 + st.y_margin * 2)
-
-        # RGBA values for color of various sec/Q lines and fonts
-        st.sec_line_RGBA = Settings.RGBA_BLACK
-        st.ql_RGBA = (128, 128, 128, 255)
-        st.qql_RGBA = (230, 230, 230, 255)
-        st.headerfont_RGBA = Settings.RGBA_BLACK
-        st.tractfont_RGBA = Settings.RGBA_BLACK
-        st.secfont_RGBA = Settings.RGBA_BLACK
-
-        # How wide the whited-out centerbox in each section should be:
-        st.centerbox_wh = 24
-        return st
-
-    @staticmethod
-    def xs_preset():
-        """Return a new Settings object with 'extra-small' defaults."""
-        st = Settings()
-        st.headerfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 18)
-        st.tractfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 14)
-        st.secfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE, 12)
-
-        st.qq_side = 14  # length of each side for a QQ in px
-        st.sec_line_stroke = 1  # section-line stroke width in px
-        st.ql_stroke = 1  # quarter line stroke width in px
-        st.qql_stroke = 1  # quarter-quarter line stroke width in px
-
-        st.y_margin = 40
-        st.y_twprge_margin = 2
-        st.dim = (st.qq_side * 4 * 6 + st.y_margin * 2,
-                  st.qq_side * 4 * 6 + st.y_margin * 2)
-
-        # RGBA values for color of various sec/Q lines and fonts
-        st.sec_line_RGBA = Settings.RGBA_BLACK
-        st.ql_RGBA = (128, 128, 128, 255)
-        st.qql_RGBA = (230, 230, 230, 255)
-        st.headerfont_RGBA = Settings.RGBA_BLACK
-        st.tractfont_RGBA = Settings.RGBA_BLACK
-        st.secfont_RGBA = (196, 196, 196, 100)
-
-        # How wide the whited-out centerbox in each section should be:
-        st.centerbox_wh = 20
-        return st
 
 
 class Plat:
@@ -229,6 +32,24 @@ class Plat:
         self.twp = twp
         self.rge = rge
         self.TR = twp+rge
+
+        # NOTE: settings can be specified as a Settings object, as a
+        # filepath (str) to a settings data .txt (which are created via
+        # the `.save_to_file()` on a Settings object), or by passing the
+        # name of an already saved preset (also as a string).
+        if isinstance(settings, str):
+            if settings.lower().endswith('.txt'):
+                try:
+                    settings = Settings.from_file(settings)
+                except:
+                    settings = None
+            else:
+                try:
+                    settings = Settings.preset(settings)
+                except:
+                    settings = None
+
+        # If settings was not specified, create a default Settings object.
         if settings is None:
             settings = Settings()
         self.settings = settings
@@ -249,9 +70,26 @@ class Plat:
         if self.settings.write_header:
             self._write_header()
 
+        # Keeping track of the current position where text (e.g., tracts
+        # etc.) can be written -- i.e. where we've written up to, and
+        # where we can still write at in x,y pixel coordinates
+        self.text_cursor = self._reset_cursor()
+        # NOTE: Other cursors can also be created
+        #   ex: This would create a new cursor at the original x,y
+        #       coords and accessed as `platObj.highlighter`:
+        #           >>> platObj._reset_cursor(cursor='highlighter')
+        #   ex: This would create a new cursor at the specified x,y
+        #       coords (120,180) and accessed as `platObj.highlighter`:
+        #           >>> platObj.set_cursor(120, 180, cursor='highlighter')
+
         # Overlay on which we'll plat QQ's
         self.overlay = Image.new('RGBA', self.image.size, (255, 255, 255, 0))
         self.overlay_draw = ImageDraw.Draw(self.overlay, 'RGBA')
+
+        # TODO: self.cursor = <the current position where tract text, etc. can be written>
+        #   i.e. Keep track where we've written up to, and where we can still write at in
+        #   x,y pixel coordinates.
+
 
     def _gen_header(self, only_section=None):
         """Generate the text of a header containing the T&R and/or
@@ -311,7 +149,7 @@ class Plat:
         x_start = (w - (self.settings.qq_side * 4 * 6)) // 2
 
         # The plat will start this many px below the top of the page.
-        y_start = self.settings.y_margin
+        y_start = self.settings.y_top_marg
 
         # PLSS sections "snake" from the NE corner of the township west
         # then down, then they cut back east, then down and west again,
@@ -355,14 +193,72 @@ class Plat:
         W = self.image.width
         w, h = self.draw.textsize(text, font=self.settings.headerfont)
 
-        # Center horizontally and write `settings.y_twprge_margin` px above top section
+        # Center horizontally and write `settings.y_header_marg` px above top section
         text_x = (W - w) / 2
-        text_y = self.settings.y_margin - h - self.settings.y_twprge_margin
+        text_y = self.settings.y_top_marg - h - self.settings.y_header_marg
         self.draw.text(
             (text_x, text_y),
             text,
             font=self.settings.headerfont,
             fill=self.settings.headerfont_RGBA)
+
+    def _reset_cursor(self, cursor='text_cursor', commit=True) -> tuple:
+        """Return the original coord (x,y) of where bottom text may be
+        written, per settings. If `commit=True` (on by default), the
+        coord will be stored to the Setting object.
+        If a string is NOT passed as `cursor`, the committed coord will
+        be set to `.text_cursor`. However, if the particular cursor IS
+        specified, it will save the resulting coord to that attribute
+        name (so long as `commit=True`).
+          ex: 'setObj._reset_cursor(cursor='highlight', commit=True)
+                -> setObj.highlight == (x, y)
+                # where x,y are the starting coord."""
+
+        stngs = self.settings
+        x = stngs.bottom_text_indent
+        y = stngs.y_top_marg + stngs.qq_side * 4 * 6 + stngs.y_px_before_tracts
+        coord = (x, y)
+
+        # Only if `commit=True` do we set this.
+        if commit:
+            setattr(self, cursor, coord)
+
+        # And return the coord.
+        return coord
+
+    def set_cursor(self, x, y, cursor='text_cursor'):
+        """Set the cursor to the specified x and y coords.  If a string
+        is NOT passed as `cursor`, the committed coord will be set to
+        `.text_cursor`. However, if the particular cursor IS specified,
+        it will save the resulting coord to that attribute name."""
+        setattr(self, cursor, (x, y))
+
+    def update_cursor(
+            self, x_delta, y_delta, cursor='text_cursor', commit=True) -> tuple:
+        """Return an updated coord (x,y) of where bottom text may be
+        written, per settings. If `commit=True` (on by default), the
+        coord will be stored to the Setting object.
+        If a string is NOT passed as `cursor`, the committed coord will
+        be set to `.text_cursor`. However, if the particular cursor IS
+        specified, it will save the resulting coord to that attribute
+        name (so long as `commit=True`).
+          ex: 'setObj.update_cursor(cursor='highlight', commit=True)
+                -> setObj.highlight == (x, y)
+                # where x,y are the updated coord.
+        IMPORTANT: If `cursor` is specified but does not already exist,
+        it will be based off `.text_cursor`."""
+
+        # Pull the specified cursor. If it does not already exist as an
+        # attribute in this object, it will fall back to `.text_cursor`,
+        # which exists for every Settings object, per init.
+        x0, y0 = getattr(self, cursor, getattr(self, 'text_cursor'))
+        coord = (x0 + x_delta, y0 + y_delta)
+
+        # Only if `commit=True` do we set this.
+        if commit:
+            setattr(self, cursor, coord)
+
+        return coord
 
     def output(self, filepath=None):
         """Merge the drawn overlay (i.e. filled QQ's) onto the base
@@ -388,7 +284,8 @@ class Plat:
         # TODO: Handle secError
         for coord in SecObj.filled_coords():
             self.fill_qq(secNum, coord, qq_fill_RGBA=qq_fill_RGBA)
-        self.write_lots(SecObj)
+        if self.settings.write_lot_numbers:
+            self.write_lots(SecObj)
 
     @staticmethod
     def from_section_grid(section : SectionGrid, tracts=None, settings=None):
@@ -442,11 +339,10 @@ class Plat:
         total_px_written = 0
 
         # starting coord for the first tract.
-        start_x = settings.tract_indent
-        start_y = settings.y_margin + settings.qq_side * 4 * 6 + settings.px_before_tracts
+        start_x, start_y = self.text_cursor
         x, y = (start_x, start_y)
 
-        max_px = self.image.height - start_y - settings.bottom_y_margin
+        max_px = self.image.height - start_y - settings.y_bottom_marg
 
         tracts_written = 0
         for tract in tracts:
@@ -824,7 +720,6 @@ def text_to_plats(text, config=None, settings=None, lddb=None, output_filepath=N
     return mp.output()
 
 
-
 ########################################################################
 # Sample / testing:
 #
@@ -836,5 +731,6 @@ def text_to_plats(text, config=None, settings=None, lddb=None, output_filepath=N
 # ttp = text_to_plats(descrip, config='cleanQQ', lddb=lddb_fp, settings=set1)
 # ttp[0].show()
 # # Or as a MultiPlat object:
-# mp = MultiPlat.from_text(descrip, config='cleanQQ', lddb=lddb_fp, settings=set1)
+# mp = MultiPlat.from_text(descrip, config='cleanQQ', lddb=lddb_fp, settings='letter')
 # mp.show(0)
+
