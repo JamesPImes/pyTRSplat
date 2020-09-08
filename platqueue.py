@@ -2,14 +2,16 @@
 
 """Objects for queuing 'plattable' objects."""
 
-from grid import SectionGrid, TownshipGrid, filter_tracts_by_tr
+from grid import SectionGrid, TownshipGrid, filter_tracts_by_twprge
 from pyTRS.pyTRS import PLSSDesc, Tract
 
 class PlatQueue(list):
     """A list of objects that can be incorporated into / projected onto
     a Plat object (i.e. 'plattable'). The PlatQueue object also contains
-    a 'sublist' property `.tracts` containing the tracts associated with
-    the queued plattable objects."""
+    an attribute `.tracts`, which is a SEPARATE list of the tracts
+    associated with the queued plattable objects.
+    These object types are plattable (i.e. can be added to a PlatQueue):
+            SectionGrid, TownshipGrid, Tract"""
 
     # These types can be platted on a (single) Plat:
     SINGLE_PLATTABLES = (SectionGrid, TownshipGrid, Tract)
@@ -29,8 +31,8 @@ class PlatQueue(list):
     def queue(self, plattable, tracts=None):
         """Add a 'plattable' object to the queue, and optionally add
         any corresponding tracts to the `.tracts` list as well. May
-        queue ONLY a single object at a time, but any number of Tract
-        objects may be be added to the `.tracts` attribute via
+        queue ONLY a single plattable at a time, but any number of Tract
+        objects may be be added to the `.tracts` attribute via the
         `tracts=` kwarg.
         (Passing an object in tracts does NOT add it to the queue!)"""
 
@@ -83,9 +85,10 @@ class PlatQueue(list):
         self.tracts.extend(tracts)
 
     def absorb(self, pqObj, tracts=None):
-        """Absorb a PlatQueue object into this one. `tracts=` should not
-        be used directly -- it will only be used when called via
-        `.queue()`."""
+        """Absorb a PlatQueue object into this one. The kwarg `tracts=`
+        should not be used directly -- it will only be used when this is
+        called via `.queue()`.
+        NOTE: Does not destroy the absorbed PlatQueue."""
         if tracts is None:
             tracts = []
         self.extend(pqObj)
@@ -97,7 +100,9 @@ class MultiPlatQueue(dict):
     """A dict keyed by T&R (in the format of '000x000y' or fewer digits)
     of objects to use to generate a MultiPlat object. Each value is a
     PlatQueue object, which in turn is a list of objects that can be
-    incorporated into / projected onto a Plat object (i.e. 'plattable')."""
+    incorporated into / projected onto a Plat object (i.e. 'plattable').
+    These object types can be added to a PlatQueue:
+            SectionGrid, TownshipGrid, Tract, PLSSDesc"""
 
     # These types can be platted on a (single) Plat:
     MULTI_PLATTABLES = (SectionGrid, TownshipGrid, Tract, PLSSDesc)
@@ -106,22 +111,25 @@ class MultiPlatQueue(dict):
         super().__init__()
 
     def queue(self, plattable, twprge='', tracts=None):
-        """Add the `plattable` object to the queue. Specifically, a
-        PlatQueue object will be created in the MultiPlatQueue object,
-        keyed by the specified `twprge`, and the `plattable` object will
-        be queued in that PlatQueue.
+        """Add the `plattable` object to the PlatQueue for the
+        respective `twprge` (in the format '000z000y'). If no PlatQueue
+        yet exists for that twprge (i.e. if that twprge is not yet a key
+        in this MultiPlatQueue object), a PQ object will be created.
+
         NOTE: If a PLSSDesc object is fed in, `twprge` and `tracts` are
         ignored, but rather are deduced automatically (because there can
         be more than one T&R from a single PLSSDesc object).
-        If a Tract object is passed as `plattable`, then `twprge` is
-        optional (as long as the Tract object has a specified `.twp` and
-        `.rge`), and `tracts` is always optional. The Tract object's
-        `.twp` and `.rge` will NOT overrule the specified `twprge=<>`."""
+
+        NOTE ALSO: If a Tract object is passed as `plattable`, then
+        `twprge` is optional (as long as the Tract object has a
+        specified `.twp` and `.rge`), and `tracts` is always optional.
+        However, the Tract object's `.twp` and `.rge` will NOT overrule
+        a kwarg-specified `twprge=` (if any)."""
 
         def breakout_PLSSDesc(descObj):
             """PLSSDesc objects must be handled specially, because they
             can generate multiple T&R's (i.e. multiple dict keys)."""
-            twp_to_tract = filter_tracts_by_tr(descObj)
+            twp_to_tract = filter_tracts_by_twprge(descObj)
             for twprge, tract_list in twp_to_tract.items():
                 self.setdefault(twprge, PlatQueue())
                 for tract in tract_list:
@@ -179,8 +187,7 @@ class MultiPlatQueue(dict):
         self[twprge].queue(plattable, tracts)
 
     def absorb(self, mpq):
-        """Absorb a PlatQueue object into this one. `tracts=` should not
-        be used directly."""
+        """Absorb a MultiPlatQueue object into this one."""
         for twprge, pq in mpq.items():
             # If a PQ for this T&R does not yet exist, we'll create one now.
             self.setdefault(twprge, PlatQueue())
@@ -189,7 +196,8 @@ class MultiPlatQueue(dict):
             self[twprge].absorb(pq)
 
     def queue_text(self, text, config=None):
-        """Parse text (optionally using `config=` parameters), and add the
-        resulting PLSSDesc object to this MultiPlat's queue (`.mpq`)."""
+        """Parse the text of a PLSS land description (optionally using
+        `config=` parameters -- see pyTRS docs), and add the resulting
+        PLSSDesc object to this MultiPlatQueue."""
         descObj = PLSSDesc(text, config=config, initParseQQ=True)
         self.queue(descObj)

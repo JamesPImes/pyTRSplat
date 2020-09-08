@@ -11,312 +11,41 @@ from pyTRS import pyTRS
 #  E.g., tracts_into_twp_grids
 
 
-class TownshipGrid:
-    """A grid of a single Township/Range, containing also a grid for
-    each of its 36 sections (SectionGrid objects). At init, use `tld=`
-    to pass in a TwpLotDefinitions object to optionally define lots to
-    corresponding QQ's in respective sections."""
-
-    # Sections 1-6, 13-18, and 25-30 (inclusive) are east-to-west (i.e. right-to-left)
-    # -- all other sections are left-to-right.
-    right_to_left_sections = list(range(1, 7)) + list(range(13, 19)) + list(range(25, 31))
-
-    def __init__(self, twp='', rge='', tld='default'):
-
-        # NOTE: `tld` stands for `TwpLotDefinitions`
-
-        total_sections = 36
-
-        self.twp = twp
-        self.rge = rge
-        self.TR = twp + rge
-        self.sections = {}
-
-        # Sections "snake" from the NE corner of the township west then
-        # down, then they cut back east, then down and west again, etc.,
-        # thus:
-        #           6   5   4   3   2   1
-        #           7   8   9   10  11  12
-        #           18  17  16  15  14  13
-        #           19  20  21  22  23  24
-        #           30  29  28  27  26  25
-        #           31  32  33  34  35  36
-        #
-        # ...so accounting for this is a little trickier:
-        for secNum in range(1, total_sections + 1):
-            x = (secNum - 1) // 6
-            if secNum in TownshipGrid.right_to_left_sections:
-                y = -secNum % 6
-            else:
-                y = secNum % 6
-            self.sections[secNum] = {
-                'coord': (x, y),
-                'SectionGrid': SectionGrid(sec=secNum, twp=twp, rge=rge)
-            }
-
-        if tld == 'default':
-            default_tld = TwpLotDefinitions(list(range(1, 37)))
-            self.apply_TwpLotDefs(default_tld)
-        elif isinstance(tld, TwpLotDefinitions):
-            self.apply_TwpLotDefs(tld)
-
-    def apply_TwpLotDefs(self, tld):
-        """Apply a TwpLotDefinitions object (i.e. set the respective
-        SectionGrid's LotDefinitions objects)."""
-        if not isinstance(tld, TwpLotDefinitions):
-            raise TypeError('`tld` must be `TwpLotDefinitions` object.')
-        for key, val in tld.items():
-            self.apply_LotDefs(key, val)
-
-    def apply_LotDefs(self, section_number : int, ld):
-        if not isinstance(ld, LotDefinitions):
-            raise TypeError('`ld` must be type `LotDefinitions`')
-        self.sections[int(section_number)]['SectionGrid'].lot_definitions = ld
-
-    def filled_sections(self):
-        """Return a list of SectionGrid objects that have at least one QQ filled."""
-        x_sec = []
-        for secNum, val in self.sections.items():
-            if val['SectionGrid'].has_any():
-                x_sec.append(val['SectionGrid'])
-        return x_sec
-
-    def incorporate_tract(self, tractObj, sec=None):
-        """Check the lotList and QQList of a parsed pyTRS.Tract object,
-        and incorporate any hits into the grid. If `sec=` is not
-        specified, it will pull the `.sec` from the Tract object."""
-        if sec is None:
-            sec = tractObj.sec
-        try:
-            sec = int(sec)
-        except:
-            raise Warning('Section number could not be converted to int. '
-                          'Tract object could not be incorporated into '
-                          'SectionGrid')
-            return
-
-        self.sections[sec]['SectionGrid'].incorporate_tract(tractObj)
-
-
-class LotDefinitions(dict):
-    """A dict object for defining which lots correspond to which QQ in a
-    given section. At init, pass in an int 1 - 36 (inclusive) to set to
-    the /default/ for that section in a STANDARD township, or pass a
-    properly formatted dict to convert it to a LotDefinitions object."""
-
-    # Some defaults for sections in a 'standard' 6x6 Township grid.
-    # (Sections along the north and west boundaries of the township have
-    # 'expected' lot locations. In practice, these will RARELY be the
-    # only lots in a township, and they are not always consistent, even
-    # within these sections. Even so, it is better than nothing.)
-
-    DEF_01_to_05 = {
-        'L1': 'NENE',
-        'L2': 'NWNE',
-        'L3': 'NENW',
-        'L4': 'NWNW'
-    }
-
-    DEF_06 = {
-        'L1': 'NENE',
-        'L2': 'NWNE',
-        'L3': 'NENW',
-        'L4': 'NWNW',
-        'L5': 'SWNW',
-        'L6': 'NWSW',
-        'L7': 'SWSW',
-    }
-
-    DEF_07_18_30_31 = {
-        'L1': 'NWNW',
-        'L2': 'SWNW',
-        'L3': 'NWSW',
-        'L4': 'SWSW'
-    }
-
-    # All other sections in a /standard/ Twp have no lots.
-    DEF_00 = {}
-
-    def __init__(self, default=None):
-        super().__init__()
-        if isinstance(default, dict):
-            self.absorb_dict(default)
-        elif default in [1, 2, 3, 4, 5]:
-            self.absorb_dict(LotDefinitions.DEF_01_to_05)
-        elif default == 6:
-            self.absorb_dict(LotDefinitions.DEF_06)
-        elif default in [7, 18, 30, 31]:
-            self.absorb_dict(LotDefinitions.DEF_07_18_30_31)
-        else:
-            self.absorb_dict(LotDefinitions.DEF_00)
-
-    def set_lot(self, lot, definition):
-        """Set definition (value) to lot (key). Overwrite, if already
-        exists. Using this method ensures that the resulting format will
-        be as expected elsewhere in the program (assuming input format
-        is acceptable)."""
-
-        # If no leading 'L' was fed in, add it now (e.g. 1 -> 'L1')
-        if str(lot).upper()[0] != 'L':
-            lot = 'L' + str(lot).upper()
-
-        # Ensure the definitions are broken down into QQ's by passing them
-        # through pyTRS.Tract parsing, and pulling the resulting QQList.
-        qq_list = pyTRS.Tract(desc=definition, initParseQQ=True, config='cleanQQ').QQList
-        self[lot] = ','.join(qq_list)
-
-    def absorb_dict(self, dct):
-        """Absorb another LotDefinitions object or appropriately
-        formatted dict. Will overwrite existing keys, if any. Using this
-        method ensures that the resulting format will be as expected
-        elsewhere in the program (assuming input format is acceptable)."""
-        for lot, definition in dct.items():
-            self.set_lot(lot, definition)
-
-    def lots_by_QQname(self) -> dict:
-        """Get a dict, with QQ's as keys, and whose values are each a
-        list of the lot(s) that correspond with those QQ's. Note that it
-        is possible for more than 1 lot per QQ, so the values are all
-        lists."""
-        ret_dict = {}
-        for k, v in self.items():
-            list_of_qqs = _smooth_QQs(v)
-            for qq in list_of_qqs:
-                if qq in ret_dict.keys():
-                    ret_dict[qq].append(k)
-                else:
-                    ret_dict[qq] = [k]
-        return ret_dict
-
-
-class TwpLotDefinitions(dict):
-    """A dict of LotDefinition objects (i.e. a nested dict) for an
-    entire township. Each key is a section number (an int), whose value
-    is a LotDefinition object for that section. If a section number or
-    list of section numbers (all ints) are passed at init, will use
-    default definitions for those sections."""
-
-    def __init__(self, default_sections=None):
-        super().__init__()
-        for i in range(1,37):
-            # Initialize an empty LotDef obj for each of the 36 sections
-            # in a standard Twp.
-            self[i] = LotDefinitions(None)
-
-        # If we want to use default dicts for any sections, do so now.
-        if isinstance(default_sections, int):
-            self[default_sections] = LotDefinitions(default_sections)
-        elif isinstance(default_sections, list):
-            for sec in default_sections:
-                self[sec] = LotDefinitions(sec)
-
-    def set_section(self, sec_num: int, lot_defs: LotDefinitions):
-        self[sec_num] = lot_defs
-
-    @staticmethod
-    def from_csv(fp, twp=None, rge=None):
-        """Generate a TwpLotDefinitions object from a properly formatted
-        csv file at filepath `fp`. Specify `twp=<str>` and `rge=<str>`
-        for which rows should match -- ex. ... twp='154n', rge='97w'.
-        (See documentation for how to format .csv files.)"""
-
-        # Confirm that `fp` points to an existing csv file. If not,
-        # return None.
-        if not confirm_file(fp, '.csv'):
-            return None
-
-        tld = TwpLotDefinitions()
-        if None in [twp, rge]:
-            return tld
-
-        twp = twp.lower()
-        rge = rge.lower()
-
-        import csv
-        f = open(fp, 'r')
-        reader = csv.DictReader(f)
-
-        for row in reader:
-            csv_twp, csv_rge = row['twp'].lower(), row['rge'].lower()
-            if csv_twp == twp and csv_rge == rge:
-                # If this row matches our twp and rge, set the lot to our tld.
-                tld[int(row['sec'])].set_lot(row['lot'], row['qq'])
-
-        return tld
-
-
-class LotDefDB(dict):
-    """A dict database of TwpLotDefinitions, whose keys are T&R (formatted
-    '000x000y' or fewer digits), and each whose values is a
-    TwpLotDefinitions object for that T&R."""
-
-    def __init__(self, source=None):
-        super().__init__()
-        if confirm_file(source, '.csv'):
-            self._import_csv(source)
-
-    @staticmethod
-    def from_csv(fp):
-        """Generate a LotDefDB from a properly formatted** .csv file at
-        filepath `fp`. Converts each unique T&R in the .csv file into a
-        separate TwpLotDefinitions object. Reads the lot definitions in
-        the .csv and store them to the respective TwpLotDefinitions
-        object. Stores the TLD's to a LotDefDB object, keyed by T&R
-        (formatted '000x000y' or fewer digits), and returns that
-        LotDefDB object.
-            **See documentation for how to format .csv files."""
-        ldd = LotDefDB()
-        ldd._import_csv(fp)
-
-        return ldd
-
-    def _import_csv(self, fp):
-        """Convert each unique T&R in a properly formatted** .csv file
-        into a separate TwpLotDefinitions object. Read the lot
-        definitions in the .csv and store them to the respective
-        TwpLotDefinitions object. Stores the TLD's to this LotDefDB
-        object, keyed by T&R (formatted '000x000y' or fewer digits).
-            **See documentation for how to format .csv files."""
-        # Confirm that `fp` points to an existing csv file. If not,
-        # return None.
-        if not confirm_file(fp, '.csv'):
-            return None
-
-        import csv
-        f = open(fp, 'r')
-        reader = csv.DictReader(f)
-
-        for row in reader:
-            twp, rge = row['twp'].lower(), row['rge'].lower()
-            sec = int(row['sec'])
-            lot, qq = row['lot'], row['qq']
-            # If now TLD has yet been created for this T&R, do it now.
-            self.setdefault(twp + rge, TwpLotDefinitions())
-
-            # Add this lot/qq definition for the section/twp/rge on this row.
-            self[twp + rge][sec].set_lot(lot, qq)
-
-    def set_twp(self, twprge, tld_obj):
-        self[twprge] = tld_obj
-
-    def trs(self, trs):
-        """Access the (section-level) LotDefinitions object for the
-        specified `trs`. Returns either the corresponding LotDefinitions
-        object -- or None, if none was found."""
-        twp, rge, sec = pyTRS.break_trs(trs)
-        if twp+rge not in self.keys():
-            return None
-        try:
-            return self[twp+rge][int(sec)]
-        except:
-            return None
-
-
 class SectionGrid:
     """A grid of a single Section, divided into standard PLSS aliquot
     quarter-quarters (QQs) -- i.e. 4x4 for a standard section.
-    Takes optional `ld` argument for specifying LotDefinitions object
-    (defaults to 'standard' township layout if not specified)."""
+    Takes optional `ld=` argument for specifying a LotDefinitions object
+    (defaults to a 'standard' township layout if not specified -- i.e.
+    Sections 1 - 7, 18, 19, 30, and 31 have lots, because they are along
+    the northern and/or western boundaries of the township).
+
+    If `sec=<int or str>`, `twp=<str>`, and `rge=<str>` are not
+    specified at init, the object may not have full functionality in
+    conjunction with other modules.
+        --Format:
+            sg_obj = SectionGrid(`sec=14, twp='154n', rge='97w')
+        --equivalently:
+            sg_obj = SectionGrid.from_trs('154n97w14')
+    (Passing `ld=...` in either example is optional, but advisable.)
+
+    If a lot was not defined for this SectionGrid but the lot is
+    incorporated into the SectionGrid anyway, it will not set any hits,
+    but the lot will be added to the list in the `.unhandled_lots`
+    attribute.
+
+    QQ's have been assigned these coordinates, with (0,0) being the NWNW
+    and (3,3) being the SESE -- i.e. moving from top-to-bottom and
+    left-to-right:
+    ------------------------------------------------------------------
+    | NWNW -> (0,0) | NENW -> (1,0) || NWNE -> (2,0) | NENE -> (3,0) |
+    |---------------+---------------++---------------+---------------|
+    | SWNW -> (0,1) | SENW -> (1,1) || SWNE -> (2,1) | SENE -> (3,1) |
+    |===============+===============++===============+===============|
+    | NWSW -> (0,2) | SESW -> (1,2) || NWSE -> (2,2) | NESE -> (3,2) |
+    |---------------+---------------++---------------+---------------|
+    | SWSW -> (0,3) | SESW -> (1,3) || SWSE -> (2,3) | SESE -> (3,3) |
+    ------------------------------------------------------------------
+    """
 
     def __init__(self, sec='', twp='', rge='', ld='default'):
 
@@ -342,13 +71,13 @@ class SectionGrid:
         except:
             secNum = 0
 
-        self.lot_definitions = {}
+        self.ld = {}
         if ld == 'default':
-            self.lot_definitions = LotDefinitions(secNum)
+            self.ld = LotDefinitions(secNum)
         elif isinstance(ld, LotDefinitions):
-            self.lot_definitions = ld
+            self.ld = ld
         else:
-            self.lot_definitions = LotDefinitions(None)
+            self.ld = LotDefinitions(None)
 
         # A dict for the 16 aliquot divisions of a standard section,
         # with (0, 0) being NWNW and (3, 3) being SESE -- i.e. beginning
@@ -386,21 +115,21 @@ class SectionGrid:
         return SectionGrid(sec, twp, rge, ld)
 
     def apply_lddb(self, lddb):
-        """Apply the appropriate LotDefinitions object from a LotDefsDB
-        object, if one exists. Will not overwrite anything if no
-        LotDefinitions object exists for this section in the LDDB."""
+        """Apply the appropriate LotDefinitions object from a LotDefDB
+        object, if such a LD obj exists. Will not overwrite anything if
+        no LD object exists for this section in the LDDB."""
         ld = lddb.trs(self.trs)
         if ld is not None:
-            self.lot_definitions = ld
+            self.ld = ld
 
     def apply_TwpLotDefs(self, tld):
         """Apply the appropriate LotDefinitions object from a
-        TwpLotDefinitions object, if one exists. Will not overwrite
-        anything if no LotDefinitions object exists for this section in
-        the TwpLotDefinitions."""
+        TwpLotDefinitions object, if such a LD exists. Will not
+        overwrite anything if no LD obj exists for this section in the
+        TwpLotDefinitions."""
         ld = tld.get(int(self.sec), None)
         if ld is not None:
-            self.lot_definitions = ld
+            self.ld = ld
 
     def lots_by_QQname(self) -> dict:
         """Get a dict, with QQ's as keys, and whose values are each a
@@ -409,10 +138,10 @@ class SectionGrid:
         lists."""
 
         # This functionality is handled by LotDefinitions object.
-        return self.lot_definitions.lots_by_QQname()
+        return self.ld.lots_by_qq_name()
 
     def lots_by_grid(self) -> list:
-        """Convert the `lot_definitions` into a grid (nested list) of
+        """Convert the `ld` into a grid (nested list) of
         which lots fall within which coordinate. For example, 'L1'
         through 'L4' in a standard Section 1 correspond to the N2N2
         QQ's, respectively -- so this method would output a grid whose
@@ -434,8 +163,8 @@ class SectionGrid:
 
     @staticmethod
     def from_tract(TractObj : pyTRS.Tract, ld='default'):
-        """Create a SectionGrid object from a pyTRS.Tract object and
-        incorporate the lotList and QQList."""
+        """Return a SectionGrid object created from a parsed pyTRS.Tract
+        object and incorporate the lotList and QQList from that Tract."""
         twp, rge, sec = TractObj.twp, TractObj.rge, TractObj.sec
         secObj = SectionGrid(sec=sec, twp=twp, rge=rge, ld=ld)
         secObj.incorporate_tract(TractObj)
@@ -444,16 +173,26 @@ class SectionGrid:
 
     def incorporate_tract(self, TractObj : pyTRS.Tract):
         """Check the lotList and QQList of a parsed pyTRS.Tract object,
-        and incorporate any hits into the grid."""
-        self.incorporate_QQList(TractObj.QQList)
-        self.incorporate_lotList(TractObj.lotList)
+        and incorporate any hits into the grid.
+        NOTE: Relies on the LotDefinitions object in `.ld` at the time
+        this method is called. Later changes to `.ld` will not
+        modify what has already been done here."""
+        self.incorporate_qq_list(TractObj.QQList)
+        self.incorporate_lot_list(TractObj.lotList)
 
-    def incorporate_lotList(self, lotList : list):
-        """Incorporate all lots in the lotList into the grid."""
+    def incorporate_lot_list(self, lotList : list):
+        """Incorporate all lots in the passed lotList into the grid.
+        ex: Passing ['L1', 'L3', 'L4', 'L5'] might set 'NENE', 'NENW',
+            'NWNW', and 'SWNW' as hits for a hypothetical section,
+            depending on the definitions in the LotDefinitions object in
+            the `self.ld` attribute.
+        NOTE: Relies on the LotDefinitions object in `.ld` at the time
+        this method is called. Later changes to `.ld` will not
+        modify what has already been done here."""
         # QQ equivalents to Lots
         equiv_qq = []
 
-        # Convert each lot to its equivalent QQ, per the lot_definitions, and
+        # Convert each lot to its equivalent QQ, per the ld, and
         # add them to the equiv_qq list.
         for lot in lotList:
             # First remove any divisions in the lot (e.g., 'N2 of L1' -> 'L1')
@@ -465,22 +204,24 @@ class SectionGrid:
                 continue
             equiv_qq.extend(eq_qqs_from_lot)
 
-        self.incorporate_QQList(equiv_qq)
+        self.incorporate_qq_list(equiv_qq)
 
-    def incorporate_QQList(self, QQList : list):
-        """Incorporate all QQs in the QQList into the grid."""
+    def incorporate_qq_list(self, QQList : list):
+        """Incorporate all QQs in the passed QQList into the grid.
+        ex: Passing 'NENE', 'NENW', 'NWNW', and 'SWNW' sets all of those
+            QQ's as hits."""
 
         # `qq` can be fed in as 'NENE' or 'NENE,NWNE'. So we need to break it
         # into components before incorporating.
         for qq in QQList:
             for qq_ in qq.replace(' ', '').split(','):
-                self.QQgrid[qq_]['val'] = 1
+                self.turn_on_qq(qq_)
 
     def _unpack_ld(self, lot) -> list:
         """Pass a lot number (string 'L1' or int 1), and get a list of the
         corresponding / properly formatted QQ(s) from the
-        `.lot_definitions` of this SectionGrid object. Returns None if
-        the lot is undefined, or defined with invalid QQ's."""
+        `.ld` of this SectionGrid object. Returns None if
+        the lot is undefined, or if it was defined with invalid QQ's."""
 
         equiv_aliquots = []
         # Cull lot divisions (i.e. 'N2 of L1' to just 'L1')
@@ -488,7 +229,7 @@ class SectionGrid:
 
         # Get the raw definition from the LotDefinitions object.
         # If undefined in the LD obj, return None.
-        raw_ldef = self.lot_definitions.get(lot, None)
+        raw_ldef = self.ld.get(lot, None)
         if raw_ldef is None:
             return None
 
@@ -503,8 +244,8 @@ class SectionGrid:
 
         return equiv_aliquots
 
-    def output_plat(self, include_header=False) -> str:
-        """Output a plat (as a string) of the Section grid values."""
+    def output_text_plat(self, include_header=False) -> str:
+        """Output a simple plat (as a string) of the Section grid values."""
 
         ar = self.output_array()
         total_columns = len(ar[0])
@@ -537,7 +278,10 @@ class SectionGrid:
         return (header + '\n') * include_header + plat_txt
 
     def output_array(self) -> list:
-        """Convert the grid to an array (oriented from NWNW to SESE)"""
+        """Convert the grid to an array (oriented from NWNW to SESE),
+        with resulting coords formatted (y, x) -- ex:
+            ar = sg_obj.output_array()
+            ar[y][x]  # Accesses the value at (x,y)"""
 
         max_x = 0
         max_y = 0
@@ -559,8 +303,26 @@ class SectionGrid:
 
         return ar
 
+    def turn_off_qq(self, qq: str):
+        """Set the value of the specified QQ (e.g. 'NENE') to 0."""
+        qq = qq.upper()
+        if qq in self.QQgrid.keys():
+            self.QQgrid[qq]['val'] = 0
+
+    def turn_on_qq(self, qq: str, custom_val=1):
+        """Set the value of the specified QQ (e.g. 'NENE') to 1."""
+
+        # Note: Passing anything other than `1` to `custom_val` will
+        # probably cause other current functionality to break. But it
+        # might be useful for some purposes (e.g., tracking which
+        # PLSS descriptions include that QQ).
+        qq = qq.upper()
+        if qq in self.QQgrid.keys():
+            self.QQgrid[qq]['val'] = custom_val
+
     def filled_coords(self) -> list:
-        """Return a list of coordinates in the SectionGrid that are filled."""
+        """Return a list of coordinates in the SectionGrid that contain
+        a hit."""
         ar = self.output_array()
         filled = []
         for y in range(len(ar)):
@@ -570,7 +332,8 @@ class SectionGrid:
         return filled
 
     def has_any(self):
-        """Return a bool, whether at least one QQ is filled."""
+        """Return a bool, whether at least one QQ is filled anywhere in
+        this SectionGrid."""
         ar = self.output_array()
         for i in ar:
             for j in i:
@@ -578,19 +341,422 @@ class SectionGrid:
                     return True
         return False
 
+class TownshipGrid:
+    """A grid of a single Township/Range, containing in `.sections` a
+    dict (keyed by integers 1 - 36, inclusive) a respective SectionGrid
+    object for each of its 36 sections.
+
+    At init, optionally use `tld=` to pass in a TwpLotDefinitions object
+    wherein lots are given a definition of which QQ(s) they correspond
+    to in each respective section. It defaults to passing
+    `tld='default'`, which causes Sections 1 - 7, 18, 19, 30, and 31 to
+    have their 'expected' lots (i.e. the lots that come from being along
+    the northern and/or western boundaries of a standard township)."""
+
+    # Sections 1-6, 13-18, and 25-30 (inclusive) are east-to-west (i.e. right-to-left)
+    # -- all other sections are left-to-right.
+    RIGHT_TO_LEFT_SECTIONS = list(range(1, 7)) + list(range(13, 19)) + list(range(25, 31))
+
+    def __init__(self, twp='', rge='', tld='default'):
+
+        # NOTE: `tld` stands for `TwpLotDefinitions`
+
+        total_sections = 36
+
+        self.twp = twp
+        self.rge = rge
+        self.TR = twp + rge
+
+        # A dict of SectionGrid objs for each section, keyed by ints 1 - 36:
+        self.sections = {}
+
+        # A dict of (x,y) coords for each section in the Twp, keyed by ints 1 - 36:
+        self.section_coords = {}
+
+        # Sections "snake" from the NE corner of the township west then
+        # down, then they cut back east, then down and west again, etc.,
+        # thus:
+        #           6   5   4   3   2   1
+        #           7   8   9   10  11  12
+        #           18  17  16  15  14  13
+        #           19  20  21  22  23  24
+        #           30  29  28  27  26  25
+        #           31  32  33  34  35  36
+        #
+        # ...so accounting for this is a little trickier:
+        for secNum in range(1, total_sections + 1):
+            x = (secNum - 1) // 6
+            if secNum in TownshipGrid.RIGHT_TO_LEFT_SECTIONS:
+                y = -secNum % 6
+            else:
+                y = secNum % 6
+            self.sections[secNum] = SectionGrid(sec=secNum, twp=twp, rge=rge)
+            self.section_coords[secNum] = (x, y)
+
+        if tld == 'default':
+            default_tld = TwpLotDefinitions(list(range(1, 37)))
+            self.apply_TwpLotDefs(default_tld)
+        elif isinstance(tld, TwpLotDefinitions):
+            self.apply_TwpLotDefs(tld)
+
+    def apply_TwpLotDefs(self, tld):
+        """Apply a TwpLotDefinitions object (i.e. set the respective
+        SectionGrid's LotDefinitions objects)."""
+        if not isinstance(tld, TwpLotDefinitions):
+            raise TypeError('`tld` must be `TwpLotDefinitions` object.')
+        for key, val in tld.items():
+            self.apply_LotDefs(key, val)
+
+    def apply_LotDefs(self, section_number : int, ld):
+        if not isinstance(ld, LotDefinitions):
+            raise TypeError('`ld` must be type `LotDefinitions`')
+        self.sections[int(section_number)].ld = ld
+
+    def filled_sections(self):
+        """Return a list of SectionGrid objects that have at least one QQ filled."""
+        x_sec = []
+        for secNum, val in self.sections.items():
+            if val.has_any():
+                x_sec.append(val)
+        return x_sec
+
+    def incorporate_tract(self, tractObj, sec=None):
+        """Check the lotList and QQList of a parsed pyTRS.Tract object,
+        and incorporate any hits into the grid. If `sec=` is not
+        specified, it will pull the `.sec` from the Tract object.
+        NOTE: Relies on the TwpLotDefinitions object in `.tld` at the
+        time this method is called. Later changes to `.tld` will not
+        modify what has already been done here."""
+        if sec is None:
+            sec = tractObj.sec
+        try:
+            sec = int(sec)
+        except:
+            raise Warning('Section number could not be converted to int. '
+                          'Tract object could not be incorporated into '
+                          'SectionGrid')
+            return
+
+        self.sections[sec].incorporate_tract(tractObj)
+
+
+class LotDefinitions(dict):
+    """A dict object (often abbreviated 'ld' or 'LD') for defining which
+    lots correspond to which QQ in a given section. At init, pass in an
+    int 1 - 36 (inclusive) to set to the /default/ for that section in a
+    STANDARD township (i.e. perhaps better than nothing).
+
+    These objects can also be contained within a TwpLotDefinitions
+    object for a 36-section collection of such lot-to-QQ definitions.
+    In turn, TwpLotDefinitions can be contained within a LotDefDB
+    object for definitions of lots in the sections of any number of
+    townships.
+
+    See `LotDefDB.from_csv()` or `TwpLotDefinitions.from_csv()` for
+    loading larger databases from .csv files, rather than creating
+    LotDefinitions objects individually."""
+
+    # Below are defaults for sections in a 'standard' 6x6 Township grid.
+    # (Sections along the north and west boundaries of the township have
+    # 'expected' lot locations. In practice, these might only RARELY be
+    # the only lots in a township, and they are not always consistent,
+    # even within these sections. Even so, it is better than nothing.)
+
+    DEF_01_to_05 = {
+        'L1': 'NENE',
+        'L2': 'NWNE',
+        'L3': 'NENW',
+        'L4': 'NWNW'
+    }
+
+    DEF_06 = {
+        'L1': 'NENE',
+        'L2': 'NWNE',
+        'L3': 'NENW',
+        'L4': 'NWNW',
+        'L5': 'SWNW',
+        'L6': 'NWSW',
+        'L7': 'SWSW',
+    }
+
+    DEF_07_18_30_31 = {
+        'L1': 'NWNW',
+        'L2': 'SWNW',
+        'L3': 'NWSW',
+        'L4': 'SWSW'
+    }
+
+    # All other sections in a /standard/ Twp have no lots.
+    DEF_00 = {}
+
+    def __init__(self, default=None):
+        super().__init__()
+
+        # If default is specified, we'll absorb that standard dict for
+        # this LD object.
+        if isinstance(default, dict):
+            self.absorb_ld(default)
+        elif default in [1, 2, 3, 4, 5]:
+            self.absorb_ld(LotDefinitions.DEF_01_to_05)
+        elif default == 6:
+            self.absorb_ld(LotDefinitions.DEF_06)
+        elif default in [7, 18, 30, 31]:
+            self.absorb_ld(LotDefinitions.DEF_07_18_30_31)
+        else:
+            self.absorb_ld(LotDefinitions.DEF_00)
+
+    def set_lot(self, lot, definition):
+        """Set definition (value) to lot (key). Overwrite, if already
+        exists. Using this method ensures that the resulting format will
+        be as expected elsewhere in the program (assuming input format
+        is acceptable), by passing definitions through pyTRS parsing."""
+
+        # If no leading 'L' was fed in, add it now (e.g. 1 -> 'L1')
+        if str(lot).upper()[0] != 'L':
+            lot = 'L' + str(lot).upper()
+
+        # Ensure the definitions are broken down into QQ's by passing them
+        # through pyTRS.Tract parsing, and pulling the resulting QQList.
+        qq_list = pyTRS.Tract(desc=definition, initParseQQ=True, config='cleanQQ').QQList
+        self[lot] = ','.join(qq_list)
+
+    def absorb_ld(self, dct):
+        """Absorb another LotDefinitions object. Will overwrite existing
+        keys, if any. Using this method ensures that the resulting
+        format will be as expected elsewhere in the program (assuming
+        input format is acceptable), by passing definitions through
+        pyTRS parsing."""
+        for lot, definition in dct.items():
+            self.set_lot(lot, definition)
+
+    def lots_by_qq_name(self) -> dict:
+        """Get a dict, with QQ's as keys (e.g., 'NENE'), and whose
+        values are each a list of the lot(s) that correspond with those
+        QQ's (e.g., 'L1'). Note that it is possible for more than 1 lot
+        per QQ, so each value is a list."""
+        ret_dict = {}
+        for k, v in self.items():
+            list_of_qqs = _smooth_QQs(v)
+            for qq in list_of_qqs:
+                if qq in ret_dict.keys():
+                    ret_dict[qq].append(k)
+                else:
+                    ret_dict[qq] = [k]
+        return ret_dict
+
+
+class TwpLotDefinitions(dict):
+    """A dict of LotDefinition objects (i.e. essentially a nested dict)
+    for an entire township. Each key is a section number (an int), whose
+    value is a LotDefinition object for that section. If a section
+    number or list of section numbers (all ints) are passed at init,
+    will use default definitions for those sections.
+
+    These objects can be contained within a LotDefDB object (keyed by
+    T&R, formatted '000x000x' or fewer digits -- e.g., '154n97w' for
+    T154N-R97W) for definitions of lots in the sections of any number of
+    townships.
+
+    See `LotDefDB.from_csv()` or `TwpLotDefinitions.from_csv()` for
+    loading larger databases from .csv files, rather than creating
+    TwpLotDefinitions objects individually."""
+
+    def __init__(self, default_sections=None):
+        super().__init__()
+        for i in range(1,37):
+            # Initialize an empty LotDef obj for each of the 36 sections
+            # in a standard Twp.
+            self[i] = LotDefinitions(None)
+
+        # If we want to use default dicts for any sections, do so now.
+        if isinstance(default_sections, int):
+            self[default_sections] = LotDefinitions(default_sections)
+        elif isinstance(default_sections, list):
+            for sec in default_sections:
+                self[sec] = LotDefinitions(sec)
+
+    def set_section(self, sec_num: int, lot_defs: LotDefinitions):
+        """Set the LotDefinitions object for a specified section."""
+        # This need not be a defined method, but it's more intuitively
+        # named, so... why not.
+        self[sec_num] = lot_defs
+
+    @staticmethod
+    def from_csv(fp, twp=None, rge=None):
+        """Generate a TwpLotDefinitions object from a properly
+        formatted** .csv file at filepath `fp`. Specify `twp=<str>` and
+        `rge=<str>` for which rows should match.
+            ex: tld_obj = TwpLotDefinitions.from_csv(
+                    r'assets\examples\SAMPLE_LDDB.csv',
+                    twp='154n', rge='97w')
+
+        **See the docstring for LotDefDB for proper .csv formatting."""
+
+        # Confirm that `fp` points to an existing csv file. If not,
+        # return None.
+        if not confirm_file(fp, '.csv'):
+            return None
+
+        tld = TwpLotDefinitions()
+        if None in [twp, rge]:
+            return tld
+
+        twp = twp.lower()
+        rge = rge.lower()
+
+        import csv
+        f = open(fp, 'r')
+        reader = csv.DictReader(f)
+
+        for row in reader:
+            csv_twp, csv_rge = row['twp'].lower(), row['rge'].lower()
+            if csv_twp == twp and csv_rge == rge:
+                # If this row matches our twp and rge, set the lot to our tld.
+                tld[int(row['sec'])].set_lot(row['lot'], row['qq'])
+
+        return tld
+
+
+class LotDefDB(dict):
+    """A dict database of TwpLotDefinitions, whose keys are T&R (formatted
+    '000x000y' or fewer digits), and each whose values is a
+    TwpLotDefinitions object for that T&R.
+
+    NOTE: If a string filepath to a properly formatted** .csv file is
+    passed as `source` at init the object will load the data represented
+    in the .csv file. The same functionality can be acheived with
+    `LotDefDB.from_csv()`.
+
+    ** For proper .csv formatting, follow these guidelines (and see the
+    example `SAMPLE_LDDB.csv` in the documentation):
+        1) These 5 headers MUST exist, all lowercase:
+                twp, rge, sec, lot, qq
+        2) twp must be specified in the format '000x'
+            ex: '154n' for Township 154 North; '1s' for Township 7 South
+                (without quotation marks)
+        3) rge must be specified in the format '000x'
+            ex: '97w' for Range 97 West; '6e' for Range 6 East
+                (without quotation marks)
+        4) sec and lot should integers (non-numeric lots cannot
+                currently be handled)
+        5) qq should be in the format as follows:
+            a) 'NENE' for 'Northeast Quarter of the Northeast Quarter';
+                    'W2' for 'West Half'; 'ALL' for 'ALL' ...
+                        (These get passed through pyTRS parsing, so
+                        reasonable abbreviations SHOULD be captured...)
+            b) If a lot comprises more than a single QQ, separate QQs by
+                    comma (with no space), and/or use larger aliquot
+                    divisions as appropriate.
+                        ex: Lot 1 that comprises the N/2NE/4 could be
+                            specified under the 'qq' columns as 'N2NE'
+                            (without quotation marks)
+                        ex: Lot 4 that sprawls across the E/2NW/4 and
+                            SW/4NW/4 could be specified under the 'qq'
+                            column as 'E2NW,SWNW' (without quotation
+                            marks)
+        6) Any other columns (e.g., 'COMMENTS') should be acceptable but
+                will be ignored.
+        7) Duplicate lot entries will result in only the last-entered
+                row being effective. If a lot comprises multiple QQ's,
+                keep it on a single row, and refer to list item #5 above
+                on how to handle it.
+        8) Keep in mind that extra long .csv files might conceivably
+                take a while to process and/or result in a LotDefDB that
+                burdens the system's memory."""
+
+    def __init__(self, source=None):
+        super().__init__()
+        if confirm_file(source, '.csv'):
+            self._import_csv(source)
+
+    @staticmethod
+    def from_csv(fp):
+        """Generate a LotDefDB from a properly formatted** .csv file at
+        filepath `fp`. Convert each unique T&R represented in the .csv
+        file into a separate TwpLotDefinitions object, keyed by T&R
+        (keys formatted '000x000y' or fewer digits -- ex: '154n97w' for
+        T154N-R97W, or '1s6e' for T1S-R6E).
+
+        **See the docstring for LotDefDB for proper .csv formatting."""
+
+        ldd = LotDefDB()
+        success_check = ldd._import_csv(fp)
+        if success_check is None:
+            # None represents a failure.
+            return None
+
+        return ldd
+
+    def _import_csv(self, fp):
+        """Read in a properly formatted** .csv file at filepath `fp`, and
+        convert each unique T&R represented in the .csv file into a
+        separate TwpLotDefinitions object, keyed by T&R (keys formatted
+        '000x000y' or fewer digits -- ex: '154n97w' for T154N-R97W, or
+        '1s6e' for T1S-R6E).
+
+        **See the docstring for LotDefDB for proper .csv formatting."""
+
+        # Confirm that `fp` points to an existing csv file. If not,
+        # return None.
+        if not confirm_file(fp, '.csv'):
+            return None
+
+        import csv
+        f = open(fp, 'r')
+        reader = csv.DictReader(f)
+
+        for row in reader:
+            twp, rge = row['twp'].lower(), row['rge'].lower()
+            sec = int(row['sec'])
+            lot, qq = row['lot'], row['qq']
+            # If no TLD has yet been created for this T&R, do it now.
+            self.setdefault(twp + rge, TwpLotDefinitions())
+
+            # Add this lot/qq definition for the section/twp/rge on this row.
+            self[twp + rge][sec].set_lot(lot, qq)
+
+        # Return success code.
+        return 0
+
+    def set_twp(self, twprge, tld_obj):
+        """Set the TwpLotDefinitions object for a specified `twprge`
+        (formatted '000x000z' or fewer digits, if not needed)."""
+        # This need not be a defined method, but it's more intuitively
+        # named, so... why not.
+        self[twprge] = tld_obj
+
+    def trs(self, trs):
+        """Access the (section-level) LotDefinitions object for the
+        specified `trs`. Returns either the corresponding LotDefinitions
+        object -- or None, if none was found.
+            ex: lddb_oj.trs('154n97w14')
+        # This would access the LD for Sec 14 of T154N-R97W, if defined
+        in the LotDefDB."""
+        twp, rge, sec = pyTRS.break_trs(trs)
+        if twp+rge not in self.keys():
+            return None
+        try:
+            return self[twp+rge][int(sec)]
+        except:
+            return None
+
 
 def plss_to_grids(PLSSDescObj: pyTRS.PLSSDesc, lddb=None) -> dict:
-    """Generate a dict of TownshipGrid objectss (keyed by T&R
-    '000x000y') from a parsed PLSSDesc object."""
+    """Generate a dict of TownshipGrid objects (keyed by T&R
+    '000x000x') from a parsed pyTRS.PLSSDesc object. Optionally specify
+    `lddb=<LotDefDB>` to define lots and get better results."""
     tl = PLSSDescObj.parsedTracts
     return tracts_into_twp_grids(tl, lddb=lddb)
 
 
 def tracts_into_twp_grids(tract_list, grid_dict=None, lddb=None) -> dict:
-    """Incorporate a list of parsed Tract objects into TownshipGrid
-    objects, and return a dict of those TownshipGrids (keyed by T&R). If
-    `grid_dict` is specified, it will be updated and returned. If not, a
-    new one will be created and returned."""
+    """Incorporate a list of parsed pyTRS.Tract objects into respective
+    TownshipGrid objects, and return a dict of those TownshipGrid objs
+    (keyed by T&R). If an existing `grid_dict` is passed, it will be
+    updated and returned. If not, a new one will be created and
+    returned.
+    Optionally specify `lddb=<LotDefDB>` to define lots and get better
+    results."""
     if grid_dict is None:
         grid_dict = {}
 
@@ -621,8 +787,8 @@ def tracts_into_twp_grids(tract_list, grid_dict=None, lddb=None) -> dict:
     return grid_dict
 
 
-def filter_tracts_by_tr(tract_list, tr_dict=None) -> dict:
-    """Filter Tract objects into a dict, keyed by T&R (formatted
+def filter_tracts_by_twprge(tract_list, twprge_dict=None) -> dict:
+    """Filter pyTRS.Tract objects into a dict, keyed by T&R (formatted
     '000x000y', or fewer digits)."""
 
     # If the user passes a PLSSDesc object, pull its TractList obj.
@@ -630,32 +796,32 @@ def filter_tracts_by_tr(tract_list, tr_dict=None) -> dict:
         tract_list = tract_list.parsedTracts
 
     # construct a dict to link Tracts to their respective Twps
-    if tr_dict is None:
-        tr_dict = {}
-    tr_to_tract = {}
+    if twprge_dict is None:
+        twprge_dict = {}
+    twprge_to_tract = {}
 
     # Copy the twp_dict to twp_to_tract
-    for twp_key, twp_val in tr_dict.keys():
-        tr_to_tract[twp_key] = twp_val
+    for twp_key, twp_val in twprge_dict.items():
+        twprge_to_tract[twp_key] = twp_val
 
     # Sort each Tract object in the tract_list into the new dict, alongside the
     # old data (if any).
     for tract in tract_list:
-        TR = tract.twp + tract.rge
-        if 'TRerr' in TR:
-            TR = 'TRerr'
-        if TR in tr_to_tract.keys():
-            tr_to_tract[TR].append(tract)
+        twprge = tract.twp + tract.rge
+        if 'TRerr' in twprge:
+            twprge = 'TRerr'
+        if twprge in twprge_to_tract.keys():
+            twprge_to_tract[twprge].append(tract)
         else:
-            tr_to_tract[TR] = [tract]
+            twprge_to_tract[twprge] = [tract]
 
-    return tr_to_tract
+    return twprge_to_tract
 
 
 def confirm_file(fp, extension=None) -> bool:
     """Check if `fp` is a filepath to an existing file. Optionally also
     confirm whether that file has the specified extension (must include
-    the period -- ex: '.csv')."""
+    the leading period -- ex: '.csv')."""
 
     import os
     try:
@@ -677,19 +843,28 @@ def confirm_file(fp, extension=None) -> bool:
 
 def _smooth_QQs(aliquot_text) -> list:
     """Ensure the input aliquot text is in a list of properly formatted
-    QQ's. (Expects already parsed data that consists only of standard
+    QQ's. (Expects already-parsed data that consists only of standard
     aliquot divisions -- e.g., 'NENE' or 'N2NE' or 'S½SE¼' or 'ALL',
-    etc.)  Does NOT convert lots to QQ."""
+    etc.).
+        ex: 'N2NE' -> ['NENE', 'NWNE']
+        ex: 'NENE' -> ['NENE']
+        ex: 'S2NENE' -> ['NENE']
+    NOTE: Does NOT convert lots to QQ."""
+
     qq_l = []
     for aliq in aliquot_text.replace(' ', '').split(','):
         scrubbed = pyTRS.scrub_aliquots(aliq, cleanQQ=True)
-        qq_l.extend(pyTRS.unpack_aliquots(scrubbed))
+        scrubbed = pyTRS.unpack_aliquots(scrubbed)
+        for qq in scrubbed:
+            # Append only the last 4 chars (ie. the true QQ: 'S2NENE' -> 'NENE')
+            qq_l.append(qq[-4:])
     return qq_l
 
 
 def _lot_without_div(lot) -> str:
-    """Cull lot divisions.
-        ex: 'N2 of L1' -> 'L1'"""
+    """Cull lot divisions and return a clean lot name.
+        ex: 'N2 of L1' -> 'L1'
+        ex: 1 -> 'L1'"""
     # If only an int is fed in, return it as a formatted lot str
     # (i.e. 1 -> 'L1')
     if isinstance(lot, int):
@@ -698,7 +873,11 @@ def _lot_without_div(lot) -> str:
 
 
 def _lot_without_L(lot) -> str:
-    """Cull leading 'L' from lot.  Also cull lot divisions, if any.
-        ex: 'N2 of L1' -> '1'"""
+    """Cull leading 'L' from lot name.  Also cull lot divisions, if any.
+    Returns a numeric-only string.
+        ex: 'N2 of L1' -> '1'
+        ex: 'L1' -> '1'"""
     lot = _lot_without_div(lot)
     return lot.replace('L', '')
+
+

@@ -10,11 +10,13 @@ and incorporate parsed pyTRS PLSSDesc and Tract objects."""
 # TODO: `platObj.text_cursor` (or other specified cursor) should be
 #  updated while tracts are being written.
 
+# TODO: Give the option to depict `.unhandled_lots` on plats somewhere.
+#  i.e. warn users that certain lots were not incorporated onto the plat
 
 from PIL import Image, ImageDraw, ImageFont
 from pyTRS import version as pyTRS_version
 from pyTRS.pyTRS import PLSSDesc, Tract, decompile_tr
-from grid import TownshipGrid, SectionGrid, plss_to_grids, filter_tracts_by_tr
+from grid import TownshipGrid, SectionGrid, plss_to_grids, filter_tracts_by_twprge
 from grid import LotDefinitions, TwpLotDefinitions, LotDefDB, confirm_file
 from platsettings import Settings
 from platqueue import PlatQueue, MultiPlatQueue
@@ -26,11 +28,27 @@ __email__ = 'jamesimes@gmail.com'
 
 
 class Plat:
-    """An object containing an Image of a 36-section (in `.image`), as
-    well as various attributes for platting on top of it. Notably,
-    `.sec_coords` is a dict of the pixel coordinates for the NWNW corner
-    of each of the 36 sections (keyed by integers 1 - 36, inclusive).
-    NOTE: May plat a single section, with `only_section=<int>` at init."""
+    """An object containing an PIL.Image object of a 36-section (in
+    `.image`), as well as various attributes for platting on top of it.
+    Notably, `.sec_coords` is a dict of the pixel coordinates for the
+    NWNW corner of each of the 36 sections (keyed by integers 1 - 36,
+    inclusive).
+
+    NOTE: May plat a single section, with `only_section=<int>` at init,
+    in which case, `.sec_coords` will have only a single key.
+
+    Plat objects can process these types of objects:
+        pyTRS.Tract**, SectionGrid, TownshipGrid
+    (**pyTRS.Tract objects are imported in this module as `Tract`.)
+
+    At init, configure the look, size, fonts, etc. of the Plat by
+    passing a Settings object to `settings=`. (Can also pass the name of
+    a preset -- see Settings docs for more details.)
+
+    For better results, optionally pass a TwpLotDefinition (or 'tld' for
+    short) to `tld=` at init, to specify which lots correspond with
+    which QQ in each respective section. (See more info in
+    `grid.TwpLotDefinition` docs and `grid.LotDefDB` docs.)"""
 
     # TODO: Wherever TLD or LD is referenced in a kwarg, allow it
     #   to pull from self.tld or self.ld.
@@ -91,14 +109,14 @@ class Plat:
         # Keeping track of the current position where text (e.g., tracts
         # etc.) can be written -- i.e. where we've written up to, and
         # where we can still write at in x,y pixel coordinates
-        self.text_cursor = self._reset_cursor()
+        self.text_cursor = self.reset_cursor()
         # NOTE: Other cursors can also be created
         #   ex: This would create a new cursor at the original x,y
-        #       coords and accessed as `platObj.highlighter`:
-        #           >>> platObj._reset_cursor(cursor='highlighter')
+        #       coords (per settings) and accessed as `platObj.highlighter`:
+        #           >>> platObj.reset_cursor(cursor='highlighter')
         #   ex: This would create a new cursor at the specified x,y
-        #       coords (120,180) and accessed as `platObj.highlighter`:
-        #           >>> platObj.set_cursor(120, 180, cursor='highlighter')
+        #       coords (120,180) and accessed as `platObj.underliner`:
+        #           >>> platObj.set_cursor(120, 180, cursor='underliner')
 
         # A PlatQueue object holding elements/tracts that will be platted.
         self.pq = PlatQueue()
@@ -166,8 +184,8 @@ class Plat:
 
     def process_queue(self, queue=None):
         """Process all objects in a PlatQueue object. If `queue=None`,
-        the PlatQueue object that will be processed is this Plat's `.pq`
-        attribute."""
+        the PlatQueue object that will be processed is the one stored in
+        this Plat's `.pq` attribute."""
 
         # If a different PlatQueue isn't otherwise specified, use the
         # Plat's own `.pq` from init.
@@ -179,9 +197,9 @@ class Plat:
                 raise TypeError(f"Cannot process type in PlatQueue: "
                                 f"{type(itm)}")
             if isinstance(itm, SectionGrid):
-                self.plat_section(itm)
+                self.plat_section_grid(itm)
             elif isinstance(itm, TownshipGrid):
-                self.plat_township(itm)
+                self.plat_township_grid(itm)
             elif isinstance(itm, Tract):
                 self.plat_tract(itm, write_tract=False)
 
@@ -299,17 +317,25 @@ class Plat:
             font=self.settings.headerfont,
             fill=self.settings.headerfont_RGBA)
 
-    def _reset_cursor(self, cursor='text_cursor', commit=True) -> tuple:
+    def reset_cursor(self, cursor='text_cursor', commit=True) -> tuple:
         """Return the original coord (x,y) of where bottom text may be
         written, per settings. If `commit=True` (on by default), the
-        coord will be stored to the Setting object.
-        If a string is NOT passed as `cursor`, the committed coord will
-        be set to `.text_cursor`. However, if the particular cursor IS
-        specified, it will save the resulting coord to that attribute
-        name (so long as `commit=True`).
-          ex: 'setObj._reset_cursor(cursor='highlight', commit=True)
-                -> setObj.highlight == (x, y)
-                # where x,y are the starting coord."""
+        coord will be stored to the appropriate Plat object attribute.
+        Specifically, if a string is NOT passed as `cursor=`, the
+        committed coord will be set to the default `.text_cursor`.
+        However, if the particular cursor IS specified, it will save the
+        resulting coord to that attribute name (so long as
+        `commit=True`).
+            ex: 'setObj.reset_cursor()
+                -> setObj.text_cursor == (100, 800) #because commit=True
+                -> and returns (100,800)
+            ex: 'setObj.reset_cursor(cursor='highlight', commit=True)
+                -> setObj.highlight == (100, 800)  #because commit=True
+                -> and returns (100,800)
+            (Note that (100, 800) as starting coords were arbitrarily
+                chosen for the purposes of this example. It depends on
+                the Settings object stored in `.settings` attribute.)
+        Be careful not to overwrite other required attributes."""
 
         stngs = self.settings
         x = stngs.bottom_text_indent
@@ -318,32 +344,42 @@ class Plat:
 
         # Only if `commit=True` do we set this.
         if commit:
-            setattr(self, cursor, coord)
+            self.set_cursor(x, y, cursor)
 
         # And return the coord.
         return coord
 
     def set_cursor(self, x, y, cursor='text_cursor'):
-        """Set the cursor to the specified x and y coords.  If a string
-        is NOT passed as `cursor`, the committed coord will be set to
-        `.text_cursor`. However, if the particular cursor IS specified,
-        it will save the resulting coord to that attribute name."""
+        """Set the cursor to the specified x and y coords. If a string
+        is NOT passed as `cursor=`, the committed coord will be set to
+        the default `.text_cursor`. However, if the particular cursor
+        IS specified, it will save the resulting coord to that attribute
+        name.
+            ex: 'setObj.set_cursor()
+                -> setObj.text_cursor == (200, 1200)
+            ex: 'setObj.set_cursor(200, 1200, cursor='highlight')
+                -> setObj.highlight == (200, 1200)
+        Be careful not to overwrite other required attributes."""
+
         setattr(self, cursor, (x, y))
 
     def update_cursor(
             self, x_delta, y_delta, cursor='text_cursor', commit=True) -> tuple:
-        """Return an updated coord (x,y) of where bottom text may be
-        written, per settings. If `commit=True` (on by default), the
-        coord will be stored to the Setting object.
-        If a string is NOT passed as `cursor`, the committed coord will
-        be set to `.text_cursor`. However, if the particular cursor IS
-        specified, it will save the resulting coord to that attribute
-        name (so long as `commit=True`).
-          ex: 'setObj.update_cursor(cursor='highlight', commit=True)
-                -> setObj.highlight == (x, y)
-                # where x,y are the updated coord.
-        IMPORTANT: If `cursor` is specified but does not already exist,
-        it will be based off `.text_cursor`."""
+        """Update the coord of the cursor, by adding the `x_delta` and
+        `y_delta` to the pre-existing coord. Returns the updated coord,
+        and optionally store it to the attribute with `commit=True` (on
+        by default).
+
+        If a string is NOT passed as `cursor=`, the committed coord will
+        be set to the default `.text_cursor`. However, if the particular
+        cursor IS specified, it will save the resulting coord to that
+        attribute name (so long as `commit=True`).
+
+        Further, if the cursor is specified but does not yet exist, this
+        will read from `.text_cursor` (to calculate the updated coord)
+        but save to the specified cursor.
+
+        Be careful not to overwrite other required attributes."""
 
         # Pull the specified cursor. If it does not already exist as an
         # attribute in this object, it will fall back to `.text_cursor`,
@@ -360,7 +396,7 @@ class Plat:
     def output(self, filepath=None):
         """Merge the drawn overlay (i.e. filled QQ's) onto the base
         township plat image and return an Image object. Optionally save
-        to file if `filepath=<filepath>` is specified."""
+        the image to file if `filepath=<filepath>` is specified."""
         merged = Image.alpha_composite(self.image, self.overlay)
 
         # TODO: Add the option with *args to specify which layers get
@@ -374,51 +410,51 @@ class Plat:
 
         return merged
 
-    def plat_section(self, SecObj, qq_fill_RGBA=None):
-        """Take the SectionGrid object and fill any ticked QQ's (per the
-        `SectionGrid.QQgrid` values)."""
-        secNum = int(SecObj.sec)
+    def plat_section_grid(self, secGrid: SectionGrid, qq_fill_RGBA=None):
+        """Project a SectionGrid object onto an existing Plat Object
+        (i.e. fill in any QQ hits per the `SectionGrid.QQgrid` values)."""
+        secNum = int(secGrid.sec)
         # TODO: Handle secError
-        for coord in SecObj.filled_coords():
+        for coord in secGrid.filled_coords():
             self.fill_qq(secNum, coord, qq_fill_RGBA=qq_fill_RGBA)
         if self.settings.write_lot_numbers:
-            self.write_lots(SecObj)
+            self.write_lots(secGrid)
 
     @staticmethod
-    def from_section_grid(section : SectionGrid, tracts=None, settings=None):
-        """Return a section-only plat generated from a SectionGrid object."""
-        # TODO: Write this method for a section-only plat, rather than 6x6 grid.
+    def from_section_grid(secGrid: SectionGrid, tracts=None, settings=None):
+        """Return a section-only Plat object generated from a
+        SectionGrid object."""
         platObj = Plat(
-            twp=section.twp,
-            rge=section.rge,
+            twp=secGrid.twp,
+            rge=secGrid.rge,
             settings=settings,
-            only_section=section.sec)
-        platObj.plat_section(section)
+            only_section=secGrid.sec)
+        platObj.plat_section_grid(secGrid)
         if platObj.settings.write_tracts:
             platObj.write_all_tracts(tracts)
         return platObj
 
     @staticmethod
-    def from_township_grid(township, tracts=None, settings=None):
+    def from_township_grid(twpGrid, tracts=None, settings=None):
         """Return a Plat object generated from a TownshipGrid object."""
-        twp = township.twp
-        rge = township.rge
+        twp = twpGrid.twp
+        rge = twpGrid.rge
         platObj = Plat(twp=twp, rge=rge, settings=settings)
-        platObj.plat_township(township=township, tracts=tracts)
+        platObj.plat_township_grid(twpGrid=twpGrid, tracts=tracts)
         return platObj
 
-    def plat_township(self, township, tracts=None):
+    def plat_township_grid(self, twpGrid, tracts=None):
         """Project a TownshipGrid object onto an existing Plat object."""
 
         # Generate the list of sections that have anything in them.
-        sec_list = township.filled_sections()
+        sec_list = twpGrid.filled_sections()
 
         # Plat each Section's filled QQ's onto our new overlay.
         for sec in sec_list:
             if self.settings.write_lot_numbers:
                 # If so configured in settings, write lot numbers onto QQ's
                 self.write_lots(sec)
-            self.plat_section(sec)
+            self.plat_section_grid(sec)
 
         # Write the Tract data to the bottom of the plat (or not, per settings).
         if self.settings.write_tracts:
@@ -427,27 +463,27 @@ class Plat:
         return self.output()
 
     @staticmethod
-    def from_tract(Tract, settings=None, single_sec=True, ld=None):
+    def from_tract(tractObj, settings=None, single_sec=True, ld=None):
         """Return a Plat object generated from a Tract object."""
-        twp = Tract.twp
-        rge = Tract.rge
-        sec = Tract.sec
+        twp = tractObj.twp
+        rge = tractObj.rge
+        sec = tractObj.sec
         only_sec = None
         if single_sec:
             only_sec = str(int(sec))
 
         platObj = Plat(twp=twp, rge=rge, settings=settings, only_section=only_sec)
-        platObj.plat_tract(Tract, ld=ld)
+        platObj.plat_tract(tractObj, ld=ld)
         return platObj
 
-    def plat_tract(self, TractObj, write_tract=None, ld=None):
+    def plat_tract(self, tractObj, write_tract=None, ld=None):
         """Project a Tract object onto an existing Plat object. Optionally,
-        write the tract at the bottom with `write_tract=True`. If
-        `write_tract` is unspecified, it will default to whatever the
+        write the tract description at the bottom with `write_tract=True`.
+        If `write_tract` is unspecified, it will default to whatever the
         Plat settings say (i.e. in `platObject.settings.write_tracts`)."""
 
-        twp, rge = TractObj.twp, TractObj.rge
-        sec = str(int(TractObj.sec)).rjust(2, '0')
+        twp, rge = tractObj.twp, tractObj.rge
+        sec = str(int(tractObj.sec)).rjust(2, '0')
 
         # If the user fed in a LDDB or TwpLD, rather than a LotDefinitions
         # object, get the appropriate LD from the LDDB or TLD.
@@ -473,15 +509,15 @@ class Plat:
                 ld = LotDefinitions()
 
         # Generate a SectionGrid from the Tract, and plat it.
-        secGrid = SectionGrid.from_tract(TractObj, ld=ld)
-        self.plat_section(secGrid)
+        secGrid = SectionGrid.from_tract(tractObj, ld=ld)
+        self.plat_section_grid(secGrid)
 
         # If not specified whether to write tract, default to settings
         if write_tract is None:
             write_tract = self.settings.write_tracts
 
         if write_tract:
-            self.write_all_tracts([TractObj])
+            self.write_all_tracts([tractObj])
 
     def write_all_tracts(self, tracts=None):
         """Write all the tract descriptions at the bottom of the plat."""
@@ -526,14 +562,14 @@ class Plat:
                         fill=Settings.RGBA_RED)
                     break
 
-    def _write_tract(self, start_xy, TractObj, font_RGBA=None):
-        """Write the parsed Tract object on the page."""
+    def _write_tract(self, start_xy, tractObj, font_RGBA=None):
+        """Write the description of the parsed Tract object on the page."""
 
         if font_RGBA is None:
             font_RGBA = self.settings.tractfont_RGBA
 
         x, y = start_xy
-        tract_text = TractObj.quick_desc()
+        tract_text = tractObj.quick_desc()
         w, h = self.draw.textsize(tract_text, font=self.settings.tractfont)
         self.draw.text(
             start_xy,
@@ -600,8 +636,10 @@ class Plat:
                 write_lot(clean_lots, (x, y))
 
     def fill_qq(self, section: int, grid_location: tuple, qq_fill_RGBA=None):
-        """Fill in the QQ at the `grid_location` coords, of the specified
-        `section`, on the `plat`, with the color specified in qq_fill_RGBA."""
+        """Fill in the QQ on the plat, in the specified `section`, at the
+        appropriate `grid_location` coord (x, y) within that section,
+        with the color specified in `qq_fill_RGBA`. If `qq_fill_RGBA` is
+        not specified, it will pull from the Plat object's settings."""
 
         if qq_fill_RGBA is None:
             # If not specified, pull from plat settings.
@@ -628,13 +666,12 @@ class Plat:
             qq_fill_RGBA
         )
 
-    def _draw_sec(self, xy_start, section=None):
-        """Draw the 4x4 grid of a section with a ImageDraw object, at the
-        specified coordinates. Optionally specify the section number with
-        `section=<int>`. If `settings=<Settings object> is not specified,
-        default settings will be used."""
+    def _draw_sec(self, top_left_corner, section=None):
+        """Draw the 4x4 grid of a section with an ImageDraw object, at the
+        specified coordinates. Optionally specify the section number
+        with `section=<int>`. (Pulls sizes, lengths, etc. from `.settings`)"""
 
-        x_start, y_start = xy_start
+        x_start, y_start = top_left_corner
 
         settings = self.settings
 
@@ -710,7 +747,30 @@ class Plat:
 
 class MultiPlat:
     """An object to create, process, hold, and output one or more Plat
-    objects -- e.g., when there are multiple T&R's from a PLSSDesc obj."""
+    objects -- e.g., when there are multiple T&R's from a PLSSDesc obj.
+
+    At init, configure the look, size, fonts, etc. of all subordinate
+    Plats by passing a Settings object to `settings=`. (Can also pass
+    the name of a preset -- see Settings docs for more details.)
+
+    For better results, optionally pass a LotDefDB object (or the path
+    to a .csv file that can be read into a LotDefDB object) to `lddb=`,
+    to specify how to handle lots -- i.e. which QQ's are intended by
+    which lots. (See more info in `grid.LotDefDB` docs.)
+
+    MultiPlat objects can process these types of objects:
+        pyTRS.PLSSDesc**, pyTRS.Tract**, SectionGrid, TownshipGrid
+    (**pyTRS.Tract objects are imported in this module as `Tract`, and
+    pyTRS.PLSSDesc objects are imported as `PLSSDesc`.)
+
+    Generated Plat objects are stored in `.plats`. They are Plat objects
+    but not flattened images. To get a list of flattened images from all
+    of the plats, use the `.output()` method. And see `.output_to_pdf()`
+    and `.output_to_png()` methods for saving to files.
+
+    A MultiPlatQueue object is stored for each MultiPlat as `.mpq`,
+    which can be added to with the `.queue()` method (or `.queue_text()`
+    method), and processed with the `.process_queue()` method."""
 
     # TODO: Wherever LDDB, TLD, or LD is referenced in a kwarg, allow it
     #   to pull from self.lddb.
@@ -763,13 +823,14 @@ class MultiPlat:
         """Queue up an object for platting -- i.e. pass through the
         arguments to the `.queue()` method in the Plat's MultiPlatQueue
         object."""
-        self.mpq.queue(plattable, twprge, tracts)
+        self.mpq.queue(plattable=plattable, twprge=twprge, tracts=tracts)
 
     def queue_text(self, text, config=None):
-        """Parse text (optionally using `config=` parameters), and add the
-        resulting PLSSDesc object to this MultiPlat's queue (`.mpq`) --
-        by passing through the arguments to the `.queue_text()` method
-        in the Plat's MultiPlatQueue object."""
+        """Parse the text of a PLSS land description (optionally using
+        `config=` parameters -- see pyTRS docs), and add the resulting
+        PLSSDesc object to this MultiPlat's queue (`.mpq`) -- by passing
+        through the arguments to the `.queue_text()` method in the
+        Plat's MultiPlatQueue object."""
         self.mpq.queue_text(text=text, config=config)
 
     def process_queue(self, queue=None):
@@ -792,16 +853,17 @@ class MultiPlat:
     @staticmethod
     def from_PLSSDesc(PLSSDesc_obj, settings=None, lddb=None):
         """Generate a MultiPlat from a parsed PLSSDesc object.
-        (lots/QQs must be parsed within the Tracts for this to work.)"""
+        (lots/QQs must be parsed within the Tracts for any QQ's to be
+        filled on the resulting plats.)"""
 
         mp_obj = MultiPlat(settings=settings, lddb=lddb)
 
         # Generate a dict of TownshipGrid objects from the PLSSDesc object.
         twp_grids = plss_to_grids(PLSSDesc_obj, lddb=lddb)
 
-        # Get a dict linking the the PLSSDesc object's parsed Tracts to their respective
-        # T&R's (keyed by T&R '000x000y' -- same as the twp_grids dict)
-        twp_to_tract = filter_tracts_by_tr(PLSSDesc_obj.parsedTracts)
+        # Get a dict linking the the PLSSDesc object's parsed Tracts to their
+        # respective T&R's (keyed by T&R '000x000y' -- same as the twp_grids dict)
+        twp_to_tract = filter_tracts_by_twprge(PLSSDesc_obj.parsedTracts)
 
         # Generate Plat object of each township, and append it to mp_obj.plats
         for k, v in twp_grids.items():
@@ -812,8 +874,9 @@ class MultiPlat:
 
     @staticmethod
     def from_text(text, config=None, settings=None, lddb=None):
-        """Parse the text of a PLSS land description, and generate plat(s)
-        for the lands described. Returns a MultiPlat object of the plats."""
+        """Parse the text of a PLSS land description (optionally using
+        `config=` parameters -- see pyTRS docs), and generate Plat(s)
+        for the lands described. Returns a MultiPlat object."""
 
         # If the user passed a filepath to a .csv file as `lddb`, create a
         # LotDefDB object from that file now, and then pass that forward.
@@ -824,8 +887,8 @@ class MultiPlat:
         return MultiPlat.from_PLSSDesc(descObj, settings=settings, lddb=lddb)
 
     def show(self, index: int):
-        """Display one of the plat Images, specifically the one in the
-        `.plats` list at the specified `index`."""
+        """Display one of the plat Image objects, specifically the one
+        in the `.plats` list at the specified `index`."""
         try:
             self.plats[index].output().show()
         except:
@@ -844,10 +907,11 @@ class MultiPlat:
         im1.save(filepath, save_all=True, append_images=plat_ims)
 
     def output_to_png(self, filepath):
-        """Save all of the Plat images to PNG(s) at the specified
-        `filepath`. IMPORTANT: If there are multiple plats, then each
-        numbers (from '_000') will be added to the end of each, before
-        the file extension."""
+        """Save all of the Plat images to .png (or multiple .png files,
+        if there is more than one Plat in `.plats`) at the specified
+        `filepath`. IMPORTANT: If there are multiple plats, then numbers
+        (from '_000') will be added to the end of each, before the file
+        extension."""
         if not filepath.lower().endswith('.png'):
             raise Exception('Error: filepath should end with `.png`')
             return
@@ -867,7 +931,8 @@ class MultiPlat:
                 i += 1
 
     def output(self) -> list:
-        """Return a list of the Plat images."""
+        """Return a list of flattened Image objects from all of the Plat
+        objects in `.plats`."""
         plat_ims = []
         for p in self.plats:
             plat_ims.append(p.output().convert('RGB'))
@@ -881,10 +946,19 @@ class MultiPlat:
 def text_to_plats(
         text, config=None, settings=None, lddb=None,
         output_filepath=None) -> list:
-    """Parse the text of a PLSS land description, and generate plat(s)
-    for the lands described. Optionally output to .png or .pdf with
+    """Parse the text of a PLSS land description (optionally using
+    `config=` parameters -- see pyTRS docs), and generate plat(s) for
+    the lands described. Optionally output to .png or .pdf with
     `output_filepath=` (end with '.png' or '.pdf' to specify the output
-    file type).  Returns a list of Image objects of the plats."""
+    file type).  Returns a list of Image objects of the plats.
+
+    Configure the look, size, fonts, etc. of the Plat by passing a
+    Settings object to `settings=`. (Can also pass the name of a preset
+    -- see Settings docs for more details.)
+
+    Optionally pass a LotDefDB object (or path to .csv file that can be
+    read into a LotDefDB object) into `lddb=` for better results. (See
+    more info in `grid.LotDefDB` docs."""
 
     mp = MultiPlat.from_text(text=text, config=config, settings=settings, lddb=lddb)
     if output_filepath is not None:

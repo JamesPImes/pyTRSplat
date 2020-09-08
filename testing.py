@@ -16,8 +16,12 @@ from plat import text_to_plats, Plat, MultiPlat
 # The filepath to a .csv that can be read into a LotDefDB object:
 example_lddb_filepath = r'C:\Users\James Imes\Box\Programming\pyTRS_plotter\assets\examples\SAMPLE_LDDB.csv'
 
-# Creating a LotDefDB object by reading in a .csv file:
+
+# Creating a LotDefDB object by reading in a .csv file.
 example_lddb_obj = LotDefDB.from_csv(example_lddb_filepath)
+# Equivalently (because `.from_csv()` is implied when we pass a proper filepath to a .csv file):
+example_lddb_obj = LotDefDB(example_lddb_filepath)
+
 
 # Sample PLSS description text:
 descrip_text = 'T154N-R97W Sec 01: Lots 1 - 3, S2NE, Sec 25: Lots 1 - 8, T155N-R97W Sec 22: W/2'
@@ -30,6 +34,7 @@ ttp = text_to_plats(descrip_text, config='cleanQQ', lddb=example_lddb_filepath, 
 # Or as a MultiPlat object:
 mp = MultiPlat.from_text(descrip_text, config='cleanQQ', lddb=example_lddb_filepath, settings='letter')
 #mp.show(0)  # Display the first image in the MultiPlat (i.e. 154n97w in this case)
+
 
 
 # Some miscellaneous objects that can be added to a PQ (or possibly MPQ):
