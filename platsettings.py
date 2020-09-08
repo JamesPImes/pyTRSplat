@@ -53,7 +53,7 @@ class Settings:
         'write_section_numbers', 'write_lot_numbers'
     ]
 
-    def __init__(self):
+    def __init__(self, source=None):
 
         # Dimensions of the image.
         self.dim = Settings.LETTER_200ppi
@@ -121,6 +121,25 @@ class Settings:
         self.write_section_numbers = True
         self.write_lot_numbers = False
 
+        # If `source` is specified as a string, we assume it is either a
+        # filepath to a .txt file that can be loaded as Settings data, or a
+        # preset name, which can also be loaded as Settings data.
+        if isinstance(source, str):
+            if source.lower().endswith('.txt'):
+                try:
+                    self._import_file(source)
+                except:
+                    raise Warning(
+                        f"Apparent filepath '{source}' could not be imported as"
+                        f" Settings object.")
+            else:
+                try:
+                    self._import_preset(source)
+                except:
+                    raise Warning(
+                        f"Apparent preset '{source}' could not be imported as"
+                        f" Settings object.")
+
     def set_font(self, purpose, typeface:str, size:int):
         """Set the font for the respective purpose.
             `purpose` -> either 'header', 'tract', 'sec', or 'lot'
@@ -144,24 +163,29 @@ class Settings:
 
     @staticmethod
     def from_file(fp):
-        """Compile and return a Config object from .txt file"""
+        """Compile and return a Settings object from .txt file"""
+
+        setObj = Settings()
+        setObj._import_file(fp)
+        return setObj
+
+    def _import_file(self, fp):
+        """Read settings from a .txt file into this Settings object."""
         # Return codes:
-        # a Config object --> success
+        # 0 --> success
         # 1 --> Filename with extension other than `.txt` entered
         # 2 --> Could not open file at `filepath`
 
-        if fp[-4:].lower() != '.txt':
-            print('Error: filename must be .txt file')
+        if not fp.lower().endswith('.txt'):
+            raise ValueError('Error: filename must be .txt file')
             return 1
 
         try:
             with open(fp, 'r') as file:
                 settingLines = file.readlines()
         except:
-            print(f'Error: Could not open file: {fp}')
+            raise IOError(f'Error: Could not open file: {fp}')
             return 2
-
-        setObj = Settings()
 
         for line in settingLines:
             # Ignore data stored in angle brackets
@@ -170,12 +194,13 @@ class Settings:
 
             # For each line, parse the 'attrib=val' pair, and commit to
             # the setObj, using ._set_str_to_values()
-            setObj._set_str_to_val(line.strip('\n'))
+            self._set_str_to_val(line.strip('\n'))
 
         # Remember to construct the font objects.
-        setObj._update_fonts()
+        self._update_fonts()
 
-        return setObj
+        # Success code:
+        return 0
 
     def _set_str_to_val(self, attrib_val):
         """Take in a string of an attribute/value pair (in the format
@@ -300,32 +325,41 @@ class Settings:
 
     @staticmethod
     def preset(name: str):
-        """Load a saved preset."""
+        """Load and return a saved preset Settings object."""
+
+        setObj = Settings()
+        setObj._import_preset(name)
+        return setObj
+
+    def _import_preset(self, name: str):
+        """Load a saved preset into the current Settings object."""
 
         try:
             presets = Settings.list_presets()
-            if name in presets:
+            if name.lower() in presets:
                 fp = f"{Settings.PRESET_DIRECTORY}{name}.txt"
-                return Settings.from_file(fp)
+                return self._import_file(fp)
             else:
-                raise Exception(f"'{name}' is not a saved preset.")
+                raise ValueError(f"'{name}' is not a saved preset.")
         except:
-            raise Exception(f"Could not find or access preset '{name}'")
-
+            raise ValueError(f"Could not find or access preset '{name}'")
 
     @staticmethod
     def list_presets() -> list:
+        """Return a list of presets (all lowercase)."""
+
         import os
         files = os.listdir(Settings.PRESET_DIRECTORY)
         presets = []
         for f in files:
             if f.lower().endswith('.txt'):
-                presets.append(f[:-4])
+                presets.append(f.lower()[:-4])
         return presets
 
     def save_preset(self, name: str):
-        """Save this Settings object as a preset."""
-        fp = f"{Settings.PRESET_DIRECTORY}{name}.txt"
+        """Save this Settings object as a preset (converted to lowercase)."""
+
+        fp = f"{Settings.PRESET_DIRECTORY}{name.lower()}.txt"
         try:
             self.save_to_file(fp)
         except:

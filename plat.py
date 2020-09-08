@@ -13,10 +13,11 @@ and incorporate parsed pyTRS PLSSDesc and Tract objects."""
 
 from PIL import Image, ImageDraw, ImageFont
 from pyTRS import version as pyTRS_version
-from pyTRS.pyTRS import PLSSDesc, Tract
+from pyTRS.pyTRS import PLSSDesc, Tract, decompile_tr
 from grid import TownshipGrid, SectionGrid, plss_to_grids, filter_tracts_by_tr
 from grid import LotDefinitions, TwpLotDefinitions, LotDefDB, confirm_file
 from platsettings import Settings
+from platqueue import PlatQueue, MultiPlatQueue
 
 __version__ = '0.0.1'
 __versionDate__ = '8/31/2020'
@@ -31,7 +32,11 @@ class Plat:
     of each of the 36 sections (keyed by integers 1 - 36, inclusive).
     NOTE: May plat a single section, with `only_section=<int>` at init."""
 
-    def __init__(self, twp='', rge='', only_section=None, settings=None):
+    # TODO: Wherever TLD or LD is referenced in a kwarg, allow it
+    #   to pull from self.tld or self.ld.
+
+    def __init__(self, twp='', rge='', only_section=None, settings=None,
+                 tld=None):
         self.twp = twp
         self.rge = rge
         self.TR = twp+rge
@@ -55,11 +60,21 @@ class Plat:
         # If settings was not specified, create a default Settings object.
         if settings is None:
             settings = Settings()
+        elif isinstance(settings, str):
+            # If passed as a string, it may be a preset or filepath to a
+            # file that can be imported as a Settings object. Create
+            # that Settings object now. (If that fails, it will be a
+            # defualt Settings object anyway.)
+            settings = Settings(settings)
         self.settings = settings
-        dim = settings.dim
 
-        self.image = Image.new('RGBA', dim, Settings.RGBA_WHITE)
+        # The main Image of the plat, and an ImageDraw object for it.
+        self.image = Image.new('RGBA', settings.dim, Settings.RGBA_WHITE)
         self.draw = ImageDraw.Draw(self.image, 'RGBA')
+
+        # Overlay on which we'll plat QQ's, and an ImageDraw object for it
+        self.overlay = Image.new('RGBA', settings.dim, (255, 255, 255, 0))
+        self.overlay_draw = ImageDraw.Draw(self.overlay, 'RGBA')
 
         # A dict of the sections and the (x,y) coords of their NWNW corner:
         self.sec_coords = {}
@@ -85,14 +100,93 @@ class Plat:
         #       coords (120,180) and accessed as `platObj.highlighter`:
         #           >>> platObj.set_cursor(120, 180, cursor='highlighter')
 
-        # Overlay on which we'll plat QQ's
-        self.overlay = Image.new('RGBA', self.image.size, (255, 255, 255, 0))
-        self.overlay_draw = ImageDraw.Draw(self.overlay, 'RGBA')
+        # A PlatQueue object holding elements/tracts that will be platted.
+        self.pq = PlatQueue()
 
-        # TODO: self.cursor = <the current position where tract text, etc. can be written>
-        #   i.e. Keep track where we've written up to, and where we can still write at in
-        #   x,y pixel coordinates.
+        # LotDefinitions and/or TwpLotDefinitions, in case we want to
+        # call `.plat_tract()`.  The appropriate one will be set
+        # shortly, depending on whether `only_section` was specified
+        # (LD's apply to single sections, whereas TLD's apply to whole
+        # townships).
+        self.ld = None
+        self.tld = None
 
+        # If a LotDefDB object was passed instead of a TLD or LD object,
+        # get the appropriate TLD from it (per twp+rge); and if none
+        # exists, then use a default TLD object. Also then get the LD
+        # from it, if `only_section` was specified; and if none exists,
+        # then get a default LotDefinitions obj.
+        if isinstance(tld, LotDefDB):
+            tld = tld.get(twp + rge, TwpLotDefinitions())
+            if only_section is not None:
+                ld = tld.get(only_section, LotDefinitions())
+            else:
+                ld = None
+        elif isinstance(tld, LotDefinitions):
+            ld = tld
+            tld = None
+        elif isinstance(tld, TwpLotDefinitions):
+            ld = None
+        else:
+            # Fall back on default LD and TLD objects.
+            ld = LotDefinitions()
+            tld = TwpLotDefinitions()
+
+        # And finally set the appropriate ld or tld.
+        if only_section is not None:
+            self.ld = ld
+        else:
+            self.tld = tld
+
+    @staticmethod
+    def from_twprge(twprge='', only_section=None, settings=None, tld=None):
+        """Generate a Plat object by specifying twprge as a single string,
+        rather than as twp and rge separately."""
+        t, ns, r, ew = decompile_tr(twprge)
+        twp = t + ns
+        rge = r + ew
+        # TODO: Handle error twprge's.
+        return Plat(twp=twp, rge=rge, only_section=only_section,
+                    settings=settings, tld=tld)
+
+    @staticmethod
+    def from_queue(pq, twp='', rge='', only_section=None, settings=None, tld=None):
+        """Generate and return a Plat object from a PlatQueue object."""
+        sp_obj = Plat(
+            twp=twp, rge=rge, only_section=only_section,
+            settings=settings, tld=tld)
+        sp_obj.process_queue(pq)
+        return sp_obj
+
+    def queue(self, plattable, tracts=None):
+        """Queue up an object for platting -- i.e. pass through the
+        arguments to the `.queue()` method in the Plat's PlatQueue
+        object."""
+        self.pq.queue(plattable, tracts)
+
+    def process_queue(self, queue=None):
+        """Process all objects in a PlatQueue object. If `queue=None`,
+        the PlatQueue object that will be processed is this Plat's `.pq`
+        attribute."""
+
+        # If a different PlatQueue isn't otherwise specified, use the
+        # Plat's own `.pq` from init.
+        if queue is None:
+            queue = self.pq
+
+        for itm in queue:
+            if not isinstance(itm, PlatQueue.SINGLE_PLATTABLES):
+                raise TypeError(f"Cannot process type in PlatQueue: "
+                                f"{type(itm)}")
+            if isinstance(itm, SectionGrid):
+                self.plat_section(itm)
+            elif isinstance(itm, TownshipGrid):
+                self.plat_township(itm)
+            elif isinstance(itm, Tract):
+                self.plat_tract(itm, write_tract=False)
+
+        if self.settings.write_tracts:
+            self.write_all_tracts(queue.tracts)
 
     def _gen_header(self, only_section=None):
         """Generate the text of a header containing the T&R and/or
@@ -300,7 +394,8 @@ class Plat:
             settings=settings,
             only_section=section.sec)
         platObj.plat_section(section)
-        platObj.write_all_tracts(tracts)
+        if platObj.settings.write_tracts:
+            platObj.write_all_tracts(tracts)
         return platObj
 
     @staticmethod
@@ -325,14 +420,72 @@ class Plat:
                 self.write_lots(sec)
             self.plat_section(sec)
 
-        # Write the Tract data to the bottom of the plat.
-        self.write_all_tracts(tracts)
+        # Write the Tract data to the bottom of the plat (or not, per settings).
+        if self.settings.write_tracts:
+            self.write_all_tracts(tracts)
 
         return self.output()
 
+    @staticmethod
+    def from_tract(Tract, settings=None, single_sec=True, ld=None):
+        """Return a Plat object generated from a Tract object."""
+        twp = Tract.twp
+        rge = Tract.rge
+        sec = Tract.sec
+        only_sec = None
+        if single_sec:
+            only_sec = str(int(sec))
+
+        platObj = Plat(twp=twp, rge=rge, settings=settings, only_section=only_sec)
+        platObj.plat_tract(Tract, ld=ld)
+        return platObj
+
+    def plat_tract(self, TractObj, write_tract=None, ld=None):
+        """Project a Tract object onto an existing Plat object. Optionally,
+        write the tract at the bottom with `write_tract=True`. If
+        `write_tract` is unspecified, it will default to whatever the
+        Plat settings say (i.e. in `platObject.settings.write_tracts`)."""
+
+        twp, rge = TractObj.twp, TractObj.rge
+        sec = str(int(TractObj.sec)).rjust(2, '0')
+
+        # If the user fed in a LDDB or TwpLD, rather than a LotDefinitions
+        # object, get the appropriate LD from the LDDB or TLD.
+        if isinstance(ld, LotDefDB):
+            ld = ld.trs(twp + rge + sec)
+        elif isinstance(ld, TwpLotDefinitions):
+            ld = ld[int(sec)]
+
+        # If the user requested default LotDefs (based on a 'standard'
+        # township) by passing 'default' for `ld`, create that LD obj.
+        if ld == 'default':
+            ld = LotDefinitions(int(sec))
+
+        # Or if not specified when `.plat_tract()` was called, pull from
+        # the Plat object's attributes, as long as they were set.
+        if ld is None:
+            if self.ld is not None:
+                ld = self.ld
+            elif self.tld is not None:
+                ld = self.tld[int(sec)]
+            else:
+                # Otherwise, fall back to an empty LD.
+                ld = LotDefinitions()
+
+        # Generate a SectionGrid from the Tract, and plat it.
+        secGrid = SectionGrid.from_tract(TractObj, ld=ld)
+        self.plat_section(secGrid)
+
+        # If not specified whether to write tract, default to settings
+        if write_tract is None:
+            write_tract = self.settings.write_tracts
+
+        if write_tract:
+            self.write_all_tracts([TractObj])
+
     def write_all_tracts(self, tracts=None):
         """Write all the tract descriptions at the bottom of the plat."""
-        if tracts is None or not self.settings.write_tracts:
+        if tracts is None:
             return
 
         # Save line space later in by setting this variable:
@@ -559,50 +712,89 @@ class MultiPlat:
     """An object to create, process, hold, and output one or more Plat
     objects -- e.g., when there are multiple T&R's from a PLSSDesc obj."""
 
-    def __init__(self, settings=None):
+    # TODO: Wherever LDDB, TLD, or LD is referenced in a kwarg, allow it
+    #   to pull from self.lddb.
+
+    # TODO: Figure out a good way to organize the plats. I'm thinking a
+    #  dict, keyed by T&R. Currently, it's a list.
+
+    def __init__(self, settings=None, lddb=None):
+
+        # If settings was not specified, create a default Settings object.
         if settings is None:
             settings = Settings()
+        elif isinstance(settings, str):
+            # If passed as a string, it may be a preset or filepath to a
+            # file that can be imported as a Settings object. Create
+            # that Settings object now. (If that fails, it will be a
+            # defualt Settings object anyway.)
+            settings = Settings(settings)
         self.settings = settings
 
         # A list of generated plats
         self.plats = []
 
+        # A MultiPlatQueue object holding PlatQueue objects (which in
+        # turn hold elements/tracts that will be platted).
+        self.mpq = MultiPlatQueue()
+
+        # LotDefDB object for defining lots in subordinate plats (if not
+        # specified when platting objects).
+        if isinstance(lddb, str):
+            # If a string is passed, we assume it's a filepath to a file
+            # that can be read into a LDDB object (e.g., a .csv file).
+            # Convert to LDDB object now.
+            lddb = LotDefDB(lddb)
+        if not isinstance(lddb, LotDefDB):
+            # If there's no valid LDDB by now, default to an empty LDDB.
+            lddb = LotDefDB()
+        self.lddb = lddb
+
     @staticmethod
-    def from_multiple(*plat_targets, settings=None):
-        """Generate a cohesive MultiPlat from multiple sources,
-        optionally of different types."""
-        # TODO: Finish writing this method.
-        mp_obj = MultiPlat(settings=settings)
+    def from_queue(mpq, settings=None, lddb=None):
+        """Generate and return a MultiPlat object from a MultiPlatQueue
+        object."""
 
-        # A list of generated plats
-        mp_obj.plats = []
+        mp_obj = MultiPlat(settings=settings, lddb=lddb)
+        mp_obj.process_queue(mpq)
+        return mp_obj
 
-        PLSSDesc_objs = []
-        Tract_objs = []
-        for p in plat_targets:
-            if isinstance(p, TownshipGrid):
-                mp_obj.plats.append(Plat.from_township_grid(p, settings=mp_obj.settings))
-            elif isinstance(p, SectionGrid):
-                mp_obj.plats.append(Plat.from_section_grid(p, settings=mp_obj.settings))
-            elif isinstance(p, PLSSDesc):
-                PLSSDesc_objs.append(p)
-            elif isinstance(p, Tract):
-                Tract_objs.append(p)
-        for d in PLSSDesc_objs:
-            Tract_objs.extend(d.parsedTracts)
-        twp_dict = {}
-        for t in Tract_objs:
-            twp_dict = filter_tracts_by_tr(t, twp_dict)
-        for township_key, v in twp_dict.items():
-            # TODO: plat_plss on each t,v
-            pass
+    def queue(self, plattable, twprge='', tracts=None):
+        """Queue up an object for platting -- i.e. pass through the
+        arguments to the `.queue()` method in the Plat's MultiPlatQueue
+        object."""
+        self.mpq.queue(plattable, twprge, tracts)
+
+    def queue_text(self, text, config=None):
+        """Parse text (optionally using `config=` parameters), and add the
+        resulting PLSSDesc object to this MultiPlat's queue (`.mpq`) --
+        by passing through the arguments to the `.queue_text()` method
+        in the Plat's MultiPlatQueue object."""
+        self.mpq.queue_text(text=text, config=config)
+
+    def process_queue(self, queue=None):
+        """Process all objects in a MultiPlatQueue object. If `queue=None`,
+        the MultiPlatQueue object that will be processed is this
+        MultiPlat's `.mpq` attribute."""
+
+        # If a different MultiPlatQueue isn't otherwise specified, use
+        # the Plat's own `.mpq` from init.
+        if queue is None:
+            queue = self.mpq
+
+        stngs = self.settings
+        for twprge, pq in queue.items():
+            tld = self.lddb.get(twprge, None)
+            pl_obj = Plat.from_twprge(twprge, settings=stngs, tld=tld)
+            pl_obj.process_queue(pq)
+            self.plats.append(pl_obj)
 
     @staticmethod
     def from_PLSSDesc(PLSSDesc_obj, settings=None, lddb=None):
         """Generate a MultiPlat from a parsed PLSSDesc object.
         (lots/QQs must be parsed within the Tracts for this to work.)"""
 
-        mp_obj = MultiPlat(settings=settings)
+        mp_obj = MultiPlat(settings=settings, lddb=lddb)
 
         # Generate a dict of TownshipGrid objects from the PLSSDesc object.
         twp_grids = plss_to_grids(PLSSDesc_obj, lddb=lddb)
@@ -682,33 +874,13 @@ class MultiPlat:
         return plat_ims
 
 
-class PlatQueue(list):
-    """A list object to hold the objects that will be projected onto a
-    Plat object, or into a MultiPlat object."""
-    def __init__(self, *queue_items):
-        super().__init__()
-        for item in queue_items:
-            if not isinstance(item, tuple):
-                raise TypeError(
-                    'items in a PlatQueue must be tuple, each containing a '
-                    'plattable object, and optionally Tract objects (or None)')
-            self.queue(item)
-
-    def queue(self, plattable, tracts=None):
-        self.append((plattable, tracts))
-
-
-# TODO: Implement PlatQueue objects into Plat and MultiPlat objects:
-#   Add items to be projected onto the plat (together with their Tract
-#   objects). Then add a method for each Plat to project them all at the
-#   same time.
-
-
 ########################################################################
 # Platting text directly
 ########################################################################
 
-def text_to_plats(text, config=None, settings=None, lddb=None, output_filepath=None) -> list:
+def text_to_plats(
+        text, config=None, settings=None, lddb=None,
+        output_filepath=None) -> list:
     """Parse the text of a PLSS land description, and generate plat(s)
     for the lands described. Optionally output to .png or .pdf with
     `output_filepath=` (end with '.png' or '.pdf' to specify the output
@@ -721,19 +893,3 @@ def text_to_plats(text, config=None, settings=None, lddb=None, output_filepath=N
         elif output_filepath.lower().endswith('.png'):
             mp.output_to_png(output_filepath)
     return mp.output()
-
-
-########################################################################
-# Sample / testing:
-#
-# lddb_fp = LotDefDB.from_csv(r'C:\Users\James Imes\Box\Programming\pyTRS_plotter\assets\examples\SAMPLE_LDDB.csv')
-# set1 = Settings()
-# set1.write_lot_numbers = True
-# descrip = 'T154N-R97W Sec 01: Lots 1 - 3, S2NE, Sec 25: Lots 1 - 8'
-# # As a list:
-# ttp = text_to_plats(descrip, config='cleanQQ', lddb=lddb_fp, settings=set1)
-# ttp[0].show()
-# # Or as a MultiPlat object:
-# mp = MultiPlat.from_text(descrip, config='cleanQQ', lddb=lddb_fp, settings='letter')
-# mp.show(0)
-

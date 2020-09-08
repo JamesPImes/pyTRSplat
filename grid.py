@@ -55,9 +55,9 @@ class TownshipGrid:
             }
 
         if tld == 'default':
-            default_tld = TwpLotDefinitions([list(range(1,37))])
+            default_tld = TwpLotDefinitions(list(range(1, 37)))
             self.apply_TwpLotDefs(default_tld)
-        elif tld is not None:
+        elif isinstance(tld, TwpLotDefinitions):
             self.apply_TwpLotDefs(tld)
 
     def apply_TwpLotDefs(self, tld):
@@ -80,6 +80,22 @@ class TownshipGrid:
             if val['SectionGrid'].has_any():
                 x_sec.append(val['SectionGrid'])
         return x_sec
+
+    def incorporate_tract(self, tractObj, sec=None):
+        """Check the lotList and QQList of a parsed pyTRS.Tract object,
+        and incorporate any hits into the grid. If `sec=` is not
+        specified, it will pull the `.sec` from the Tract object."""
+        if sec is None:
+            sec = tractObj.sec
+        try:
+            sec = int(sec)
+        except:
+            raise Warning('Section number could not be converted to int. '
+                          'Tract object could not be incorporated into '
+                          'SectionGrid')
+            return
+
+        self.sections[sec]['SectionGrid'].incorporate_tract(tractObj)
 
 
 class LotDefinitions(dict):
@@ -183,16 +199,16 @@ class TwpLotDefinitions(dict):
     def __init__(self, default_sections=None):
         super().__init__()
         for i in range(1,37):
-            # Initialize an empty dict for each of the 36 sections in a
-            # standard Twp.
+            # Initialize an empty LotDef obj for each of the 36 sections
+            # in a standard Twp.
             self[i] = LotDefinitions(None)
 
-            # If we want to use_defaults, do so now.
-            if isinstance(default_sections, int):
-                self[default_sections] = LotDefinitions(default_sections)
-            elif isinstance(default_sections, list):
-                for sec in default_sections:
-                    self[sec] = LotDefinitions(sec)
+        # If we want to use default dicts for any sections, do so now.
+        if isinstance(default_sections, int):
+            self[default_sections] = LotDefinitions(default_sections)
+        elif isinstance(default_sections, list):
+            for sec in default_sections:
+                self[sec] = LotDefinitions(sec)
 
     def set_section(self, sec_num: int, lot_defs: LotDefinitions):
         self[sec_num] = lot_defs
@@ -234,24 +250,37 @@ class LotDefDB(dict):
     '000x000y' or fewer digits), and each whose values is a
     TwpLotDefinitions object for that T&R."""
 
-    def __init__(self):
+    def __init__(self, source=None):
         super().__init__()
+        if confirm_file(source, '.csv'):
+            self._import_csv(source)
 
     @staticmethod
     def from_csv(fp):
-        """Generate a LDDatabase of TwpLotDefinitions objects from a
-        properly formatted file at filepath `fp`. Converts each unique
-        T&R in the .csv file into a separate TwpLotDefinitions object.
-        Returns a dict, keyed by T&R (formatted '000x000y' or fewer
-        digits), each of whose value is the TwpLotDefinitions object for
-        that T&R.  (See documentation for how to format .csv files.)"""
+        """Generate a LotDefDB from a properly formatted** .csv file at
+        filepath `fp`. Converts each unique T&R in the .csv file into a
+        separate TwpLotDefinitions object. Reads the lot definitions in
+        the .csv and store them to the respective TwpLotDefinitions
+        object. Stores the TLD's to a LotDefDB object, keyed by T&R
+        (formatted '000x000y' or fewer digits), and returns that
+        LotDefDB object.
+            **See documentation for how to format .csv files."""
+        ldd = LotDefDB()
+        ldd._import_csv(fp)
 
+        return ldd
+
+    def _import_csv(self, fp):
+        """Convert each unique T&R in a properly formatted** .csv file
+        into a separate TwpLotDefinitions object. Read the lot
+        definitions in the .csv and store them to the respective
+        TwpLotDefinitions object. Stores the TLD's to this LotDefDB
+        object, keyed by T&R (formatted '000x000y' or fewer digits).
+            **See documentation for how to format .csv files."""
         # Confirm that `fp` points to an existing csv file. If not,
         # return None.
         if not confirm_file(fp, '.csv'):
             return None
-
-        ldd = LotDefDB()
 
         import csv
         f = open(fp, 'r')
@@ -262,15 +291,13 @@ class LotDefDB(dict):
             sec = int(row['sec'])
             lot, qq = row['lot'], row['qq']
             # If now TLD has yet been created for this T&R, do it now.
-            ldd.setdefault(twp + rge, TwpLotDefinitions())
+            self.setdefault(twp + rge, TwpLotDefinitions())
 
             # Add this lot/qq definition for the section/twp/rge on this row.
-            ldd[twp + rge][sec].set_lot(lot, qq)
+            self[twp + rge][sec].set_lot(lot, qq)
 
-        return ldd
-
-    def set_twp(self, twprge, twplotdef_obj):
-        self[twprge] = twplotdef_obj
+    def set_twp(self, twprge, tld_obj):
+        self[twprge] = tld_obj
 
     def trs(self, trs):
         """Access the (section-level) LotDefinitions object for the
@@ -589,7 +616,7 @@ def tracts_into_twp_grids(tract_list, grid_dict=None, lddb=None) -> dict:
         # No /new/ SectionGrid objects are created at this point (since a TownshipGrid
         # object creates all 36 of them at init), but SectionGrid objects are
         # updated at this point to incorporate our tracts.
-        grid_dict[twp + rge].sections[int(sec)]['SectionGrid'].incorporate_tract(tractObj)
+        grid_dict[twp + rge].incorporate_tract(tractObj, sec)
 
     return grid_dict
 
@@ -597,6 +624,11 @@ def tracts_into_twp_grids(tract_list, grid_dict=None, lddb=None) -> dict:
 def filter_tracts_by_tr(tract_list, tr_dict=None) -> dict:
     """Filter Tract objects into a dict, keyed by T&R (formatted
     '000x000y', or fewer digits)."""
+
+    # If the user passes a PLSSDesc object, pull its TractList obj.
+    if isinstance(tract_list, pyTRS.PLSSDesc):
+        tract_list = tract_list.parsedTracts
+
     # construct a dict to link Tracts to their respective Twps
     if tr_dict is None:
         tr_dict = {}
