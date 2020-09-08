@@ -1,7 +1,8 @@
 # Copyright (c) 2020, James P. Imes. All rights reserved.
 
-"""Generate plat images of full Townships (6x6 grid) or single Sections
-and incorporate parsed pyTRS PLSSDesc and Tract objects."""
+"""A module to generate plat images of full Townships (6x6 grid) or
+single Sections and incorporate parsed PLSSDesc and Tract objects from
+the pyTRS module."""
 
 # TODO: Add kwarg for specifying LotDefinitions for Tracts, and
 #  maybe TwpLotDefinitions where appropriate. (Have already implemented
@@ -16,7 +17,7 @@ and incorporate parsed pyTRS PLSSDesc and Tract objects."""
 from PIL import Image, ImageDraw, ImageFont
 from pyTRS import version as pyTRS_version
 from pyTRS.pyTRS import PLSSDesc, Tract, decompile_tr
-from grid import TownshipGrid, SectionGrid, plss_to_grids, filter_tracts_by_twprge
+from grid import TownshipGrid, SectionGrid, plssdesc_to_grids, filter_tracts_by_twprge
 from grid import LotDefinitions, TwpLotDefinitions, LotDefDB, confirm_file
 from platsettings import Settings
 from platqueue import PlatQueue, MultiPlatQueue
@@ -851,7 +852,7 @@ class MultiPlat:
             self.plats.append(pl_obj)
 
     @staticmethod
-    def from_PLSSDesc(PLSSDesc_obj, settings=None, lddb=None):
+    def from_plssdesc(PLSSDesc_obj, settings=None, lddb=None):
         """Generate a MultiPlat from a parsed PLSSDesc object.
         (lots/QQs must be parsed within the Tracts for any QQ's to be
         filled on the resulting plats.)"""
@@ -859,7 +860,7 @@ class MultiPlat:
         mp_obj = MultiPlat(settings=settings, lddb=lddb)
 
         # Generate a dict of TownshipGrid objects from the PLSSDesc object.
-        twp_grids = plss_to_grids(PLSSDesc_obj, lddb=lddb)
+        twp_grids = plssdesc_to_grids(PLSSDesc_obj, lddb=lddb)
 
         # Get a dict linking the the PLSSDesc object's parsed Tracts to their
         # respective T&R's (keyed by T&R '000x000y' -- same as the twp_grids dict)
@@ -884,7 +885,7 @@ class MultiPlat:
             lddb = LotDefDB.from_csv(lddb)
 
         descObj = PLSSDesc(text, config=config, initParseQQ=True)
-        return MultiPlat.from_PLSSDesc(descObj, settings=settings, lddb=lddb)
+        return MultiPlat.from_plssdesc(descObj, settings=settings, lddb=lddb)
 
     def show(self, index: int):
         """Display one of the plat Image objects, specifically the one

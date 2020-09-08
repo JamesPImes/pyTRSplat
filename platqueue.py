@@ -126,7 +126,7 @@ class MultiPlatQueue(dict):
         However, the Tract object's `.twp` and `.rge` will NOT overrule
         a kwarg-specified `twprge=` (if any)."""
 
-        def breakout_PLSSDesc(descObj):
+        def breakout_plssdesc(descObj):
             """PLSSDesc objects must be handled specially, because they
             can generate multiple T&R's (i.e. multiple dict keys)."""
             twp_to_tract = filter_tracts_by_twprge(descObj)
@@ -167,7 +167,7 @@ class MultiPlatQueue(dict):
 
         # Handle PLSSDesc object, if it is one.
         if isinstance(plattable, PLSSDesc):
-            breakout_PLSSDesc(plattable)
+            breakout_plssdesc(plattable)
             return
 
         # Handle Tract object, if it is one.

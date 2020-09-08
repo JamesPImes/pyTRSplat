@@ -22,7 +22,7 @@ class SectionGrid:
     If `sec=<int or str>`, `twp=<str>`, and `rge=<str>` are not
     specified at init, the object may not have full functionality in
     conjunction with other modules.
-        --Format:
+        --example:
             sg_obj = SectionGrid(`sec=14, twp='154n', rge='97w')
         --equivalently:
             sg_obj = SectionGrid.from_trs('154n97w14')
@@ -122,7 +122,7 @@ class SectionGrid:
         if ld is not None:
             self.ld = ld
 
-    def apply_TwpLotDefs(self, tld):
+    def apply_tld(self, tld):
         """Apply the appropriate LotDefinitions object from a
         TwpLotDefinitions object, if such a LD exists. Will not
         overwrite anything if no LD obj exists for this section in the
@@ -131,7 +131,7 @@ class SectionGrid:
         if ld is not None:
             self.ld = ld
 
-    def lots_by_QQname(self) -> dict:
+    def lots_by_qq_name(self) -> dict:
         """Get a dict, with QQ's as keys, and whose values are each a
         list of the lot(s) that correspond with those QQ's. Note that it
         is possible for more than 1 lot per QQ, so the values are all
@@ -147,7 +147,7 @@ class SectionGrid:
         QQ's, respectively -- so this method would output a grid whose
         (0,0), (1,0), (2,0), and (3,0) are filled with ['L4'], ['L3'],
         ['L2'], and ['L1'], respectively."""
-        lots_by_QQname_dict = self.lots_by_QQname()
+        lots_by_QQname_dict = self.lots_by_qq_name()
         ar = self.output_array()
 
         for qq_name, dv in self.QQgrid.items():
@@ -162,23 +162,23 @@ class SectionGrid:
         return ar
 
     @staticmethod
-    def from_tract(TractObj : pyTRS.Tract, ld='default'):
+    def from_tract(tractObj : pyTRS.Tract, ld='default'):
         """Return a SectionGrid object created from a parsed pyTRS.Tract
         object and incorporate the lotList and QQList from that Tract."""
-        twp, rge, sec = TractObj.twp, TractObj.rge, TractObj.sec
+        twp, rge, sec = tractObj.twp, tractObj.rge, tractObj.sec
         secObj = SectionGrid(sec=sec, twp=twp, rge=rge, ld=ld)
-        secObj.incorporate_tract(TractObj)
+        secObj.incorporate_tract(tractObj)
 
         return secObj
 
-    def incorporate_tract(self, TractObj : pyTRS.Tract):
+    def incorporate_tract(self, tractObj : pyTRS.Tract):
         """Check the lotList and QQList of a parsed pyTRS.Tract object,
         and incorporate any hits into the grid.
         NOTE: Relies on the LotDefinitions object in `.ld` at the time
         this method is called. Later changes to `.ld` will not
         modify what has already been done here."""
-        self.incorporate_qq_list(TractObj.QQList)
-        self.incorporate_lot_list(TractObj.lotList)
+        self.incorporate_qq_list(tractObj.QQList)
+        self.incorporate_lot_list(tractObj.lotList)
 
     def incorporate_lot_list(self, lotList : list):
         """Incorporate all lots in the passed lotList into the grid.
@@ -281,7 +281,7 @@ class SectionGrid:
         """Convert the grid to an array (oriented from NWNW to SESE),
         with resulting coords formatted (y, x) -- ex:
             ar = sg_obj.output_array()
-            ar[y][x]  # Accesses the value at (x,y)"""
+            ar[y][x]  # Accesses the value at (x, y) in `sg_obj.QQgrid`"""
 
         max_x = 0
         max_y = 0
@@ -395,19 +395,20 @@ class TownshipGrid:
 
         if tld == 'default':
             default_tld = TwpLotDefinitions(list(range(1, 37)))
-            self.apply_TwpLotDefs(default_tld)
+            self.apply_tld(default_tld)
         elif isinstance(tld, TwpLotDefinitions):
-            self.apply_TwpLotDefs(tld)
+            self.apply_tld(tld)
 
-    def apply_TwpLotDefs(self, tld):
+    def apply_tld(self, tld):
         """Apply a TwpLotDefinitions object (i.e. set the respective
         SectionGrid's LotDefinitions objects)."""
         if not isinstance(tld, TwpLotDefinitions):
             raise TypeError('`tld` must be `TwpLotDefinitions` object.')
         for key, val in tld.items():
-            self.apply_LotDefs(key, val)
+            self.apply_ld(key, val)
 
-    def apply_LotDefs(self, section_number : int, ld):
+    def apply_ld(self, section_number : int, ld):
+        """Apply a LotDefinitions object for the specified section_number."""
         if not isinstance(ld, LotDefinitions):
             raise TypeError('`ld` must be type `LotDefinitions`')
         self.sections[int(section_number)].ld = ld
@@ -741,7 +742,7 @@ class LotDefDB(dict):
             return None
 
 
-def plss_to_grids(PLSSDescObj: pyTRS.PLSSDesc, lddb=None) -> dict:
+def plssdesc_to_grids(PLSSDescObj: pyTRS.PLSSDesc, lddb=None) -> dict:
     """Generate a dict of TownshipGrid objects (keyed by T&R
     '000x000x') from a parsed pyTRS.PLSSDesc object. Optionally specify
     `lddb=<LotDefDB>` to define lots and get better results."""
@@ -872,7 +873,7 @@ def _lot_without_div(lot) -> str:
     return lot.split(' ')[-1].upper()
 
 
-def _lot_without_L(lot) -> str:
+def _simplify_lot_number(lot) -> str:
     """Cull leading 'L' from lot name.  Also cull lot divisions, if any.
     Returns a numeric-only string.
         ex: 'N2 of L1' -> '1'
