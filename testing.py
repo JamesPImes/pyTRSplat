@@ -14,27 +14,38 @@ from plat import text_to_plats, Plat, MultiPlat
 ########################################################################
 #
 # The filepath to a .csv that can be read into a LotDefDB object:
-example_lddb_filepath = r'C:\Users\James Imes\Box\Programming\pyTRS_plotter\assets\examples\SAMPLE_LDDB.csv'
+example_lddb_filepath = r'assets/examples/SAMPLE_LDDB.csv'
 
 
 # Creating a LotDefDB object by reading in a .csv file.
 example_lddb_obj = LotDefDB.from_csv(example_lddb_filepath)
-# Equivalently (because `.from_csv()` is implied when we pass a proper filepath to a .csv file):
+# Equivalently (because `.from_csv()` is implied when we pass a valid
+# filepath to an existing .csv file):
 example_lddb_obj = LotDefDB(example_lddb_filepath)
 
 
 # Sample PLSS description text:
-descrip_text = 'T154N-R97W Sec 01: Lots 1 - 3, S2NE, Sec 25: Lots 1 - 8, T155N-R97W Sec 22: W/2'
+descrip_text_1 = '''T154N-R97W
+Sec 01: Lots 1 - 3, S2NE
+Sec 25: Lots 1 - 8
+T155N-R97W Sec 22: W/2'''
 
 
-# Generating a list of plat images from `descrip_text` string:
-ttp = text_to_plats(descrip_text, config='cleanQQ', lddb=example_lddb_filepath, settings='letter')
+# Generating a list of plat images from `descrip_text_1` string:
+ttp = text_to_plats(
+    descrip_text_1, config='cleanQQ', lddb=example_lddb_filepath, settings='letter')
 #ttp[0].show()  # Display the first image in the list (i.e. 154n97w in this case)
 
 # Or as a MultiPlat object:
-mp = MultiPlat.from_text(descrip_text, config='cleanQQ', lddb=example_lddb_filepath, settings='letter')
+mp = MultiPlat.from_text(
+    descrip_text_1, config='cleanQQ', lddb=example_lddb_filepath, settings='letter')
 #mp.show(0)  # Display the first image in the MultiPlat (i.e. 154n97w in this case)
 
+# If creating more than one MultiPlat object (or other class or function that takes
+# `lddb=` as an argument), then it's probably better practice to create a LotDefDB
+# object and pass that to `lddb=` -- rather than passing the filepath to `lddb=`.
+# Creating the LDDB object first would avoid a lot of repetitive I/O and redundant
+# objects in memory.
 
 
 # Some miscellaneous objects that can be added to a PQ (or possibly MPQ):
@@ -42,15 +53,17 @@ t1 = Tract('154n97w14', 'NE/4', initParseQQ=True)
 t2 = Tract('154n97w15', 'W/2', initParseQQ=True)
 t3 = Tract('154n97w01', 'Lots 1 - 3, S2NE', initParseQQ=True)
 t4 = Tract('154n97w25', 'Lots 4, 5, 7, NE4NE4', initParseQQ=True)
-# PLSSDesc objects can only be added to MPQ objects, not to PQ objects.
-d1 = PLSSDesc('T154N-R97W Sec 3: Lots 1, 4, S2N2, T155N-R97W Sec 18: Lots 2 - 4, E2W2', initParseQQ=True)
+# PLSSDesc objects can only be added to MPQ objects -- not to PQ objects.
+d1 = PLSSDesc(
+    'T154N-R97W Sec 3: Lots 1, 4, S2N2, T155N-R97W Sec 18: Lots 2 - 4, E2W2',
+    initParseQQ=True)
 sg1 = SectionGrid.from_tract(t1)
 tg1 = TownshipGrid('154n', '97w')
 tg1.incorporate_tract(t2, 15)
 
 
-# Generating a (single) Plat by adding objects to its PlatQueue (via `.queue()` method)
-# and then processing the queue:
+# Generating a (single) Plat by adding objects to its PlatQueue (via
+# `.queue()` method) and then processing the queue:
 set1 = Settings.preset('letter')
 sp = Plat(settings=set1, tld=example_lddb_obj['154n97w'])
 sp.queue(sg1, t1)
@@ -94,10 +107,11 @@ mp3.process_queue()
 
 # Demonstrating adding text to a MultiPlat queue (`config=` is optional,
 # and just affects how the text is parsed by the pyTRS module):
-descrip_text1 = 'T154N-R97W Sec 01: Lots 1 - 3, S2NE, Sec 25: Lots 1 - 8, T155N-R97W Sec 22: W/2'
-descrip_text2 = 'T154N-R97W Sec 14: NE/4'
+descrip_text_2 = '''T154N-R97W Sec 01: Lots 1 - 3, S2NE, Sec 25: Lots 1 - 8,
+T155N-R97W Sec 22: W/2'''
+descrip_text_3 = 'T154N-R97W Sec 14: NE/4'
 mp4 = MultiPlat(settings='letter', lddb=example_lddb_obj)
-mp4.queue_text(descrip_text1, config='cleanQQ')
-mp4.queue_text(descrip_text2, config='cleanQQ')
+mp4.queue_text(descrip_text_2, config='cleanQQ')
+mp4.queue_text(descrip_text_3, config='cleanQQ')
 mp4.process_queue()
 #mp4.show(0)  # Show the first plat (i.e. 154n97w, in this case)

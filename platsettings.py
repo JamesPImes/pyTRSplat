@@ -69,10 +69,11 @@ class Settings:
         'dim', 'headerfont_typeface', 'secfont_typeface', 'lotfont_typeface',
         'headerfont_size', 'tractfont_size', 'secfont_size', 'lotfont_size',
         'headerfont_RGBA', 'tractfont_RGBA', 'secfont_RGBA', 'lotfont_RGBA',
-        'y_top_marg', 'y_bottom_marg', 'bottom_text_indent',
-        'y_px_before_tracts', 'qq_side', 'sec_line_stroke', 'ql_stroke',
-        'qql_stroke', 'sec_line_RGBA', 'ql_RGBA', 'qql_RGBA', 'qq_fill_RGBA',
-        'centerbox_wh', 'lot_num_offset_px', 'write_header', 'write_tracts',
+        'y_top_marg', 'y_bottom_marg', 'x_text_left_marg', 'x_text_right_marg',
+        'y_px_before_tracts', 'y_px_between_tracts', 'qq_side',
+        'sec_line_stroke', 'ql_stroke', 'qql_stroke', 'sec_line_RGBA',
+        'ql_RGBA', 'qql_RGBA', 'qq_fill_RGBA', 'centerbox_wh',
+        'lot_num_offset_px', 'write_header', 'write_tracts',
         'write_section_numbers', 'write_lot_numbers'
     ]
 
@@ -125,11 +126,21 @@ class Settings:
         # Bottom margin before triggering 'panic' button.
         self.y_bottom_marg = 80
 
-        # px indent for tract text.
-        self.bottom_text_indent = 100
+        # px indent for tract text (from the left side of the image).
+        self.x_text_left_marg = 100
+        # TODO: Set x_text_left_marg for various presets.
+
+        # px for tract text right margin (distance from right side of image
+        # that we can write up to).
+        self.x_text_right_marg = 0
+        # TODO: Set x_text_right_marg for various presets.
 
         # Distance between bottom section line and the first tract text written.
         self.y_px_before_tracts = 40
+
+        # Distance between tracts.
+        self.y_px_between_tracts = 10
+        # TODO: Set y_px_between_tracts for various presets.
 
         self.qq_side = 50  # length of each side for a QQ in px
         self.sec_line_stroke = 3  # section-line stroke width in px

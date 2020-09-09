@@ -1,26 +1,34 @@
 # Copyright (c) 2020, James P. Imes. All rights reserved.
 
-"""A module to generate plat images of full Townships (6x6 grid) or
-single Sections and incorporate parsed PLSSDesc and Tract objects from
+"""A module to generate plat images of full townships (6x6 grid) or
+single sections and incorporate parsed PLSSDesc and Tract objects from
 the pyTRS module."""
 
 # TODO: Add kwarg for specifying LotDefinitions for Tracts, and
 #  maybe TwpLotDefinitions where appropriate. (Have already implemented
 #  LDDB in at least some places.)
 
-# TODO: `platObj.text_cursor` (or other specified cursor) should be
-#  updated while tracts are being written.
-
 # TODO: Give the option to depict `.unhandled_lots` on plats somewhere.
 #  i.e. warn users that certain lots were not incorporated onto the plat
 
-from PIL import Image, ImageDraw, ImageFont
-from pyTRS import version as pyTRS_version
-from pyTRS.pyTRS import PLSSDesc, Tract, decompile_tr
-from grid import TownshipGrid, SectionGrid, plssdesc_to_grids, filter_tracts_by_twprge
-from grid import LotDefinitions, TwpLotDefinitions, LotDefDB, confirm_file
+# TODO: Consider making Cursor its own Class?
+
+# TODO: Some sort of warning when a LDDB object could not be loaded.
+
+# Submodules from this project.
+from grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
+from grid import plssdesc_to_grids, filter_tracts_by_twprge
 from platsettings import Settings
 from platqueue import PlatQueue, MultiPlatQueue
+
+# For drawing the plat images, and coloring / writing on them.
+from PIL import Image, ImageDraw, ImageFont
+
+# For parsing text of PLSS land descriptions into its component parts.
+from pyTRS.pyTRS import PLSSDesc, Tract
+from pyTRS.pyTRS import decompile_tr
+from pyTRS import version as pyTRS_version
+
 
 __version__ = '0.0.1'
 __versionDate__ = '8/31/2020'
@@ -339,37 +347,86 @@ class Plat:
         Be careful not to overwrite other required attributes."""
 
         stngs = self.settings
-        x = stngs.bottom_text_indent
+        x = stngs.x_text_left_marg
         y = stngs.y_top_marg + stngs.qq_side * 4 * 6 + stngs.y_px_before_tracts
         coord = (x, y)
 
         # Only if `commit=True` do we set this.
         if commit:
-            self.set_cursor(x, y, cursor)
+            self.set_cursor((x, y), cursor)
 
         # And return the coord.
         return coord
 
-    def set_cursor(self, x, y, cursor='text_cursor'):
+    def set_cursor(self, coord, cursor='text_cursor'):
         """Set the cursor to the specified x and y coords. If a string
         is NOT passed as `cursor=`, the committed coord will be set to
         the default `.text_cursor`. However, if the particular cursor
         IS specified, it will save the resulting coord to that attribute
         name.
-            ex: 'setObj.set_cursor()
+            ex: 'setObj.set_cursor((200, 1200))
                 -> setObj.text_cursor == (200, 1200)
-            ex: 'setObj.set_cursor(200, 1200, cursor='highlight')
+            ex: 'setObj.set_cursor((200, 1200), cursor='highlight')
                 -> setObj.highlight == (200, 1200)
         Be careful not to overwrite other required attributes."""
 
-        setattr(self, cursor, (x, y))
+        setattr(self, cursor, coord)
+
+    def next_line_cursor(
+            self, xy_delta, cursor='text_cursor', commit=True,
+            left_margin=None, additional_indent=0) -> tuple:
+        """Move the specified `cursor` to the so-called 'next line', after
+        having written some text at that cursor. `xy_delta` should be a
+        tuple of (width, height) of text that was written. It will move
+        the cursor down that many px (plus `.y_px_between_tracts`
+        from settings) and move the cursor back to the left_margin.
+
+        If `left_margin=` pixels is not specified (as an int), it will
+        default to settings.
+
+        If a string is NOT passed as `cursor=`, the returned (and
+        optionally committed) coord will be set to the default
+        `.text_cursor`. However, if the particular cursor IS specified,
+        it will save the resulting coord to that attribute name (so long
+        as `commit=True`).
+
+        Further, if the cursor is specified but does not yet exist, this
+        will read from `.text_cursor` (to calculate the updated coord)
+        but save to the specified cursor.
+
+        Be careful not to overwrite other required attributes."""
+
+        if not isinstance(left_margin, int):
+            left_margin, _ = self.reset_cursor(cursor, commit=False)
+
+        # Set x to the left_margin (plus optional indent).
+        x = left_margin + additional_indent
+
+        # Discard the x from xy_delta, but get the y_delta.
+        _, y_delta = xy_delta
+
+        # Discard the x0 from the cursor, but get y0.  (Nested `getattr`
+        # calls ensures we get `.text_cursor`, if `cursor=` was
+        # specified as a string that wasn't already set; but this won't
+        # overwrite the specified `cursor` for committing the coord
+        # shortly.)
+        _, y0 = getattr(self, cursor, getattr(self, 'text_cursor'))
+
+        # We will add to our y-value the px between tracts, per settings.
+        y_line_spacer = self.settings.y_px_between_tracts
+
+        coord = (x, y0 + y_delta + y_line_spacer)
+
+        if commit:
+            self.set_cursor(coord, cursor=cursor)
+        return coord
 
     def update_cursor(
-            self, x_delta, y_delta, cursor='text_cursor', commit=True) -> tuple:
+            self, xy_delta, cursor='text_cursor', commit=True) -> tuple:
         """Update the coord of the cursor, by adding the `x_delta` and
-        `y_delta` to the pre-existing coord. Returns the updated coord,
-        and optionally store it to the attribute with `commit=True` (on
-        by default).
+        `y_delta` to the current coord of the specified `cursor`.
+        Returns the updated coord, and optionally stores it to the
+        cursor attribute with `commit=True` (on by default).
 
         If a string is NOT passed as `cursor=`, the committed coord will
         be set to the default `.text_cursor`. However, if the particular
@@ -385,6 +442,7 @@ class Plat:
         # Pull the specified cursor. If it does not already exist as an
         # attribute in this object, it will fall back to `.text_cursor`,
         # which exists for every Settings object, per init.
+        x_delta, y_delta = xy_delta
         x0, y0 = getattr(self, cursor, getattr(self, 'text_cursor'))
         coord = (x0 + x_delta, y0 + y_delta)
 
@@ -393,6 +451,57 @@ class Plat:
             setattr(self, cursor, coord)
 
         return coord
+
+    def _check_legal_textwrite(self, text, font, cursor='text_cursor') -> bool:
+        """Check if there is enough room to write the specified `text`,
+        using the specified `font`. If `coord` is specified, will check
+        against that. Otherwise, checks against the specified `cursor`.
+
+        And if a string is NOT passed as `cursor=` (or a non-existent
+        cursor is specified), this will check against default
+        `.text_cursor` (assuming `coord` was not specified)."""
+        w, h = self.draw.textsize(text, font=font)
+
+        # Only `legal` matters for this method.
+        legal, _, __ = self._check_legal_cursor((w, h), cursor=cursor)
+        return legal
+
+    def _check_legal_cursor(self, xy_delta: tuple, cursor='text_cursor') -> tuple:
+        """Check if there is enough room to move the cursor from its
+        current position by `xy_delta` (a tuple of x,y value) before
+        running afoul of the margins in `.settings`. (Assumes that it is
+        starting from a legal coord.)
+
+        If a string is NOT passed as `cursor=` (or a non-existent cursor
+        is specified), this will check against default `.text_cursor`.
+
+        Returns a tuple containing (bool, x_overshot, y_overshot).
+        A negative x_overshot and y_overshot means it was legal; and
+        there were that many pixels between the cursor and the boundary.
+
+        If `coord` is specified, the `cursor` will be ignored, and will
+        check only against the `coord`."""
+
+        # Confirm `cursor` points to an existing tuple in self's
+        # attributes. If not, we'll use the `.text_cursor` attribute.
+        cursor_check = getattr(self, cursor, None)
+        if not isinstance(cursor_check, tuple):
+            cursor = 'text_cursor'
+
+        # Get the hypothetical resulting cursor location if xy_delta is
+        # applied. (`commit=False` means it won't be stored yet.)
+        x, y = self.update_cursor(xy_delta, cursor, commit=False)
+
+        bottom_y = self.settings.dim[1] - self.settings.y_bottom_marg
+        right_x = self.settings.dim[0] - self.settings.x_text_right_marg
+
+        x_overshot = x - right_x
+        y_overshot = y - bottom_y
+        legal = True
+        if x_overshot > 0 or y_overshot > 0:
+            legal = False
+
+        return (legal, x_overshot, y_overshot)
 
     def output(self, filepath=None):
         """Merge the drawn overlay (i.e. filled QQ's) onto the base
@@ -520,64 +629,116 @@ class Plat:
         if write_tract:
             self.write_all_tracts([tractObj])
 
-    def write_all_tracts(self, tracts=None):
-        """Write all the tract descriptions at the bottom of the plat."""
+    def write_all_tracts(self, tracts=None, cursor='text_cursor'):
+        """Write all the tract descriptions at the bottom of the plat,
+        starting at the current coord of the specified `cursor`. If a
+        string is NOT passed as `cursor=` (or a non-existent cursor is
+        specified), it will begin at the default `.text_cursor`. The
+        coord in `cursor` will also be updated as text gets written."""
+
         if tracts is None:
             return
 
         # Save line space later in by setting this variable:
         settings = self.settings
 
-        y_spacer = 10  # This many px between tracts.
-        total_px_written = 0
+        def write_warning(num_unwritten_tracts, tracts_written):
+            """Could not fit all tracts on the page. Write a warning to
+            that effect at the bottom of the page."""
 
-        # starting coord for the first tract.
-        start_x, start_y = self.text_cursor
-        x, y = (start_x, start_y)
+            # If we wrote at least one tract, we want to include the word
+            # 'other', to avoid any confusion.
+            other = ''
+            if tracts_written > 0:
+                other = ' other'
 
-        max_px = self.image.height - start_y - settings.y_bottom_marg
+            plural = ''
+            if num_unwritten_tracts > 1:
+                plural = 's'
+
+            warning = f'[No space to write {num_unwritten_tracts}{other} tract{plural}]'
+
+            x = settings.x_text_left_marg
+            y = settings.dim[1] - settings.y_bottom_marg
+
+            font=self.settings.tractfont
+
+            # Check the size of our warning message
+            w, h = self.draw.textsize(warning, font=font)
+
+            # Pixel location of the bottom of the image:
+            bottom_of_page = settings.dim[1]
+
+            # If our warning would have made it off the page, move it up.
+            if y + h > bottom_of_page:
+                y = bottom_of_page - h
+
+            self._write_text((x, y), warning, font, font_RGBA=Settings.RGBA_RED)
 
         tracts_written = 0
         for tract in tracts:
-            # x and y are returned from write_tract(); x stays the same, but y is updated
-            last_y = y
             font_RGBA = self.settings.tractfont_RGBA
             if len(tract.lotQQList) == 0:
                 # If no lots/QQs were identified, we'll write the tract in red
                 font_RGBA = Settings.RGBA_RED
-            x, y = self._write_tract((x, y), tract, font_RGBA=font_RGBA)
-            y += y_spacer
-            total_px_written = y - start_y
+            xy_delta = self._write_tract(
+                cursor=cursor, tractObj=tract, font_RGBA=font_RGBA)
+            if xy_delta is None:
+                # Failed to write the tract because it would have passed the margins.
+                num_unwritten = len(tracts) - tracts_written
+                write_warning(num_unwritten, tracts_written)
+                break
             tracts_written += 1
-            if total_px_written >= max_px:
-                if tracts_written + 1 >= len(tracts):
-                    # No more or only 1 more tract to write.
-                    continue
-                else:
-                    # Write a warning that we ran out of space to write tracts.
-                    warning = '[AND OTHER TRACTS]'
-                    self.draw.text(
-                        (x, y),
-                        warning,
-                        font=self.settings.tractfont,
-                        fill=Settings.RGBA_RED)
-                    break
 
-    def _write_tract(self, start_xy, tractObj, font_RGBA=None):
-        """Write the description of the parsed Tract object on the page."""
+    def _write_tract(
+            self, cursor: str, tractObj: Tract, font_RGBA=None,
+            override_legal_check=False):
+        """Write the description of the parsed Tract object on the page,
+        at the current coord of the specified `cursor`. First confirms
+        that writing the text would not go past margins; and if so, will
+        not write it. Updates the `cursor`, and returns the width and
+        height of the written text; or returns None if nothing was
+        written.
 
+        Using `override_legal_check=True` will ignore whether it is
+        passed the margins.
+        """
+
+        # Extract the text of the TRS+description from the Tract object.
+        text = tractObj.quick_desc()
+
+        # If font color not otherwise specified, pull from settings.
         if font_RGBA is None:
             font_RGBA = self.settings.tractfont_RGBA
 
-        x, y = start_xy
-        tract_text = tractObj.quick_desc()
-        w, h = self.draw.textsize(tract_text, font=self.settings.tractfont)
-        self.draw.text(
-            start_xy,
-            tract_text,
-            font=self.settings.tractfont,
-            fill=font_RGBA)
-        return x, y + h
+        # Pull font from settings.
+        font = self.settings.tractfont
+
+        # Check if we can fit what we're about to write within the margins.
+        is_legal = self._check_legal_textwrite(text, font, cursor)
+
+        if is_legal or override_legal_check:
+            # Pull coord from the chosen cursor attribute
+            coord = getattr(self, cursor)
+            # Write the text, and set the width/height of the written text to xy_delta
+            xy_delta = self._write_text(coord, text, font, font_RGBA)
+            # Update the chosen cursor to the next line.
+            self.next_line_cursor(xy_delta, cursor, commit=True)
+            return xy_delta
+        else:
+            return None
+
+    def _write_text(self, coord: tuple, text: str, font, font_RGBA) -> tuple:
+        """Write `text` at the specified `coord`. Returns a tuple of the
+        width and height of the written text. Does NOT update a cursor.
+        NOTE: This method does not care whether it goes past margins, so
+            be sure to handle `._check_legal_textwrite()` before calling
+            this method."""
+
+        w, h = self.draw.textsize(text, font=font)
+        self.draw.text(coord, text, font=font, fill=font_RGBA)
+        return (w, h)
+
 
     #TODO: def write_custom_text(self, start_xy, text, font_RGBA)
 
@@ -879,10 +1040,14 @@ class MultiPlat:
         `config=` parameters -- see pyTRS docs), and generate Plat(s)
         for the lands described. Returns a MultiPlat object."""
 
-        # If the user passed a filepath to a .csv file as `lddb`, create a
-        # LotDefDB object from that file now, and then pass that forward.
-        if confirm_file(lddb, '.csv'):
-            lddb = LotDefDB.from_csv(lddb)
+        # TODO: Confirm and delete this commented-out portion:
+        # # If the user passed a filepath to a .csv file as `lddb`, create a
+        # # LotDefDB object from that file now, and then pass that forward.
+        # if isinstance(lddb, str):
+        #     if confirm_file(lddb, '.csv'):
+        #         lddb = LotDefDB.from_csv(lddb)
+        #     else:
+        #         lddb = None
 
         descObj = PLSSDesc(text, config=config, initParseQQ=True)
         return MultiPlat.from_plssdesc(descObj, settings=settings, lddb=lddb)

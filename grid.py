@@ -440,6 +440,26 @@ class TownshipGrid:
 
         self.sections[sec].incorporate_tract(tractObj)
 
+    def turn_off_qq(self, secNum: int, qq: str):
+        """For the specified section, set the value of the specified QQ
+        (e.g. 'NENE') to 0, in the appropriate SectionGrid in the
+        `.sections` attribute of this TownshipGrid object."""
+
+        if secNum in self.sections.keys():
+            self.sections[int(secNum)].turn_on_qq(qq=qq)
+
+    def turn_on_qq(self, secNum: int, qq: str, custom_val=1):
+        """For the specified section, set the value of the specified QQ
+        (e.g. 'NENE') to 1, in the appropriate SectionGrid in the
+        `.sections` attribute of this TownshipGrid object."""
+
+        # Note: Passing anything other than `1` to `custom_val` will
+        # probably cause other current functionality to break. But it
+        # might be useful for some purposes (e.g., tracking which
+        # PLSS descriptions include that QQ).
+
+        if secNum in self.sections.keys():
+            self.sections[int(secNum)].turn_on_qq(qq=qq, custom_val=custom_val)
 
 class LotDefinitions(dict):
     """A dict object (often abbreviated 'ld' or 'LD') for defining which
@@ -761,8 +781,12 @@ def tracts_into_twp_grids(tract_list, grid_dict=None, lddb=None) -> dict:
     if grid_dict is None:
         grid_dict = {}
 
-    # If lddb (LotDefDB) is not specified, create a default.
-    if lddb is None:
+    # If the user passed a filepath (as a str) to a .csv file that can
+    # be loaded into a LDDB object, create that.
+    if isinstance(lddb, str):
+        lddb = LotDefDB(lddb)
+    # If we do not yet have a valid LotDefDB object, create a default.
+    if not isinstance(lddb, LotDefDB):
         lddb = LotDefDB()
 
     # We'll incorporate each Tract object into a SectionGrid object. If necessary,
@@ -824,9 +848,9 @@ def confirm_file(fp, extension=None) -> bool:
     confirm whether that file has the specified extension (must include
     the leading period -- ex: '.csv')."""
 
-    import os
+    from pathlib import Path
     try:
-        if not os.path.isfile(fp):
+        if not Path(fp).is_file():
             return False
     except:
         return False
@@ -835,7 +859,7 @@ def confirm_file(fp, extension=None) -> bool:
         return True
 
     # If extension was specified, confirm the fp ends in such.
-    return os.path.splitext(fp)[1].lower() == extension.lower()
+    return Path(fp).suffix.lower() == extension.lower()
 
 
 ########################################################################
