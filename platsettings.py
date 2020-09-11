@@ -6,7 +6,7 @@ class Settings:
     """Configurable or default settings for drawing sections / townships
     and generating Plat objects.
 
-    When a string is passed (as `source=`) at init, it is assumed to be
+    When a string is passed (as `preset=`) at init, it is assumed to be
     one of two things:
         -- the filepath to a saved .txt file of data that can be read
             into a Settings object, with the `._import_file()` method.
@@ -77,19 +77,19 @@ class Settings:
         'write_section_numbers', 'write_lot_numbers'
     ]
 
-    def __init__(self, source='default'):
+    def __init__(self, preset='default'):
 
         # If the 'default' preset was deleted or can't be accessed, try
         # resetting the 'default' preset to the original, hard-coded
-        # default (i.e. `source=None`). If that fails, then we set
-        # `source` to `None`, which will bypass trying to import from
+        # default (i.e. `preset=None`). If that fails, then we set
+        # `preset` to `None`, which will bypass trying to import from
         # .txt file altogether and just return the hard-coded defaults.
-        if source == 'default':
+        if preset == 'default':
             try:
                 if 'default' not in Settings.list_presets():
                     Settings.__restore_default()
             except:
-                source = None
+                preset = None
 
         # Dimensions of the image.
         self.dim = Settings.LETTER_200ppi
@@ -167,24 +167,10 @@ class Settings:
         self.write_section_numbers = True
         self.write_lot_numbers = False
 
-        # If `source` is specified as a string, we assume it is either a
-        # filepath to a .txt file that can be loaded as Settings data, or a
-        # preset name, which can also be loaded as Settings data.
-        if isinstance(source, str):
-            if source.lower().endswith('.txt'):
-                try:
-                    self._import_file(source)
-                except:
-                    raise Warning(
-                        f"Apparent filepath '{source}' could not be imported as"
-                        f" Settings object.")
-            else:
-                try:
-                    self._import_preset(source)
-                except:
-                    raise Warning(
-                        f"Apparent preset '{source}' could not be imported as"
-                        f" Settings object.")
+        # If `preset` is specified as a string, we assume it is a preset
+        # and attempt to load it as Settings data.
+        if isinstance(preset, str):
+            self._import_preset(preset)
 
     def set_font(self, purpose: str, typeface: str, size: int):
         """Set the font for the specified purpose:
@@ -227,15 +213,10 @@ class Settings:
         # 2 --> Could not open file at `filepath`
 
         if not fp.lower().endswith('.txt'):
-            raise ValueError('Error: filename must be .txt file')
-            return 1
+            raise ValueError("Filename must end in '.txt'")
 
-        try:
-            with open(fp, 'r') as file:
-                settingLines = file.readlines()
-        except:
-            raise IOError(f'Error: Could not open file: {fp}')
-            return 2
+        with open(fp, 'r') as file:
+            settingLines = file.readlines()
 
         for line in settingLines:
             # Ignore data stored in angle brackets
@@ -274,7 +255,7 @@ class Settings:
             try:
                 for txt in txtlist:
                     tl_ints.append(int(txt))
-            except:
+            except ValueError:
                 return None
 
             # Success. This was a 2-item or 4-item tuple of ints
@@ -285,7 +266,7 @@ class Settings:
             If not, return None."""
             try:
                 return int(text)
-            except:
+            except ValueError:
                 return None
 
         def try_bool(text):
@@ -306,7 +287,7 @@ class Settings:
         try:
             if components[1] == '':
                 return None
-        except:
+        except IndexError:
             if len(components) == 1:
                 return None
 
@@ -333,20 +314,17 @@ class Settings:
     def save_to_file(self, filepath):
         """Output the data in this Settings object to .txt file at
         filepath `fp`."""
-        # Return codes:
-        # 0 --> Success
-        # 1 --> Filename with extension other than `.txt` entered
-        # 2 --> Could not open file at `filepath`
+        # Returns 0 if success.
 
         if filepath[-4:].lower() != '.txt':
-            print('Error: filename must be .txt file')
-            return 1
+            raise ValueError("filename must end in '.txt'")
 
-        try:
-            file = open(filepath, 'w')
-        except:
-            print(f'Error: Could not open file: {filepath}.')
-            return 2
+        # try:
+        #     file = open(filepath, 'w')
+        # except IOError:
+        #     print(f'Could not open file: {filepath}.')
+        #     return 2
+        file = open(filepath, 'w')
 
         # These are the attributes we'll write to the file:
         attsToWrite = Settings.__setAtts__
@@ -376,34 +354,24 @@ class Settings:
         file.close()
         return 0
 
-    @staticmethod
-    def preset(name: str):
-        """Load and return a saved preset Settings object. The specified
-        `name` must exist in the presets, which can be listed with
-        `Settings.list_presets()`."""
-
-        setObj = Settings()
-        setObj._import_preset(name)
-        return setObj
-
     def _import_preset(self, name: str):
         """Load a saved preset into the current Settings object. The
         specified `name` must exist in the presets, which can be listed
         with `Settings.list_presets()`."""
 
-        try:
-            presets = Settings.list_presets()
-            if name.lower() in presets:
-                fp = f"{Settings.PRESET_DIRECTORY}{name}.txt"
-                return self._import_file(fp)
-            else:
-                raise ValueError(f"'{name}' is not a saved preset.")
-        except:
-            raise ValueError(f"Could not find or access preset '{name}'")
+        presets = Settings.list_presets()
+        if name.lower() in presets:
+            fp = f"{Settings.PRESET_DIRECTORY}{name}.txt"
+            return self._import_file(fp)
+        else:
+            raise ValueError(
+                f"'{name}' is not a saved Settings preset."
+                f"\nCurrent presets directory: {Settings.PRESET_DIRECTORY}"
+                f"\nCurrent presets: {', '. join(Settings.list_presets())}")
 
     @staticmethod
     def list_presets() -> list:
-        """Return a list of current presets in the preset directory
+        """Return a sorted list of current presets in the preset directory
         (each returned as all lowercase)."""
 
         import os
@@ -412,6 +380,7 @@ class Settings:
         for f in files:
             if f.lower().endswith('.txt'):
                 presets.append(f.lower()[:-4])
+        presets.sort()
         return presets
 
     def save_preset(self, name: str):
@@ -419,14 +388,11 @@ class Settings:
         converted to all lowercase)."""
 
         fp = f"{Settings.PRESET_DIRECTORY}{name.lower()}.txt"
-        try:
-            self.save_to_file(fp)
-        except:
-            raise Exception(f"Could not find or write to filepath '{fp}'")
+        self.save_to_file(fp)
 
     @staticmethod
     def __restore_default():
         """Restore the 'default' preset Setting object to the original,
         hard-coded default."""
-        st = Settings(source=None)
+        st = Settings(preset=None)
         st.save_preset('default')

@@ -4,20 +4,16 @@
 single sections and incorporate parsed PLSSDesc and Tract objects from
 the pyTRS module."""
 
-# TODO: Add kwarg for specifying LotDefinitions for Tracts, and
-#  maybe TwpLotDefinitions where appropriate. (Have already implemented
-#  LDDB in at least some places.)
-
 # TODO: Give the option to depict `.unhandled_lots` on plats somewhere.
 #  i.e. warn users that certain lots were not incorporated onto the plat
 
 # TODO: Consider making Cursor its own Class?
 
-# TODO: Some sort of warning when a LDDB object could not be loaded.
+from pathlib import Path
 
 # Submodules from this project.
 from grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
-from grid import plssdesc_to_grids, filter_tracts_by_twprge
+from grid import plssdesc_to_grids, filter_tracts_by_twprge, confirm_file_ext
 from platsettings import Settings
 from platqueue import PlatQueue, MultiPlatQueue
 
@@ -26,7 +22,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 # For parsing text of PLSS land descriptions into its component parts.
 from pyTRS.pyTRS import PLSSDesc, Tract
-from pyTRS.pyTRS import decompile_tr
+from pyTRS.pyTRS import decompile_twprge
 from pyTRS import version as pyTRS_version
 
 
@@ -43,8 +39,10 @@ class Plat:
     NWNW corner of each of the 36 sections (keyed by integers 1 - 36,
     inclusive).
 
-    NOTE: May plat a single section, with `only_section=<int>` at init,
-    in which case, `.sec_coords` will have only a single key.
+    NOTE: We can plat a single section, with `only_section=<int>` at
+    init, in which case, `.sec_coords` will have only a single key. (Be
+    sure to choose settings that are appropriate for a single-section
+    plat.)
 
     Plat objects can process these types of objects:
         pyTRS.Tract**, SectionGrid, TownshipGrid
@@ -68,21 +66,15 @@ class Plat:
         self.rge = rge
         self.TR = twp+rge
 
-        # NOTE: settings can be specified as a Settings object, as a
-        # filepath (str) to a settings data .txt (which are created via
-        # the `.save_to_file()` on a Settings object), or by passing the
-        # name of an already saved preset (also as a string).
+        # NOTE: settings can be specified as a Settings object, or by
+        # passing the name of an already saved preset (as a string).
+        # Alternatively, to load settings data from a DIFFERENT source
+        # (i.e. a '.txt' file saved somewhere OTHER than the presets
+        # directory), first use the `Settings.from_file()` method, or
+        # something like:
+        #      `... settings=Settings.from_file(<whatever filepath>)...`
         if isinstance(settings, str):
-            if settings.lower().endswith('.txt'):
-                try:
-                    settings = Settings.from_file(settings)
-                except:
-                    settings = None
-            else:
-                try:
-                    settings = Settings.preset(settings)
-                except:
-                    settings = None
+            settings = Settings(preset=settings)
 
         # If settings was not specified, create a default Settings object.
         if settings is None:
@@ -139,7 +131,7 @@ class Plat:
         self.tld = None
 
         # If a LotDefDB object was passed instead of a TLD or LD object,
-        # get the appropriate TLD from it (per twp+rge); and if none
+        # get the appropriate TLD from it (per twp+rge key); and if none
         # exists, then use a default TLD object. Also then get the LD
         # from it, if `only_section` was specified; and if none exists,
         # then get a default LotDefinitions obj.
@@ -167,9 +159,9 @@ class Plat:
 
     @staticmethod
     def from_twprge(twprge='', only_section=None, settings=None, tld=None):
-        """Generate a Plat object by specifying twprge as a single string,
-        rather than as twp and rge separately."""
-        t, ns, r, ew = decompile_tr(twprge)
+        """Generate an empty Plat object by specifying twprge as a single
+        string, rather than as twp and rge separately."""
+        t, ns, r, ew = decompile_twprge(twprge)
         twp = t + ns
         rge = r + ew
         # TODO: Handle error twprge's.
@@ -178,7 +170,8 @@ class Plat:
 
     @staticmethod
     def from_queue(pq, twp='', rge='', only_section=None, settings=None, tld=None):
-        """Generate and return a Plat object from a PlatQueue object."""
+        """Generate and return a filled-in Plat object from a PlatQueue
+        object."""
         sp_obj = Plat(
             twp=twp, rge=rge, only_section=only_section,
             settings=settings, tld=tld)
@@ -267,13 +260,34 @@ class Plat:
     def _draw_all_sections(self, only_section=None):
         """Draw the 36 sections in the standard 6x6 grid; or draw a
         single section if `only_section=<int>` is specified."""
-        w, h = self.settings.dim
 
-        # We'll horizontally center our plat on the page.
-        x_start = (w - (self.settings.qq_side * 4 * 6)) // 2
+        # Saving some line space shortly by setting this variable:
+        settings = self.settings
+
+        w, h = settings.dim
+
+        # Our township (a square) will either be a 6x6 grid of sections,
+        # or a single section (i.e. 1x1).
+        sections_per_side = 6
+        if only_section is not None:
+            sections_per_side = 1
+
+        # Number of QQ divisions per section -- i.e. a 4x4 grid of QQ's,
+        # or a square of 4 units (QQ's) by 4 units.
+        qqs_per_sec_side = 4
+
+        # Multiplying `settings.qq_side` (an int representing how long
+        # we draw a QQ side) by `qq_per_sec_side` (an int representing
+        # how many QQ's per section side) gets us the number of px per
+        # section side.
+        section_length = settings.qq_side * qqs_per_sec_side
+
+        # We'll horizontally center our plat on the page. (4 is the number
+        # of QQ's drawn per section)
+        x_start = (w - (section_length * sections_per_side)) // 2
 
         # The plat will start this many px below the top of the page.
-        y_start = self.settings.y_top_marg
+        y_start = settings.y_top_marg
 
         # PLSS sections "snake" from the NE corner of the township west
         # then down, then they cut back east, then down and west again,
@@ -293,20 +307,28 @@ class Plat:
         sec_nums.extend(list(range(30, 24, -1)))
         sec_nums.extend(list(range(31, 37)))
 
-        # Generate section(s) on the plat, and number them.
+        # If drawing only one section, override that list with a
+        # single-element list.
         if only_section is not None:
-            # If drawing only one section
-            self._draw_sec((x_start, y_start), section=only_section)
-            self.sec_coords[int(only_section)] = (x_start, y_start)
-        else:
-            # If drawing all 36 sections
-            for i in range(6):
-                for j in range(6):
-                    sec_num = sec_nums.pop(0)
-                    cur_x = x_start + self.settings.qq_side * 4 * j
-                    cur_y = y_start + self.settings.qq_side * 4 * i
-                    self._draw_sec((cur_x, cur_y), section=sec_num)
-                    self.sec_coords[sec_num] = (cur_x, cur_y)
+            sec_nums = [int(only_section)]
+
+        # Generate section(s) on the plat, and number them.
+        #
+        # For each section, we start at (x_start, y_start) and move
+        # `j` section-lengths over, and `i` section-lengths down,
+        # at which point we are at the NW corner of the section,
+        # from which we'll draw our 4x4 grid for that section and
+        # mark the coord in the `.sec_coords` dict.
+        #
+        # Remember that sections_per_side is `1` if we're platting only
+        # a single section, in which case i and j will only be 0.
+        for i in range(sections_per_side):
+            for j in range(sections_per_side):
+                sec_num = sec_nums.pop(0)
+                cur_x = x_start + section_length * j
+                cur_y = y_start + section_length * i
+                self._draw_sec((cur_x, cur_y), section=sec_num)
+                self.sec_coords[sec_num] = (cur_x, cur_y)
 
     def _write_header(self, text=None):
         """Write the header at the top of the page."""
@@ -347,8 +369,27 @@ class Plat:
         Be careful not to overwrite other required attributes."""
 
         stngs = self.settings
+
+        # Number of QQ divisions per section -- i.e. a 4x4 grid of QQ's,
+        # or a square of 4 units (QQ's) by 4 units.
+        qqs_per_sec_side = 4
+
+        # Multiplying `settings.qq_side` (an int representing how long
+        # we draw a QQ side) by `qq_per_sec_side` (an int representing
+        # how many QQ's per section side) gets us the number of px per
+        # section side.
+        sec_len = stngs.qq_side * qqs_per_sec_side
+
+        # If we platted all 36 sections, there are 6 per side (6x6 grid)
+        secs_per_twp_side = 6
+        if len(self.sec_coords.keys()) == 1:
+            # But if we only platted one, it's a 1x1 grid.
+            secs_per_twp_side = 1
+
         x = stngs.x_text_left_marg
-        y = stngs.y_top_marg + stngs.qq_side * 4 * 6 + stngs.y_px_before_tracts
+
+        # Set y below the plat.
+        y = stngs.y_top_marg + sec_len * secs_per_twp_side + stngs.y_px_before_tracts
         coord = (x, y)
 
         # Only if `commit=True` do we set this.
@@ -372,14 +413,71 @@ class Plat:
 
         setattr(self, cursor, coord)
 
+    def same_line_cursor(
+            self, xy_delta: tuple, cursor='text_cursor', commit=True,
+            additional_x_px=0, left_margin=None, additional_indent=0) -> tuple:
+        """Move the specified `cursor` to the right, on the same so-called
+        'line', after having written some text at that cursor.
+        `xy_delta` should be a tuple of (width, height) of text that was
+        written. It will move the cursor right that many px (plus the
+        optionally specified `additional_x_px` -- e.g., px for an
+        additional space character). Returns the resulting coord.
+
+        If the resulting cursor coord would be illegal (per settings),
+        it will move down to a 'new line'. The parameters `left_margin`
+        and `additional_indent` have no effect unless we end up moving
+        the cursor to the next line (in which case, they have the same
+        effect as they do in the `.next_line_cursor()` method).
+
+        If a string is NOT passed as `cursor=`, the returned (and
+        optionally committed) coord will be set to the default
+        `.text_cursor`. However, if the particular cursor IS specified,
+        it will save the resulting coord to that attribute name (so long
+        as `commit=True`).
+
+        Further, if the cursor is specified but does not yet exist, this
+        will read from `.text_cursor` (to calculate the updated coord)
+        but save to the specified cursor.
+
+        Be careful not to overwrite other required attributes."""
+
+        # Discard the y from xy_delta, but get the x_delta.
+        x_delta, _ = xy_delta
+
+        # Get the x0 and y0 from the cursor.  (Using nested `getattr`
+        # calls ensures we get `.text_cursor`, if `cursor=` was
+        # specified as a string that wasn't already set; but this won't
+        # overwrite the specified `cursor` for committing the coord
+        # shortly.)
+        x0, y0 = getattr(self, cursor, getattr(self, 'text_cursor'))
+
+        y = y0
+
+        total_x_delta = x_delta + additional_x_px
+
+        # Make sure that the resulting candidate cursor movement is legal.
+        # If not, we'll set the coord to the next line instead, by passing
+        # through our arguments to `.next_line_cursor()`.
+        if self._check_legal_cursor((total_x_delta, 0), cursor):
+            coord = (x0 + total_x_delta, y)
+        else:
+            coord = self.next_line_cursor(
+                xy_delta=xy_delta, cursor=cursor, commit=False,
+                left_margin=left_margin, additional_indent=additional_indent)
+
+        if commit:
+            self.set_cursor(coord, cursor=cursor)
+        return coord
+
     def next_line_cursor(
-            self, xy_delta, cursor='text_cursor', commit=True,
+            self, xy_delta: tuple, cursor='text_cursor', commit=True,
             left_margin=None, additional_indent=0) -> tuple:
         """Move the specified `cursor` to the so-called 'next line', after
         having written some text at that cursor. `xy_delta` should be a
         tuple of (width, height) of text that was written. It will move
         the cursor down that many px (plus `.y_px_between_tracts`
         from settings) and move the cursor back to the left_margin.
+        Returns the resulting coord.
 
         If `left_margin=` pixels is not specified (as an int), it will
         default to settings.
@@ -396,6 +494,8 @@ class Plat:
 
         Be careful not to overwrite other required attributes."""
 
+        # If `left_margin` is not specified (as an int), set it to the
+        # x-value of the original cursor position (discard the y value).
         if not isinstance(left_margin, int):
             left_margin, _ = self.reset_cursor(cursor, commit=False)
 
@@ -520,6 +620,10 @@ class Plat:
 
         return merged
 
+    def show(self):
+        """Flatten and display the plat Image."""
+        self.output().show()
+
     def plat_section_grid(self, secGrid: SectionGrid, qq_fill_RGBA=None):
         """Project a SectionGrid object onto an existing Plat Object
         (i.e. fill in any QQ hits per the `SectionGrid.QQgrid` values)."""
@@ -573,8 +677,10 @@ class Plat:
         return self.output()
 
     @staticmethod
-    def from_tract(tractObj, settings=None, single_sec=True, ld=None):
-        """Return a Plat object generated from a Tract object."""
+    def from_tract(tractObj, settings=None, single_sec=False, ld=None):
+        """Return a Plat object generated from a Tract object. Specify
+        `single_sec=True` to plat only one section, or `False` (the
+        default) to show the entire township."""
         twp = tractObj.twp
         rge = tractObj.rge
         sec = tractObj.sec
@@ -739,8 +845,76 @@ class Plat:
         self.draw.text(coord, text, font=font, fill=font_RGBA)
         return (w, h)
 
+    def write_custom_text(
+            self, text, cursor='text_cursor', font=None, font_RGBA=None,
+            override_legal_check=False, suppress_next_line=False,
+            **configure_cursor_update) -> tuple:
+        """Write custom `text` on the image. May specify the location to
+        write at by using EITHER `coord` (a tuple) OR by specifying
+        `cursor` (a string). If `coord` is specified, that will take
+        precedence over `cursor`. If neither is specified, it will
+        default to the cursor 'text_cursor'.
 
-    #TODO: def write_custom_text(self, start_xy, text, font_RGBA)
+        Returns the width and height of the written text; or returns
+        None if nothing was written.
+
+        Optionally specify `font` (an ImageFont object) and/or
+        `font_RGBA` -- or they will be pulled from settings.
+
+        `override_legal_check=True` (`False` by default) will ignore
+        whether the attempted text goes past margins.
+
+        `suppress_next_line=True` (`False` by default) will update the
+        cursor but only right-ward (not down), unless it is past the
+        margin, in which case, it will go to the 'next line'. (Same
+        behavior as calling the `.same_line_cursor()` method.)
+
+        Further, we can optionally pass the same parameters as in
+        `.same_line_cursor()` and/or `.next_line_cursor()`, which have
+        the same effect here:
+            left_margin=<int> (or `None`)
+            additional_x_px=<int>
+            additional_indent=<int>"""
+
+        if font is None:
+            font = self.settings.tractfont
+
+        if font_RGBA is None:
+            font_RGBA = self.settings.tractfont_RGBA
+
+        xy_delta = (0, 0)
+        coord = getattr(self, cursor, getattr(self, 'text_cursor'))
+        if self._check_legal_textwrite(text, font, cursor) or override_legal_check:
+            # Write the text and get the width and height of the text written.
+            xy_delta = self._write_text(coord, text, font, font_RGBA)
+        else:
+            return None
+
+        # Unpacking the kwargs for configuring the same-line cursor update
+        # (only used if `suppress_next_line==True` -- i.e. keeping our
+        # cursor on the same line, if possible and if requested).
+        additional_x_px = 0
+        left_margin = None
+        additional_indent = 0
+        for k, v in configure_cursor_update.items():
+            if k == 'additional_indent':
+                additional_indent = v
+            elif k == 'left_margin':
+                left_margin = v
+            elif k == 'additional_indent':
+                additional_indent = v
+
+        if suppress_next_line:
+            self.same_line_cursor(
+                xy_delta, cursor=cursor, additional_x_px=additional_x_px,
+                left_margin=left_margin, additional_indent=additional_indent,
+                commit=True)
+        else:
+            self.next_line_cursor(
+                xy_delta, cursor=cursor, commit=True,
+                additional_indent=additional_indent)
+
+        return xy_delta
 
     def write_lots(self, secObj):
         """Write lot numbers in the top-left corner of the respective QQs."""
@@ -915,10 +1089,10 @@ class MultiPlat:
     Plats by passing a Settings object to `settings=`. (Can also pass
     the name of a preset -- see Settings docs for more details.)
 
-    For better results, optionally pass a LotDefDB object (or the path
-    to a .csv file that can be read into a LotDefDB object) to `lddb=`,
-    to specify how to handle lots -- i.e. which QQ's are intended by
-    which lots. (See more info in `grid.LotDefDB` docs.)
+    For better results, optionally pass a LotDefDB object (or the
+    filepath to a .csv file that can be read into a LotDefDB object) to
+    `lddb=`, to specify how to handle lots -- i.e. which QQ's are
+    intended by which lots. (See more info in `grid.LotDefDB` docs.)
 
     MultiPlat objects can process these types of objects:
         pyTRS.PLSSDesc**, pyTRS.Tract**, SectionGrid, TownshipGrid
@@ -946,11 +1120,10 @@ class MultiPlat:
         if settings is None:
             settings = Settings()
         elif isinstance(settings, str):
-            # If passed as a string, it may be a preset or filepath to a
-            # file that can be imported as a Settings object. Create
-            # that Settings object now. (If that fails, it will be a
-            # defualt Settings object anyway.)
-            settings = Settings(settings)
+            # If passed as a string, it should be the name of a preset.
+            # Create that Settings object now. (Will throw off an error
+            # if not an existing preset name.)
+            settings = Settings(preset=settings)
         self.settings = settings
 
         # A list of generated plats
@@ -960,13 +1133,22 @@ class MultiPlat:
         # turn hold elements/tracts that will be platted).
         self.mpq = MultiPlatQueue()
 
+        # Try converting lddb to a pathlib.Path object (e.g., if it was
+        # passed as a string). If unsuccessful, it seems the user has
+        # NOT tried to pass a filepath as `lddb`.
+        try:
+            lddb = Path(lddb)
+        except TypeError:
+            pass
+
         # LotDefDB object for defining lots in subordinate plats (if not
         # specified when platting objects).
-        if isinstance(lddb, str):
+        if isinstance(lddb, Path):
             # If a string is passed, we assume it's a filepath to a file
             # that can be read into a LDDB object (e.g., a .csv file).
-            # Convert to LDDB object now.
-            lddb = LotDefDB(lddb)
+            # Convert to LDDB object now. (Will throw off errors if it
+            # does not lead to a '.csv' file.)
+            lddb = LotDefDB(from_csv=lddb)
         if not isinstance(lddb, LotDefDB):
             # If there's no valid LDDB by now, default to an empty LDDB.
             lddb = LotDefDB()
@@ -1055,17 +1237,15 @@ class MultiPlat:
     def show(self, index: int):
         """Display one of the plat Image objects, specifically the one
         in the `.plats` list at the specified `index`."""
-        try:
-            self.plats[index].output().show()
-        except:
-            return None
+        self.plats[index].output().show()
 
     def output_to_pdf(self, filepath):
         """Save all of the Plat images to a PDF at the specified
         `filepath`."""
-        if not filepath.lower().endswith('.pdf'):
-            raise Exception('Error: filepath should end with `.pdf`')
-            return
+
+        if not confirm_file_ext(filepath, '.pdf'):
+            raise ValueError('filepath must end with \'.pdf\'')
+
         plat_ims = self.output()
         if len(plat_ims) == 0:
             return
@@ -1078,9 +1258,10 @@ class MultiPlat:
         `filepath`. IMPORTANT: If there are multiple plats, then numbers
         (from '_000') will be added to the end of each, before the file
         extension."""
-        if not filepath.lower().endswith('.png'):
-            raise Exception('Error: filepath should end with `.png`')
-            return
+
+        if not confirm_file_ext(filepath, '.png'):
+            raise ValueError('filepath must end with \'.png\'')
+
         plat_ims = self.output()
 
         if len(plat_ims) == 0:
@@ -1128,8 +1309,8 @@ def text_to_plats(
 
     mp = MultiPlat.from_text(text=text, config=config, settings=settings, lddb=lddb)
     if output_filepath is not None:
-        if output_filepath.lower().endswith('.pdf'):
+        if confirm_file_ext(output_filepath, '.pdf'):
             mp.output_to_pdf(output_filepath)
-        elif output_filepath.lower().endswith('.png'):
+        elif confirm_file_ext(output_filepath, '.png'):
             mp.output_to_png(output_filepath)
     return mp.output()

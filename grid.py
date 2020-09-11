@@ -68,7 +68,7 @@ class SectionGrid:
 
         try:
             secNum = int(sec)
-        except:
+        except ValueError:
             secNum = 0
 
         self.ld = {}
@@ -432,11 +432,10 @@ class TownshipGrid:
             sec = tractObj.sec
         try:
             sec = int(sec)
-        except:
+        except ValueError:
             raise Warning('Section number could not be converted to int. '
                           'Tract object could not be incorporated into '
                           'SectionGrid')
-            return
 
         self.sections[sec].incorporate_tract(tractObj)
 
@@ -603,7 +602,7 @@ class TwpLotDefinitions(dict):
         self[sec_num] = lot_defs
 
     @staticmethod
-    def from_csv(fp, twp=None, rge=None):
+    def from_csv(fp, twp: str, rge: str):
         """Generate a TwpLotDefinitions object from a properly
         formatted** .csv file at filepath `fp`. Specify `twp=<str>` and
         `rge=<str>` for which rows should match.
@@ -613,38 +612,26 @@ class TwpLotDefinitions(dict):
 
         **See the docstring for LotDefDB for proper .csv formatting."""
 
-        # Confirm that `fp` points to an existing csv file. If not,
-        # return None.
-        if not confirm_file(fp, '.csv'):
-            return None
-
-        tld = TwpLotDefinitions()
         if None in [twp, rge]:
-            return tld
+            raise ValueError('`twp` and `rge` must be specified.')
 
         twp = twp.lower()
         rge = rge.lower()
 
-        import csv
-        f = open(fp, 'r')
-        reader = csv.DictReader(f)
-
-        for row in reader:
-            csv_twp, csv_rge = row['twp'].lower(), row['rge'].lower()
-            if csv_twp == twp and csv_rge == rge:
-                # If this row matches our twp and rge, set the lot to our tld.
-                tld[int(row['sec'])].set_lot(row['lot'], row['qq'])
-
-        return tld
+        # Load a full LotDefDB object from .csv file, and then pull our
+        # twp+rge from it. If our twp+rge does not exist as a key,
+        # return an empty TLD object.
+        temp_lddb = LotDefDB(from_csv=fp)
+        return temp_lddb.get(twp+rge, TwpLotDefinitions())
 
 
 class LotDefDB(dict):
     """A dict database of TwpLotDefinitions, whose keys are T&R (formatted
-    '000x000y' or fewer digits), and each whose values is a
+    '000a000b' or fewer digits), and each whose values is a
     TwpLotDefinitions object for that T&R.
 
     NOTE: If a string filepath to a properly formatted** .csv file is
-    passed as `source` at init the object will load the data represented
+    passed as `preset` at init the object will load the data represented
     in the .csv file. The same functionality can be acheived with
     `LotDefDB.from_csv()`.
 
@@ -685,28 +672,10 @@ class LotDefDB(dict):
                 take a while to process and/or result in a LotDefDB that
                 burdens the system's memory."""
 
-    def __init__(self, source=None):
+    def __init__(self, from_csv=None):
         super().__init__()
-        if confirm_file(source, '.csv'):
-            self._import_csv(source)
-
-    @staticmethod
-    def from_csv(fp):
-        """Generate a LotDefDB from a properly formatted** .csv file at
-        filepath `fp`. Convert each unique T&R represented in the .csv
-        file into a separate TwpLotDefinitions object, keyed by T&R
-        (keys formatted '000x000y' or fewer digits -- ex: '154n97w' for
-        T154N-R97W, or '1s6e' for T1S-R6E).
-
-        **See the docstring for LotDefDB for proper .csv formatting."""
-
-        ldd = LotDefDB()
-        success_check = ldd._import_csv(fp)
-        if success_check is None:
-            # None represents a failure.
-            return None
-
-        return ldd
+        if from_csv is not None:
+            self._import_csv(from_csv)
 
     def _import_csv(self, fp):
         """Read in a properly formatted** .csv file at filepath `fp`, and
@@ -717,10 +686,11 @@ class LotDefDB(dict):
 
         **See the docstring for LotDefDB for proper .csv formatting."""
 
-        # Confirm that `fp` points to an existing csv file. If not,
-        # return None.
-        if not confirm_file(fp, '.csv'):
-            return None
+        from pathlib import Path
+
+        # Confirm that we're going to read '.csv' file.
+        if Path(fp).suffix.lower() != '.csv':
+            raise ValueError("Filepath must end in '.csv'")
 
         import csv
         f = open(fp, 'r')
@@ -735,9 +705,6 @@ class LotDefDB(dict):
 
             # Add this lot/qq definition for the section/twp/rge on this row.
             self[twp + rge][sec].set_lot(lot, qq)
-
-        # Return success code.
-        return 0
 
     def set_twp(self, twprge, tld_obj):
         """Set the TwpLotDefinitions object for a specified `twprge`
@@ -758,7 +725,7 @@ class LotDefDB(dict):
             return None
         try:
             return self[twp+rge][int(sec)]
-        except:
+        except (KeyError, ValueError):
             return None
 
 
@@ -859,6 +826,13 @@ def confirm_file(fp, extension=None) -> bool:
         return True
 
     # If extension was specified, confirm the fp ends in such.
+    return Path(fp).suffix.lower() == extension.lower()
+
+def confirm_file_ext(fp, extension) -> bool:
+    """Check if `fp` is a filepath ending in `extension` (must include
+    the leading period for `extension` -- ex: '.csv')."""
+
+    from pathlib import Path
     return Path(fp).suffix.lower() == extension.lower()
 
 

@@ -16,13 +16,8 @@ from plat import text_to_plats, Plat, MultiPlat
 # The filepath to a .csv that can be read into a LotDefDB object:
 example_lddb_filepath = r'assets/examples/SAMPLE_LDDB.csv'
 
-
 # Creating a LotDefDB object by reading in a .csv file.
-example_lddb_obj = LotDefDB.from_csv(example_lddb_filepath)
-# Equivalently (because `.from_csv()` is implied when we pass a valid
-# filepath to an existing .csv file):
-example_lddb_obj = LotDefDB(example_lddb_filepath)
-
+example_lddb_obj = LotDefDB(from_csv=example_lddb_filepath)
 
 # Sample PLSS description text:
 descrip_text_1 = '''T154N-R97W
@@ -64,12 +59,37 @@ tg1.incorporate_tract(t2, 15)
 
 # Generating a (single) Plat by adding objects to its PlatQueue (via
 # `.queue()` method) and then processing the queue:
-set1 = Settings.preset('letter')
-sp = Plat(settings=set1, tld=example_lddb_obj['154n97w'])
+set1 = Settings(preset='letter')
+sp = Plat(settings=set1, twp='154n', rge='97w', tld=example_lddb_obj['154n97w'])
 sp.queue(sg1, t1)
 sp.queue(tg1, t2)
 sp.queue(t3)
 sp.process_queue()
+
+# Writing custom text on the Plat object we just created.
+sp.write_custom_text('Testing custom 1')  # Continues writing where tracts left off.
+sp.write_custom_text('Testing custom 2', cursor='new_cursor')
+sp.write_custom_text('Testing custom 3', cursor='new_cursor')
+# This next call uses cursor='text_cursor' (the default), which is still where
+# `.new_cursor` was when writing 'Testing custom 2':
+sp.write_custom_text('This will overwrite the "custom 2" line')
+# Moving `.new_cursor` to a different coord:
+sp.new_cursor = (340, 1900)
+sp.write_custom_text('But this one should be off on its own', cursor='new_cursor')
+#sp.show()
+
+
+# Create a Settings object from the 'letter' preset, but adjust a few
+# settings -- because we'll use it to create a single-section Plat from
+# Tract `t1`.
+custom_set2 = Settings(preset='letter')
+custom_set2.qq_side = 240
+custom_set2.centerbox_wh = 300
+custom_set2.secfont_size = 72
+custom_set2.tractfont_size = 48
+custom_set2._update_fonts()  # Won't create the ImageFont objects if we don't do this
+sp2 = Plat.from_tract(t1, settings=custom_set2, single_sec=True)
+#sp2.show()
 
 
 # Demonstrating adding objects to MultiPlatQueue, and then generating a

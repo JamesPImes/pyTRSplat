@@ -163,7 +163,6 @@ class MultiPlatQueue(dict):
         if not isinstance(plattable, MultiPlatQueue.MULTI_PLATTABLES):
             raise TypeError(f"Cannot add type to MultiPlatQueue: "
                             f"{type(plattable)}")
-            return
 
         # Handle PLSSDesc object, if it is one.
         if isinstance(plattable, PLSSDesc):
