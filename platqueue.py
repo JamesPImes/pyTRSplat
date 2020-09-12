@@ -147,9 +147,15 @@ class MultiPlatQueue(dict):
             if twprge in ['', None]:
                 twp, rge = tractObj.twp.lower(), tractObj.rge.lower()
                 twprge = twp+rge
-                # TODO: Handle TRerr twp/rge.
+                if twprge == '':
+                    # i.e. tractObj.twp and tractObj.rge were both also ''
+                    twprge = 'undef'
             else:
                 twprge = twprge.lower()
+
+            # Smooth out any variations of 'TRerrTRerr', 'TRerr_', etc.
+            if 'trerr' in twprge.lower():
+                twprge = 'TRerr'
 
             # Ensure this Tract object has been added to the tract list.
             confirmed_tracts = []

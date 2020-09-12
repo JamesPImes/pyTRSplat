@@ -5,11 +5,6 @@ converting them to a grid, and basic platting."""
 
 from pyTRS import pyTRS
 
-# TODO: Handle sections that didn't generate any lots/QQ's (e.g., m&b etc.).
-
-# TODO: Add a kwarg in a lot of places for importing lot_definitions from file.
-#  E.g., tracts_into_twp_grids
-
 
 class SectionGrid:
     """A grid of a single Section, divided into standard PLSS aliquot
@@ -17,7 +12,9 @@ class SectionGrid:
     Takes optional `ld=` argument for specifying a LotDefinitions object
     (defaults to a 'standard' township layout if not specified -- i.e.
     Sections 1 - 7, 18, 19, 30, and 31 have lots, because they are along
-    the northern and/or western boundaries of the township).
+    the northern and/or western boundaries of the township). A
+    TwpLotDefinitions object may also be passed, so long as `sec`,
+    `twp`, and `rge` are also correctly specified.
 
     If `sec=<int or str>`, `twp=<str>`, and `rge=<str>` are not
     specified at init, the object may not have full functionality in
@@ -58,6 +55,13 @@ class SectionGrid:
         self.twp = twp
         self.rge = rge
 
+        # 'secError' can be returned by pyTRS in the event of a flawed
+        # parse, so we handle this by setting to 0 (a meaningless number
+        # for a section that can't exist in reality) to avoid causing
+        # ValueError when converting to int elsewhere.
+        if sec == 'secError':
+            sec = 0
+
         # Ensure sec is formatted as a two digit string -- ex: '01'
         sec = str(int(sec)).rjust(2, '0')
 
@@ -76,6 +80,12 @@ class SectionGrid:
             self.ld = LotDefinitions(secNum)
         elif isinstance(ld, LotDefinitions):
             self.ld = ld
+        elif isinstance(ld, TwpLotDefinitions):
+            # If the user passed a TLD object (which contains LotDefinitions
+            # objects), then pull the appropriate LD object (based on the
+            # section number); and if it doesn't exist, create a new (empty)
+            # LD object
+            self.ld = ld.get(int(sec), LotDefinitions())
         else:
             self.ld = LotDefinitions(None)
 
@@ -104,6 +114,11 @@ class SectionGrid:
             'SWSE': {'coord': (2, 3), 'val': 0},
             'SESE': {'coord': (3, 3), 'val': 0}
         }
+
+        # Whether this SectionGrid has been 'pinged' by a setter (e.g.,
+        # by `.incorporate_lotList()` -- even if no values were actually
+        # set, or if values were later reset to 0).
+        self._was_pinged = False
 
     @staticmethod
     def from_trs(trs='', ld='default'):
@@ -177,6 +192,7 @@ class SectionGrid:
         NOTE: Relies on the LotDefinitions object in `.ld` at the time
         this method is called. Later changes to `.ld` will not
         modify what has already been done here."""
+        self._was_pinged = True
         self.incorporate_qq_list(tractObj.QQList)
         self.incorporate_lot_list(tractObj.lotList)
 
@@ -189,6 +205,9 @@ class SectionGrid:
         NOTE: Relies on the LotDefinitions object in `.ld` at the time
         this method is called. Later changes to `.ld` will not
         modify what has already been done here."""
+
+        self._was_pinged = True
+
         # QQ equivalents to Lots
         equiv_qq = []
 
@@ -211,6 +230,8 @@ class SectionGrid:
         ex: Passing 'NENE', 'NENW', 'NWNW', and 'SWNW' sets all of those
             QQ's as hits."""
 
+        self._was_pinged = True
+
         # `qq` can be fed in as 'NENE' or 'NENE,NWNE'. So we need to break it
         # into components before incorporating.
         for qq in QQList:
@@ -219,9 +240,9 @@ class SectionGrid:
 
     def _unpack_ld(self, lot) -> list:
         """Pass a lot number (string 'L1' or int 1), and get a list of the
-        corresponding / properly formatted QQ(s) from the
-        `.ld` of this SectionGrid object. Returns None if
-        the lot is undefined, or if it was defined with invalid QQ's."""
+        corresponding / properly formatted QQ(s) from the `.ld` of this
+        SectionGrid object. Returns None if the lot is undefined, or if
+        it was defined with invalid QQ's."""
 
         equiv_aliquots = []
         # Cull lot divisions (i.e. 'N2 of L1' to just 'L1')
@@ -312,6 +333,8 @@ class SectionGrid:
     def turn_on_qq(self, qq: str, custom_val=1):
         """Set the value of the specified QQ (e.g. 'NENE') to 1."""
 
+        self._was_pinged = True
+
         # Note: Passing anything other than `1` to `custom_val` will
         # probably cause other current functionality to break. But it
         # might be useful for some purposes (e.g., tracking which
@@ -365,7 +388,7 @@ class TownshipGrid:
 
         self.twp = twp
         self.rge = rge
-        self.TR = twp + rge
+        self.twprge = twp + rge
 
         # A dict of SectionGrid objs for each section, keyed by ints 1 - 36:
         self.sections = {}
@@ -393,6 +416,16 @@ class TownshipGrid:
             self.sections[secNum] = SectionGrid(sec=secNum, twp=twp, rge=rge)
             self.section_coords[secNum] = (x, y)
 
+        # Also add a nonsense 'Section 0' (which never actually exists
+        # for any real-life township). This way, we can handle section
+        # errors (e.g., from a flawed parse by pyTRS, which can generate
+        # a section number of 'secError') by changing them to Section 0,
+        # without crashing the program, but while also being able to
+        # check if there were flaws (e.g., if there are any changes made
+        # to this SectionGrid object).
+        self.sections[0] = SectionGrid(sec=0, twp=twp, rge=rge)
+        self.section_coords[0] = (-1, -1)
+
         if tld == 'default':
             default_tld = TwpLotDefinitions(list(range(1, 37)))
             self.apply_tld(default_tld)
@@ -413,11 +446,19 @@ class TownshipGrid:
             raise TypeError('`ld` must be type `LotDefinitions`')
         self.sections[int(section_number)].ld = ld
 
-    def filled_sections(self):
-        """Return a list of SectionGrid objects that have at least one QQ filled."""
+    def filled_sections(self, include_pinged=False):
+        """Return a list of SectionGrid objects that have at least one
+        QQ filled. Optionally, `include_pinged=True` (`False` by
+        default) will include SectionGrid objects that were 'pinged' by
+        any setter method, even if no values were actually set (e.g., an
+        empty list was passed to `secGridObj.incorporate_lotlist()`, so
+        no values were actually set -- this is potentially useful if a
+        Tract object was parsed but did not have any identifiable lots
+        or QQ's and we still want to include the corresponding
+        SectionGrid object here)."""
         x_sec = []
         for secNum, val in self.sections.items():
-            if val.has_any():
+            if val.has_any() or (val._was_pinged and include_pinged):
                 x_sec.append(val)
         return x_sec
 
@@ -430,14 +471,15 @@ class TownshipGrid:
         modify what has already been done here."""
         if sec is None:
             sec = tractObj.sec
-        try:
-            sec = int(sec)
-        except ValueError:
-            raise Warning('Section number could not be converted to int. '
-                          'Tract object could not be incorporated into '
-                          'SectionGrid')
-
-        self.sections[sec].incorporate_tract(tractObj)
+        # 'secError' can be returned by pyTRS in the event of a flawed
+        # parse, so we handle this by setting sec to 0 (a section number
+        # that can't exist in reality), before trying to
+        # convert `sec` to an int causes a ValueError.
+        if sec == 'secError':
+            sec = 0
+        sec = int(sec)
+        secGridObj = self.sections[sec]
+        secGridObj.incorporate_tract(tractObj)
 
     def turn_off_qq(self, secNum: int, qq: str):
         """For the specified section, set the value of the specified QQ
@@ -751,7 +793,7 @@ def tracts_into_twp_grids(tract_list, grid_dict=None, lddb=None) -> dict:
     # If the user passed a filepath (as a str) to a .csv file that can
     # be loaded into a LDDB object, create that.
     if isinstance(lddb, str):
-        lddb = LotDefDB(lddb)
+        lddb = LotDefDB(from_csv=lddb)
     # If we do not yet have a valid LotDefDB object, create a default.
     if not isinstance(lddb, LotDefDB):
         lddb = LotDefDB()
@@ -759,22 +801,44 @@ def tracts_into_twp_grids(tract_list, grid_dict=None, lddb=None) -> dict:
     # We'll incorporate each Tract object into a SectionGrid object. If necessary,
     # we'll first create TownshipGrid objects that do not yet exist in the grid_dict.
     for tractObj in tract_list:
+
+        # If there was a T&R error in the parsing by pyTRS, twp and rge
+        # will both be set as 'TRerr' by `.break_TRS()`. If there was a
+        # section error, `sec` will be set as `secError`. Otherwise,
+        # these three variables are set usefully.
         twp, rge, sec = pyTRS.break_trs(tractObj.trs)
-        # TODO: handle error parses ('TRerr' / 'secError').
+
+        # We don't want to duplicate 'TRerr' when setting a key shortly,
+        # so set twp and rge, such that only twp contains 'TRerr'.
+        if 'TRerr' in twp+rge:
+            twp = 'TRerr'
+            rge = ''
+
+        # If `sec` == 'secError', that will be passed through to
+        # `.incorporate_tract()`, which handles that error.
+
+        # Handling a twp, rge, and/or sec that are undefined.
+        if twp == '':
+            twp = 'undef'
+            rge = ''
+        if sec in ['', None]:
+            sec = 0
 
         # Get the TLD for this T&R from the lddb, if one exists. If not,
         # create and use a default TLD object.
         tld = lddb.get(twp + rge, TwpLotDefinitions())
 
-        # If a TownshipGrid object does not yet exist for this T&R in the dict,
-        # create one, and add it to the dict now.
+        # If a TownshipGrid object does not yet exist for this T&R in
+        # the dict, create one, and add it to the dict now.
         grid_dict.setdefault(twp + rge, TownshipGrid(twp=twp, rge=rge, tld=tld))
 
-        # Now incorporate the Tract object into a SectionGrid object within the dict.
-        # No /new/ SectionGrid objects are created at this point (since a TownshipGrid
-        # object creates all 36 of them at init), but SectionGrid objects are
-        # updated at this point to incorporate our tracts.
-        grid_dict[twp + rge].incorporate_tract(tractObj, sec)
+        # Now incorporate the Tract object into a SectionGrid object
+        # within the dict. No /new/ SectionGrid objects are created at
+        # this point (since a TownshipGrid object creates all 36 of them
+        # at init), but SectionGrid objects are updated at this point to
+        # incorporate our tracts.
+        TwpGridObj = grid_dict[twp + rge]
+        TwpGridObj.incorporate_tract(tractObj, sec)
 
     return grid_dict
 
@@ -802,10 +866,10 @@ def filter_tracts_by_twprge(tract_list, twprge_dict=None) -> dict:
         twprge = tract.twp + tract.rge
         if 'TRerr' in twprge:
             twprge = 'TRerr'
-        if twprge in twprge_to_tract.keys():
-            twprge_to_tract[twprge].append(tract)
-        else:
-            twprge_to_tract[twprge] = [tract]
+        if twprge == '':
+            twprge = 'undef'
+        twprge_to_tract.setdefault(twprge, [])
+        twprge_to_tract[twprge].append(tract)
 
     return twprge_to_tract
 
@@ -827,6 +891,7 @@ def confirm_file(fp, extension=None) -> bool:
 
     # If extension was specified, confirm the fp ends in such.
     return Path(fp).suffix.lower() == extension.lower()
+
 
 def confirm_file_ext(fp, extension) -> bool:
     """Check if `fp` is a filepath ending in `extension` (must include

@@ -22,7 +22,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 # For parsing text of PLSS land descriptions into its component parts.
 from pyTRS.pyTRS import PLSSDesc, Tract
-from pyTRS.pyTRS import decompile_twprge
+from pyTRS.pyTRS import decompile_twprge, break_trs
 from pyTRS import version as pyTRS_version
 
 
@@ -161,10 +161,8 @@ class Plat:
     def from_twprge(twprge='', only_section=None, settings=None, tld=None):
         """Generate an empty Plat object by specifying twprge as a single
         string, rather than as twp and rge separately."""
-        t, ns, r, ew = decompile_twprge(twprge)
-        twp = t + ns
-        rge = r + ew
-        # TODO: Handle error twprge's.
+        twp, rge, _ = break_trs(twprge)
+
         return Plat(twp=twp, rge=rge, only_section=only_section,
                     settings=settings, tld=tld)
 
@@ -212,44 +210,53 @@ class Plat:
         """Generate the text of a header containing the T&R and/or
         Section number."""
 
-        twptxt = ''
-        if '' not in [self.twp, self.rge]:
-            # If twp and rge were specified
-            twptxt = '{Township/Range Error}'
+        twp = str(self.twp)
+        rge = str(self.rge)
+        NS = 'undefined'
+        EW = 'undefined'
 
-            twp = str(self.twp)
-            rge = str(self.rge)
+        # Check that directions for twp and rge were appropriately specified.
+        # If no direction was specified, then also check if (only) digits were
+        # specified for twp and rge. If that's the case, arbitrarily assign 'n'
+        # and 'w' as their directions (only for purposes of `decompile_twprge()`
+        # -- will be cut off before the header itself is compiled).
+        if not twp.lower().endswith(('n', 's')):
 
-            twpNum = '0'
-            rgeNum = '0'
-            NS = 'undefined'
+            if twp != '':
+                try:
+                    twp = str(int(twp))
+                    twp = twp + 'n'
+                except ValueError:
+                    pass
+        if not rge.lower().endswith(('e', 'w')):
             EW = 'undefined'
-            twprge_fail = False
+            if rge != '':
+                try:
+                    rge = str(int(rge))
+                    rge = rge + 'w'
+                except ValueError:
+                    pass
 
-            if twp[-1].lower() == 'n':
-                NS = 'North'
-                twpNum = twp[:-1]
-            elif twp[-1].lower() == 's':
-                NS = 'South'
-                twpNum = twp[:-1]
-            else:
-                twprge_fail = True
+        twpNum, try_NS, rgeNum, try_EW = decompile_twprge(twp + rge)
 
-            if rge[-1].lower() == 'e':
-                EW = 'East'
-                rgeNum = rge[:-1]
-            elif rge[-1].lower() == 'w':
-                EW = 'West'
-                rgeNum = rge[:-1]
-            else:
-                twprge_fail = True
+        if try_NS == 'n':
+            NS = 'North'
+        elif try_NS == 's':
+            NS = 'South'
 
-            if 'TRerr' in [twp, rge]:
-                twptxt = '{Township/Range Error}'
-            elif twprge_fail:
-                twptxt = ''
-            else:
-                twptxt = f'Township {twpNum} {NS}, Range {rgeNum} {EW}'
+        if try_EW == 'e':
+            EW = 'East'
+        elif try_EW == 'w':
+            EW = 'West'
+
+        if twp + rge == '':
+            # If neither twp nor rge have been set, we will not write T&R in header.
+            twptxt = ''
+        elif 'TRerr' in [twpNum, rgeNum]:
+            # If N/S or E/W were not specified, or if there's some other T&R error
+            twptxt = '{Township/Range Error}'
+        else:
+            twptxt = f'Township {twpNum} {NS}, Range {rgeNum} {EW}'
 
         if only_section is not None:
             # If we're platting a single section.
@@ -628,7 +635,6 @@ class Plat:
         """Project a SectionGrid object onto an existing Plat Object
         (i.e. fill in any QQ hits per the `SectionGrid.QQgrid` values)."""
         secNum = int(secGrid.sec)
-        # TODO: Handle secError
         for coord in secGrid.filled_coords():
             self.fill_qq(secNum, coord, qq_fill_RGBA=qq_fill_RGBA)
         if self.settings.write_lot_numbers:
@@ -661,7 +667,11 @@ class Plat:
         """Project a TownshipGrid object onto an existing Plat object."""
 
         # Generate the list of sections that have anything in them.
-        sec_list = twpGrid.filled_sections()
+        # We use `include_pinged=True` to also include any sections
+        # that were 'pinged' by a setter method, but may not have had
+        # any values actually set (e.g., perhaps for a Tract object that
+        # failed to generate any lots/QQ's when parsed by pyTRS).
+        sec_list = twpGrid.filled_sections(include_pinged=True)
 
         # Plat each Section's filled QQ's onto our new overlay.
         for sec in sec_list:
@@ -784,8 +794,12 @@ class Plat:
         tracts_written = 0
         for tract in tracts:
             font_RGBA = self.settings.tractfont_RGBA
-            if len(tract.lotQQList) == 0:
-                # If no lots/QQs were identified, we'll write the tract in red
+            if len(tract.lotQQList) == 0 or tract.sec == 'secError':
+                # If no lots/QQs were identified, or if this tract has a
+                # 'secError' (i.e. it was a flawed parse where the section
+                # number could not be successfully deduced -- in which case it
+                # could not have been projected onto this plat), then we'll
+                # write the tract in red
                 font_RGBA = Settings.RGBA_RED
             xy_delta = self._write_tract(
                 cursor=cursor, tractObj=tract, font_RGBA=font_RGBA)
@@ -976,6 +990,9 @@ class Plat:
         appropriate `grid_location` coord (x, y) within that section,
         with the color specified in `qq_fill_RGBA`. If `qq_fill_RGBA` is
         not specified, it will pull from the Plat object's settings."""
+
+        if section == 0:
+            return
 
         if qq_fill_RGBA is None:
             # If not specified, pull from plat settings.
