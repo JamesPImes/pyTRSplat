@@ -1,8 +1,8 @@
 dim=1700,2800
-headerfont_typeface=assets/liberation-fonts-ttf-2.1.1/LiberationSans-Regular.ttf
-tractfont_typeface=assets/liberation-fonts-ttf-2.1.1/LiberationSans-Regular.ttf
-secfont_typeface=assets/liberation-fonts-ttf-2.1.1/LiberationSans-Regular.ttf
-lotfont_typeface=assets/liberation-fonts-ttf-2.1.1/LiberationSans-Regular.ttf
+headerfont_typeface=assets/fonts/LiberationSans-Regular.ttf
+tractfont_typeface=assets/fonts/LiberationSans-Regular.ttf
+secfont_typeface=assets/fonts/LiberationSans-Regular.ttf
+lotfont_typeface=assets/fonts/LiberationSans-Regular.ttf
 headerfont_size=64
 tractfont_size=28
 secfont_size=36
