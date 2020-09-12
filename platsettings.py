@@ -26,8 +26,12 @@ class Settings:
     A Settings object can be saved to a (non-preset) .txt file at a
     specified filepath with the `.save_to_file()` method.
     NOTE: The file extension MUST BE SPECIFIED when saving/loading to a
-        .txt file that is not a preset."""
+        .txt file that is not a preset.
 
+    To change font size and/or typeface, be sure to use `.set_font()`."""
+
+    # Note: To change font size and/or typeface for a given Settings object,
+    # be sure to use `.set_font()`.
     DEFAULT_TYPEFACE = r'assets/liberation-fonts-ttf-2.1.1/LiberationSans-Regular.ttf'
     PRESET_DIRECTORY = r'assets/presets/'
 
@@ -66,15 +70,14 @@ class Settings:
     # These are the attributes that will get included when outputting a
     # Settings object to text file (i.e. creating a preset).
     __setAtts__ = [
-        'dim', 'headerfont_typeface', 'secfont_typeface', 'lotfont_typeface',
-        'headerfont_size', 'tractfont_size', 'secfont_size', 'lotfont_size',
-        'headerfont_RGBA', 'tractfont_RGBA', 'secfont_RGBA', 'lotfont_RGBA',
-        'y_top_marg', 'y_bottom_marg', 'x_text_left_marg', 'x_text_right_marg',
-        'y_px_before_tracts', 'y_px_between_tracts', 'qq_side',
-        'sec_line_stroke', 'ql_stroke', 'qql_stroke', 'sec_line_RGBA',
-        'ql_RGBA', 'qql_RGBA', 'qq_fill_RGBA', 'centerbox_wh',
-        'lot_num_offset_px', 'write_header', 'write_tracts',
-        'write_section_numbers', 'write_lot_numbers'
+        'dim', 'headerfont_typeface', 'tractfont_typeface', 'secfont_typeface',
+        'lotfont_typeface', 'headerfont_size', 'tractfont_size', 'secfont_size',
+        'lotfont_size', 'headerfont_RGBA', 'tractfont_RGBA', 'secfont_RGBA',
+        'lotfont_RGBA', 'y_top_marg', 'y_bottom_marg', 'x_text_left_marg',
+        'x_text_right_marg', 'y_px_before_tracts', 'y_px_between_tracts',
+        'qq_side', 'sec_line_stroke', 'ql_stroke', 'qql_stroke', 'sec_line_RGBA',
+        'ql_RGBA', 'qql_RGBA', 'qq_fill_RGBA', 'centerbox_wh', 'lot_num_offset_px',
+        'write_header', 'write_tracts', 'write_section_numbers', 'write_lot_numbers'
     ]
 
     def __init__(self, preset='default'):
@@ -87,14 +90,16 @@ class Settings:
         if preset == 'default':
             try:
                 if 'default' not in Settings.list_presets():
-                    Settings.__restore_default()
+                    Settings._restore_default()
             except:
                 preset = None
 
         # Dimensions of the image.
         self.dim = Settings.LETTER_200ppi
 
-        # Font typeface, size, and RGBA values
+        # Font typeface, size, and RGBA values.
+        # IMPORTANT: To change font size and/or typeface, be sure to use
+        # `.set_font()`, because it creates a new ImageFont object.
         self.headerfont_typeface = Settings.DEFAULT_TYPEFACE
         self.tractfont_typeface = Settings.DEFAULT_TYPEFACE
         self.secfont_typeface = Settings.DEFAULT_TYPEFACE
@@ -128,19 +133,16 @@ class Settings:
 
         # px indent for tract text (from the left side of the image).
         self.x_text_left_marg = 100
-        # TODO: Set x_text_left_marg for various presets.
 
         # px for tract text right margin (distance from right side of image
         # that we can write up to).
         self.x_text_right_marg = 0
-        # TODO: Set x_text_right_marg for various presets.
 
         # Distance between bottom section line and the first tract text written.
         self.y_px_before_tracts = 40
 
         # Distance between tracts.
         self.y_px_between_tracts = 10
-        # TODO: Set y_px_between_tracts for various presets.
 
         self.qq_side = 50  # length of each side for a QQ in px
         self.sec_line_stroke = 3  # section-line stroke width in px
@@ -172,28 +174,105 @@ class Settings:
         if isinstance(preset, str):
             self._import_preset(preset)
 
-    def set_font(self, purpose: str, typeface: str, size: int):
+    def set_font(self, purpose: str, size=None, typeface=None, RGBA=None):
         """Set the font for the specified purpose:
             `purpose` -> 'header', 'tract', 'sec', or 'lot'
-            `typeface` -> filepath (str) to a font (extension: .ttf)
             `size` -> int of font size
-        (Constructs a PIL.ImageFont object and sets it to the
-        appropriate attribute.)"""
+            `typeface` -> filepath (str) to a font (extension: .ttf)
+            `RGBA` -> 4-item tuple of RGBA color to use for the font
+                (each element in the tuple must be an int 0 to 255).
+            (Any unspecified parameters will remain unchanged for the
+                specified `purpose`.)
 
-        if purpose.lower() not in ['header', 'tract', 'sec', 'lot']:
-            # Failure.
-            return -1
+            ex: settingsObj.set_font('header', size=112)
+                    -> The header will be written with size 112 font,
+                        using the same typeface as before.
+            ex: settingsObj.set_font(
+                    'header', typeface=r'custom/user_def.ttf')
+                    -> The header will be written with the typeface at
+                        the specified filepath, using the same size as
+                        before.
+            (Or specify `size`, `typeface`, and/or `RGBA` at one time.)"""
 
+        purpose = purpose.lower()
+
+        # Confirm it's a legal font `purpose`
+        Settings._font_purpose_error_check(purpose)
+
+        # Check for errors in the specified `RGBA`, and then set it.
+        if RGBA is not None:
+            if not isinstance(RGBA, tuple):
+                raise TypeError('`RGBA` must be tuple containing 4 ints from '
+                                f'0 to 255. (Argument of type \'{type(RGBA)}\' '
+                                'was passed)')
+            elif len(RGBA) != 4:
+                raise ValueError(f"`RGBA` must be tuple containing 4 ints from "
+                                 f"0 to 255. "
+                                 f"(Passed tuple contained {len(RGBA)} elements.")
+            for val in RGBA:
+                if not isinstance(val, int):
+                    raise TypeError('`RGBA` must be tuple containing 4 ints '
+                                    'from 0 to 255. (Passed tuple contained '
+                                    f'element of type \'{type(val)}\')')
+                if val < 0 or val > 255:
+                    raise ValueError('`RGBA` must contain ints from 0 to 255. '
+                                     f'(Passed tuple contained int {val})')
+            # If it passes the checks, set it.
+            setattr(self, f"{purpose}font_RGBA", RGBA)
+
+        # If `typeface` and `size` are BOTH None, then the ImageFont
+        # object won't change. So if we don't need to create a new
+        # ImageFont obj, we can return now. (RGBA does not get encoded
+        # in an ImageFont obj)
+        if typeface is None and size is None:
+            return
+
+        if typeface is None:
+            typeface = getattr(self, f"{purpose}font_typeface")
+
+        if size is None:
+            size = getattr(self, f"{purpose}font_size")
+
+        self._create_set_font(purpose, size, typeface)
+
+        # We only want to change the respective typeface attribute AFTER
+        # creating an ImageFont object, so that that has now had the
+        # chance to raise any appropriate errors.
+        setattr(self, f"{purpose}font_size", size)
+        setattr(self, f"{purpose}font_typeface", typeface)
+
+
+    @staticmethod
+    def _font_purpose_error_check(purpose: str) -> bool:
+        """Confirm the specified `purpose` is legal. If so, return
+        `True`. Otherwise, raise a ValueError."""
+        purposes = ['header', 'tract', 'sec', 'lot']
+        if purpose not in purposes:
+            raise ValueError(f"May customize font size and typeface for these "
+                             f"purposes: {', '.join(purposes)}; "
+                             f"Attempted to set font for purpose '{purpose}'")
+        else:
+            return True
+
+    def _create_set_font(self, purpose: str, size: int, typeface: str):
+        """Construct an ImageFont object from the specified `size` and
+        `typeface` (a filepath to a .ttf file), and set it for the
+        specified `purpose` (being 'header', 'tract', 'sec', or 'lot')."""
+
+        purpose = purpose.lower()
+
+        # Confirm it's a legal font `purpose`
+        Settings._font_purpose_error_check(purpose)
         fnt = ImageFont.truetype(typeface, size)
-        setattr(self, f"{purpose.lower()}font", fnt)
+        setattr(self, f'{purpose}font', fnt)
 
     def _update_fonts(self):
         """Construct ImageFont objects from the current font settings,
         and set them to the appropriate attributes."""
-        self.set_font('header', self.headerfont_typeface, self.headerfont_size)
-        self.set_font('tract', self.tractfont_typeface, self.tractfont_size)
-        self.set_font('sec', self.secfont_typeface, self.secfont_size)
-        self.set_font('lot', self.lotfont_typeface, self.lotfont_size)
+        self._create_set_font('header', self.headerfont_size, self.headerfont_typeface)
+        self._create_set_font('tract', self.tractfont_size, self.tractfont_typeface)
+        self._create_set_font('sec', self.secfont_size, self.secfont_typeface)
+        self._create_set_font('lot', self.lotfont_size, self.lotfont_typeface)
 
     @staticmethod
     def from_file(fp):
@@ -391,7 +470,7 @@ class Settings:
         self.save_to_file(fp)
 
     @staticmethod
-    def __restore_default():
+    def _restore_default():
         """Restore the 'default' preset Setting object to the original,
         hard-coded default."""
         st = Settings(preset=None)

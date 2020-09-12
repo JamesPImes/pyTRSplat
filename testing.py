@@ -53,7 +53,7 @@ T155N-R97W Sec 22: W/2'''
 # Generating a list of plat images from `descrip_text_1` string:
 ttp = text_to_plats(
     descrip_text_1, config='cleanQQ', lddb=example_lddb_filepath, settings='letter')
-ttp[0].show()  # Display the first image in the list (i.e. 154n97w in this case)
+#ttp[0].show()  # Display the first image in the list (i.e. 154n97w in this case)
 
 # Or as a MultiPlat object:
 mp = MultiPlat.from_text(
@@ -109,9 +109,23 @@ sp.write_custom_text('But this one should be off on its own', cursor='new_cursor
 custom_set2 = Settings(preset='letter')
 custom_set2.qq_side = 240
 custom_set2.centerbox_wh = 300
-custom_set2.secfont_size = 72
-custom_set2.tractfont_size = 48
-custom_set2._update_fonts()  # Won't create the ImageFont objects if we don't do this
+
+# Setting a variable to the filepath of the bold/italicized version of
+# the included 'Liberation Sans' font.
+boldital_tf = r'assets\liberation-fonts-ttf-2.1.1\LiberationSans-BoldItalic.ttf'
+
+# Using size 72 font and a lighter color (RGBA), but the original
+# typeface, to write sec numbers:
+custom_set2.set_font('sec', size=72, RGBA=(200, 200, 200, 255))
+
+# Using size 48 font and the bold/italics typeface to write tracts (color unchanged):
+custom_set2.set_font('tract', size=48, typeface=boldital_tf)
+
+# Using the bold/italics typeface to write the header (but using the same size as before)
+custom_set2.set_font('header', typeface=boldital_tf)
+
+# Create a Plat object from Tract object `t1`, using our custom settings,
+# and plating it as only a single section
 sp2 = Plat.from_tract(t1, settings=custom_set2, single_sec=True)
 #sp2.show()
 

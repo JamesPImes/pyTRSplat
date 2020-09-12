@@ -1239,15 +1239,6 @@ class MultiPlat:
         `config=` parameters -- see pyTRS docs), and generate Plat(s)
         for the lands described. Returns a MultiPlat object."""
 
-        # TODO: Confirm and delete this commented-out portion:
-        # # If the user passed a filepath to a .csv file as `lddb`, create a
-        # # LotDefDB object from that file now, and then pass that forward.
-        # if isinstance(lddb, str):
-        #     if confirm_file(lddb, '.csv'):
-        #         lddb = LotDefDB.from_csv(lddb)
-        #     else:
-        #         lddb = None
-
         descObj = PLSSDesc(text, config=config, initParseQQ=True)
         return MultiPlat.from_plssdesc(descObj, settings=settings, lddb=lddb)
 
