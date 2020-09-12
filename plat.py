@@ -1,8 +1,10 @@
 # Copyright (c) 2020, James P. Imes. All rights reserved.
 
-"""A module to generate plat images of full townships (6x6 grid) or
-single sections and incorporate parsed PLSSDesc and Tract objects from
-the pyTRS module."""
+"""
+pyTRSplat -- A module to generate land plat images of full townships
+(6x6 grid) or single sections from PLSS land descriptions ('legal
+descriptions'), using the pyTRS parsing module.
+"""
 
 # TODO: Give the option to depict `.unhandled_lots` on plats somewhere.
 #  i.e. warn users that certain lots were not incorporated onto the plat
@@ -25,11 +27,17 @@ from pyTRS.pyTRS import PLSSDesc, Tract
 from pyTRS.pyTRS import decompile_twprge, break_trs
 from pyTRS import version as pyTRS_version
 
+import _constants
 
-__version__ = '0.0.1'
-__versionDate__ = '8/31/2020'
-__author__ = 'James P. Imes'
-__email__ = 'jamesimes@gmail.com'
+__version__ = _constants.__version__
+__versionDate__ = _constants.__versionDate__
+__author__ = _constants.__author__
+__email__ = _constants.__email__
+
+
+def version():
+    """Return the current version and version date as a string."""
+    return f'v{__version__} - {__versionDate__}'
 
 
 class Plat:

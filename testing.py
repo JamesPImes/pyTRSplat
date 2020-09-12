@@ -112,7 +112,7 @@ custom_set2.centerbox_wh = 300
 
 # Setting a variable to the filepath of the bold/italicized version of
 # the included 'Liberation Sans' font.
-boldital_tf = r'assets\liberation-fonts-ttf-2.1.1\LiberationSans-BoldItalic.ttf'
+boldital_tf = Settings.DEFAULT_TYPEFACE_BOLDITAL
 
 # Using size 72 font and a lighter color (RGBA), but the original
 # typeface, to write sec numbers:
@@ -173,3 +173,9 @@ mp4.queue_text(descrip_text_2, config='cleanQQ')
 mp4.queue_text(descrip_text_3, config='cleanQQ')
 mp4.process_queue()
 #mp4.show(0)  # Show the first plat (i.e. 154n97w, in this case)
+
+
+
+# Specifying `output_filepath=` saved the plat to the specified fp. It also
+# returned a list of the Image objects of the plats (in this case only one
+# Image in the list).

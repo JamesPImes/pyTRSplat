@@ -28,11 +28,48 @@ class Settings:
     NOTE: The file extension MUST BE SPECIFIED when saving/loading to a
         .txt file that is not a preset.
 
-    To change font size and/or typeface, be sure to use `.set_font()`."""
+    To change font size and/or typeface, be sure to use `.set_font()`.
 
-    # Note: To change font size and/or typeface for a given Settings object,
-    # be sure to use `.set_font()`.
-    DEFAULT_TYPEFACE = r'assets/liberation-fonts-ttf-2.1.1/LiberationSans-Regular.ttf'
+    NOTE: If `preset=` is not specified, 'default' will be loaded. The
+        settings of the 'default' preset can be changed by creating a
+        Settings object and calling `.save_preset('default')`, and then
+        these will be the settings loaded by default in the future.
+        There is also a hard-coded default, which can be loaded by
+        passing `preset=None`, and which can be restored to the
+        'default' preset with the method `Settings._restore_default()`.
+    """
+
+    ####################################################################
+    # IMPORTANT: To change font size and/or typeface for a given
+    # Settings object, be sure to use `.set_font()`, rather than setting
+    # those attributes directly. Otherwise, the ImageFont object (from
+    # the PIL module) will not be updated, so the updated size/typeface
+    # won't actually get used.
+    #
+    # However, the RGBA of the font can be set directly, or with
+    # `.set_font()` -- because color does not get encoded in a ImageFont
+    # object.
+    ####################################################################
+
+    # 'Arial'-like font
+    DEFAULT_TYPEFACE = r'assets/fonts/LiberationSans-Regular.ttf'
+    DEFAULT_TYPEFACE_BOLD = r'assets/fonts/LiberationSans-Bold.ttf'
+    DEFAULT_TYPEFACE_BOLDITAL = r'assets/fonts/LiberationSans-BoldItalic.ttf'
+    DEFAULT_TYPEFACE_ITAL = r'assets/fonts/LiberationSans-Italic.ttf'
+
+    # 'Times New Roman'-like font
+    DEFAULT_TYPEFACE_SERIF = r'assets/fonts/LiberationSerif-Regular.ttf'
+    DEFAULT_TYPEFACE_SERIF_BOLD = r'assets/fonts/LiberationSerif-Bold.ttf'
+    DEFAULT_TYPEFACE_SERIF_BOLDITAL = r'assets/fonts/LiberationSerif-BoldItalic.ttf'
+    DEFAULT_TYPEFACE_SERIF_ITAL = r'assets/fonts/LiberationSerif-Italic.ttf'
+
+    # 'Courier'-like font
+    DEFAULT_TYPEFACE_MONO = r'assets/fonts/LiberationMono-Regular.ttf'
+    DEFAULT_TYPEFACE_MONO_BOLD = r'assets/fonts/LiberationMono-Bold.ttf'
+    DEFAULT_TYPEFACE_MONO_BOLDITAL = r'assets/fonts/LiberationMono-BoldItalic.ttf'
+    DEFAULT_TYPEFACE_MONO_ITAL = r'assets/fonts/LiberationMono-Italic.ttf'
+
+    # Where we'll look for .txt files of preset data.
     PRESET_DIRECTORY = r'assets/presets/'
 
     # Default page-size dimensions.
@@ -100,6 +137,8 @@ class Settings:
         # Font typeface, size, and RGBA values.
         # IMPORTANT: To change font size and/or typeface, be sure to use
         # `.set_font()`, because it creates a new ImageFont object.
+        # (RGBA can be set directly, or with `.set_font()` -- because
+        # color is not encoded in a ImageFont object)
         self.headerfont_typeface = Settings.DEFAULT_TYPEFACE
         self.tractfont_typeface = Settings.DEFAULT_TYPEFACE
         self.secfont_typeface = Settings.DEFAULT_TYPEFACE
@@ -113,11 +152,11 @@ class Settings:
         self.secfont_RGBA = Settings.RGBA_BLACK
         self.lotfont_RGBA = Settings.RGBA_BLACK
 
-        # Default font objects will be replaced shortly.
-        self.headerfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE)
-        self.tractfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE)
-        self.secfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE)
-        self.lotfont = ImageFont.truetype(Settings.DEFAULT_TYPEFACE)
+        # Default font objects will be set by `._update_fonts()` shortly.
+        self.headerfont = None
+        self.tractfont = None
+        self.secfont = None
+        self.lotfont = None
 
         # Construct ImageFont objects from the above settings:
         self._update_fonts()
