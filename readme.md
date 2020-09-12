@@ -22,15 +22,16 @@ lot_database_fp = r'assets\examples\SAMPLE_LDDB.csv'
 # Output to a .png file (could also output to .pdf)
 output_fp = r'C:\land plats\sample_plat_01.png'
 
-# Using the 'letter' settings preset (i.e. letter-sized paper at 200ppi)
+# Using the 'letter' settings preset (i.e. letter-sized paper at 200ppi),
+# generate the plat
 plats = pyTRSplat.text_to_plats(
     land_description, settings='letter', lddb=lot_database_fp, 
     output_filepath=output_fp)
 
-# Specifying `output_filepath=` saved the plat to the specified fp. It also
-# returned a list of the Image objects of the plats (in this case only one 
-# Image in the list), and we set the list to variable `plats`, in case we want
-# to use them for something else.
+# Specifying `output_filepath=` saved the plat to the specified fp. The function
+# also returns a list of the Image objects of the plats (in this case only one 
+# Image in the list), and we've set the list to variable `plats`, in case we
+# want to use them for something else.
 ```
 
 ...resulting in the following plat:

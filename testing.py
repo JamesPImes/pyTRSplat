@@ -173,9 +173,3 @@ mp4.queue_text(descrip_text_2, config='cleanQQ')
 mp4.queue_text(descrip_text_3, config='cleanQQ')
 mp4.process_queue()
 #mp4.show(0)  # Show the first plat (i.e. 154n97w, in this case)
-
-
-
-# Specifying `output_filepath=` saved the plat to the specified fp. It also
-# returned a list of the Image objects of the plats (in this case only one
-# Image in the list).
