@@ -6,16 +6,18 @@ pyTRSplat -- A module to generate land plat images of full townships
 descriptions'), using the pyTRS parsing module.
 """
 
-from plat import Plat, MultiPlat
-from plat import text_to_plats
+# TODO: Decide on license.
+
+from Plat import Plat, MultiPlat
+from Plat import text_to_plats
 
 from pyTRS.pyTRS import PLSSDesc, Tract
 from pyTRS import version as pyTRSversion
 
-from grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
-from grid import tracts_into_twp_grids
-from platsettings import Settings
-from platqueue import PlatQueue, MultiPlatQueue
+from Grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
+from Grid import tracts_into_twp_grids
+from PlatSettings import Settings
+from Queue import PlatQueue, MultiPlatQueue
 
 import _constants
 

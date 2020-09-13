@@ -14,10 +14,10 @@ descriptions'), using the pyTRS parsing module.
 from pathlib import Path
 
 # Submodules from this project.
-from grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
-from grid import plssdesc_to_grids, filter_tracts_by_twprge, confirm_file_ext
-from platsettings import Settings
-from platqueue import PlatQueue, MultiPlatQueue
+from Grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
+from Grid import plssdesc_to_grids, filter_tracts_by_twprge, confirm_file_ext
+from PlatSettings import Settings
+from Queue import PlatQueue, MultiPlatQueue
 
 # For drawing the plat images, and coloring / writing on them.
 from PIL import Image, ImageDraw, ImageFont
@@ -72,7 +72,7 @@ class Plat:
                  tld=None):
         self.twp = twp
         self.rge = rge
-        self.TR = twp+rge
+        self.twprge = twp + rge
 
         # NOTE: settings can be specified as a Settings object, or by
         # passing the name of an already saved preset (as a string).
@@ -717,7 +717,10 @@ class Plat:
         Plat settings say (i.e. in `platObject.settings.write_tracts`)."""
 
         twp, rge = tractObj.twp, tractObj.rge
-        sec = str(int(tractObj.sec)).rjust(2, '0')
+        sec = tractObj.sec
+        if sec == 'secError':
+            sec = 0
+        sec = str(int(sec)).rjust(2, '0')
 
         # If the user fed in a LDDB or TwpLD, rather than a LotDefinitions
         # object, get the appropriate LD from the LDDB or TLD.

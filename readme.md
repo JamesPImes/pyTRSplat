@@ -3,11 +3,17 @@
 A python module for generating configurable plat images of PLSS descriptions (or 'legal descriptions') of land. Uses the [pyTRS library](https://github.com/mesji/pyTRS) for parsing raw land descriptions into their component parts and the [Pillow (PIL) library](https://python-pillow.org/) for drawing the plats.
 
 
+### Included GUI Application
+
+A basic GUI application is included as `pyTRSplat_window.pyw`, which has somewhat pared-down functionality, but is also fairly straightforward.
+
+![gui_01](documentation/gui_01.png)
+
 ### Quick demonstration
 
 Below is a demonstration of very basic functionality of converting text into a plat.
 
-(However, plats can be worked with more in-depth. Look into `Plat` and `MultiPlat` objects in `pyTRSplat.plat`. And configure settings with a `Settings` object in `pyTRSplat.platsettings`. If platting multiple sources onto a single plat, look into `PlatQueue` and `MultiPlatQueue` objects in `pyTRSplat.platqueue`.)
+(However, plats can be worked with more in-depth. Look into `Plat` and `MultiPlat` objects in `pyTRSplat.Plat`. And configure settings with a `Settings` object in `pyTRSplat.PlatSettings`. If platting multiple sources onto a single plat, look into `PlatQueue` and `MultiPlatQueue` objects in `pyTRSplat.Queue`.)
 
 ```
 import pyTRSplat

@@ -630,6 +630,11 @@ class TwpLotDefinitions(dict):
             # in a standard Twp.
             self[i] = LotDefinitions(None)
 
+        # Initialize an empty LotDef obj for an non-existing 'section 0'
+        # (for error-handling purposes only -- will not contain
+        # meaningful data)
+        self[0] = LotDefinitions(None)
+
         # If we want to use default dicts for any sections, do so now.
         if isinstance(default_sections, int):
             self[default_sections] = LotDefinitions(default_sections)
@@ -673,9 +678,8 @@ class LotDefDB(dict):
     TwpLotDefinitions object for that T&R.
 
     NOTE: If a string filepath to a properly formatted** .csv file is
-    passed as `preset` at init the object will load the data represented
-    in the .csv file. The same functionality can be acheived with
-    `LotDefDB.from_csv()`.
+    passed as `from_csv=` at init the object will load the data
+    represented in the .csv file.
 
     ** For proper .csv formatting, follow these guidelines (and see the
     example `SAMPLE_LDDB.csv` in the documentation):

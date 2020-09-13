@@ -2,7 +2,7 @@
 
 """Objects for queuing 'plattable' objects."""
 
-from grid import SectionGrid, TownshipGrid, filter_tracts_by_twprge
+from Grid import SectionGrid, TownshipGrid, filter_tracts_by_twprge
 from pyTRS.pyTRS import PLSSDesc, Tract
 
 class PlatQueue(list):

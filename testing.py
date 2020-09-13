@@ -3,11 +3,11 @@
 """Testing"""
 
 from pyTRS.pyTRS import PLSSDesc, Tract
-from grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
-from grid import tracts_into_twp_grids
-from platsettings import Settings
-from platqueue import PlatQueue, MultiPlatQueue
-from plat import text_to_plats, Plat, MultiPlat
+from Grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
+from Grid import tracts_into_twp_grids
+from PlatSettings import Settings
+from Queue import PlatQueue, MultiPlatQueue
+from Plat import text_to_plats, Plat, MultiPlat
 
 ########################################################################
 # Examples / Testing:
