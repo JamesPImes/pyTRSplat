@@ -67,7 +67,7 @@ class MainWindow(tk.Tk):
 
 
 ########################################################################
-# PLSSDesc Frame
+# Getting / Parsing / Managing Land Descriptions and loading LotDefDB
 ########################################################################
 
 class DescFrame(tk.Frame):
@@ -100,7 +100,8 @@ class DescFrame(tk.Frame):
             command=self.parse_btn_clicked)
         parse_button.grid(row=3, column=1, pady=8, sticky='e')
 
-        desc_box_header = tk.Label(desc_frame, text='Enter land description:')
+        desc_box_header = tk.Label(desc_frame,
+                                   text='Enter one or more land descriptions:')
         desc_box_header.grid(row=1, column=1, sticky='w')
 
         self.desc_box_entry = tk.Text(desc_frame, width=36, height=9)
@@ -170,9 +171,9 @@ class DescFrame(tk.Frame):
             self.master.preview_frame.gen_preview()
 
     def lddb_btn_clicked(self):
-        """Prompt user for .csv file containing LotDefDB data. If selected,
-         loads from that file into main_window's `.lddb` attribute, and
-         replaces the existing LotDefDB in that attribute."""
+        """Prompt user for .csv file containing LotDefDB data. If
+        selected, loads from that file into `master.lddb` attribute, and
+        replaces the existing LotDefDB in that attribute."""
         lddb_fp = filedialog.askopenfilename(
             initialdir='/',
             filetypes=[("CSV Files", "*.csv")],
@@ -203,53 +204,6 @@ class DescFrame(tk.Frame):
                 messagebox.showerror(
                     '.csv Files Only', 'May only load \'.csv\' files containing '
                                        'lot definitions.')
-
-
-########################################################################
-# About
-########################################################################
-
-class About(tk.Frame):
-    """A frame containing the 'About' button, and corresponding
-    functionality."""
-
-    def __init__(self, master=None):
-        tk.Frame.__init__(self, master)
-        self.master = master
-        #about_frame = tk.Frame(master=self)
-
-        # Button to display 'about' info
-        about_button = tk.Button(
-            self, text='About', height=1, width=6,
-            command=self.about_btn_clicked)
-        about_button.grid(row=1, column=1, padx=4, sticky='w')
-
-        # Button to display pyTRS disclaimer
-        disclaimer_button = tk.Button(
-            self, text='pyTRS disclaimer', height=1,
-            command=self.disclaimer_btn_clicked)
-        disclaimer_button.grid(row=1, column=2, ipadx=2, padx=4, sticky='e')
-
-    def about_btn_clicked(self):
-        splash_info = (
-            f"pyTRSplat {Plat.version()}\n"
-            "Copyright (c) 2020, James P. Imes, all rights reserved.\n"
-            "A program for generating plats from PLSS land descriptions (often "
-            "called 'legal descriptions').\n\n"
-
-            f"Built on pyTRS {pyTRSversion()}.\n"
-            "Copyright (c) 2020, James P. Imes, all rights reserved.\n"
-            "A program for parsing PLSS land descriptions into their component "
-            "parts.\n\n"
-
-            f"Contact: <{_constants.__email__}>"
-
-        )
-        messagebox.showinfo('pyTRSplat - About', splash_info)
-
-    def disclaimer_btn_clicked(self):
-        """Display the disclaimer text from the pyTRS module."""
-        messagebox.showinfo('pyTRS disclaimer', pyTRS_constants.__disclaimer__)
 
 
 ########################################################################
@@ -347,7 +301,8 @@ class PlatPreview(tk.Frame):
 
     def gen_preview(self):
         """Generate a new list of preview plats (Image objects) and set
-        it to main_window's `.previews`."""
+        it to `self.previews`. (Discards the old previews.) Updates
+        `self.dummy_set` as appropriate."""
         mpq = self.master.mpq
         lddb = self.master.lddb
         # Create a new MP
@@ -376,7 +331,7 @@ class PlatPreview(tk.Frame):
         self.update_preview_display()
 
     def update_preview_display(self, index=None):
-        """Update the preview image and header in the tk window."""
+        """Update the preview image and header in this widget."""
 
         if index is None:
             index = self.preview_index
@@ -409,7 +364,7 @@ class PlatPreview(tk.Frame):
         self.scroll_preview(-1)
 
     def scroll_preview(self, direction=1):
-        """Scroll the preview left or right. (right -> +1; left -> -1).
+        """Scroll the preview left or right. (1 -> right;  -1 -> left).
         Defaults to scrolling right."""
         self.preview_index += direction
         if self.preview_index >= len(self.previews):
@@ -612,6 +567,57 @@ class OutputFrame(tk.Frame):
         os.startfile(first_png)
 
 
-if __name__ == '__main__':
+########################################################################
+# About and Disclaimer Buttons
+########################################################################
+
+class About(tk.Frame):
+    """A frame containing the 'About' button, and corresponding
+    functionality."""
+
+    def __init__(self, master=None):
+        tk.Frame.__init__(self, master)
+        self.master = master
+        #about_frame = tk.Frame(master=self)
+
+        # Button to display 'about' info
+        about_button = tk.Button(
+            self, text='About', height=1, width=6,
+            command=self.about_btn_clicked)
+        about_button.grid(row=1, column=1, padx=4, sticky='w')
+
+        # Button to display pyTRS disclaimer
+        disclaimer_button = tk.Button(
+            self, text='pyTRS disclaimer', height=1,
+            command=self.disclaimer_btn_clicked)
+        disclaimer_button.grid(row=1, column=2, ipadx=2, padx=4, sticky='e')
+
+    def about_btn_clicked(self):
+        splash_info = (
+            f"pyTRSplat {Plat.version()}\n"
+            "Copyright (c) 2020, James P. Imes, all rights reserved.\n"
+            "A program for generating plats from PLSS land descriptions (often "
+            "called 'legal descriptions').\n\n"
+
+            f"Built on pyTRS {pyTRSversion()}.\n"
+            "Copyright (c) 2020, James P. Imes, all rights reserved.\n"
+            "A program for parsing PLSS land descriptions into their component "
+            "parts.\n\n"
+
+            f"Contact: <{_constants.__email__}>"
+
+        )
+        messagebox.showinfo('pyTRSplat - About', splash_info)
+
+    def disclaimer_btn_clicked(self):
+        """Display the disclaimer text from the pyTRS module."""
+        messagebox.showinfo('pyTRS disclaimer', pyTRS_constants.__disclaimer__)
+
+
+def main():
     app = MainWindow()
     app.mainloop()
+
+
+if __name__ == '__main__':
+    main()
