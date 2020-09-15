@@ -554,7 +554,7 @@ class LotDefinitions(dict):
         'L7': 'SWSW',
     }
 
-    DEF_07_18_30_31 = {
+    DEF_07_18_19_30_31 = {
         'L1': 'NWNW',
         'L2': 'SWNW',
         'L3': 'NWSW',
@@ -575,8 +575,8 @@ class LotDefinitions(dict):
             self.absorb_ld(LotDefinitions.DEF_01_to_05)
         elif default == 6:
             self.absorb_ld(LotDefinitions.DEF_06)
-        elif default in [7, 18, 30, 31]:
-            self.absorb_ld(LotDefinitions.DEF_07_18_30_31)
+        elif default in [7, 18, 19, 30, 31]:
+            self.absorb_ld(LotDefinitions.DEF_07_18_19_30_31)
         else:
             self.absorb_ld(LotDefinitions.DEF_00)
 
