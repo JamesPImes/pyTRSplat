@@ -6,7 +6,7 @@ from pyTRS.pyTRS import PLSSDesc, Tract
 from Grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
 from Grid import tracts_into_twp_grids
 from PlatSettings import Settings
-from Queue import PlatQueue, MultiPlatQueue
+from PlatQueue import PlatQueue, MultiPlatQueue
 from Plat import text_to_plats, Plat, MultiPlat
 
 ########################################################################
@@ -54,6 +54,7 @@ T155N-R97W Sec 22: W/2'''
 ttp = text_to_plats(
     descrip_text_1, config='cleanQQ', lddb=example_lddb_filepath, settings='letter')
 #ttp[0].show()  # Display the first image in the list (i.e. 154n97w in this case)
+
 
 # Or as a MultiPlat object:
 mp = MultiPlat.from_text(

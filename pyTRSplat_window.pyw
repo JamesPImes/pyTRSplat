@@ -8,8 +8,6 @@ A basic GUI for pyTRSplat.
 
 # TODO: Implement option to view / delete added PLSSDesc objs in mpq.
 
-# TODO: Implement / allow use of 'default' TwpLotDefinitions.
-
 # TODO: Implement custom settings options.
 
 # TODO: Warn/confirm when error parse detected.
@@ -100,8 +98,8 @@ class DescFrame(tk.Frame):
             command=self.parse_btn_clicked)
         parse_button.grid(row=3, column=1, pady=8, sticky='e')
 
-        desc_box_header = tk.Label(desc_frame,
-                                   text='Enter one or more land descriptions:')
+        desc_box_header = tk.Label(
+            desc_frame, text='Enter one or more land descriptions:')
         desc_box_header.grid(row=1, column=1, sticky='w')
 
         self.desc_box_entry = tk.Text(desc_frame, width=36, height=9)
@@ -124,6 +122,24 @@ class DescFrame(tk.Frame):
         lddb_label = tk.Label(desc_frame, textvariable=self.lddp_fp_text)
         lddb_label.grid(row=5, column=1, sticky='w')
 
+        default_lots_frame = tk.Frame(desc_frame)
+        default_lots_frame.grid(row=6, column=1, sticky='w')
+
+        self.trust_default_lots = tk.BooleanVar(
+            desc_frame, value=True, name='trust_default_lots')
+        lots_chkbtn = tk.Checkbutton(
+            default_lots_frame, text='Trust Default Lots', onvalue=True,
+            offvalue=False, variable=self.trust_default_lots,
+            command=self.trigger_update_preview)
+        lots_chkbtn.grid(row=1, column=2, sticky='w')
+
+        lots_help_btn = tk.Button(
+            default_lots_frame, text='?', padx=4,
+            command=self.lots_help_btn_clicked)
+        lots_help_btn.grid(
+            row=1, column=1, sticky='w')
+
+
     def cf_btn_clicked(self):
         """Config button was clicked; launch popup window to get Config
         parameters from user (results are stored in 'config_text' var of
@@ -131,12 +147,23 @@ class DescFrame(tk.Frame):
         `self.getvar(name='config_text')` to retrieve after it's set)."""
         config_popup_tk = tk.Toplevel()
         config_popup_tk.title('Set pyTRS Config Parameters')
+        after_prompt = None
+        if len(self.master.mpq) > 0:
+            # If the user has already parsed one or more descriptions,
+            # we'll give this notice after config parameters are set.
+            after_prompt = (
+                'NOTE: '
+                'The config parameters that have just been set will ONLY '
+                'affect descriptions that are parsed AFTER this point. Any '
+                'descriptions that have already been parsed and added to '
+                'the plat will NOT be affected by changes to these config '
+                'parameters.')
         prompt_config(
             parameters=[
                 'cleanQQ', 'requireColon', 'ocrScrub', 'segment', 'layout'
             ],
             show_save=False, show_cancel=False, config_window=config_popup_tk,
-            main_window=self)
+            main_window=self, prompt_after_ok=after_prompt)
 
     def parse_btn_clicked(self):
         """Pull the entered text, and use the chosen config parameters (if
@@ -154,6 +181,9 @@ class DescFrame(tk.Frame):
         self.desc_box_entry.delete("1.0", 'end-1c')
 
         # And update the preview plat.
+        self.trigger_update_preview()
+
+    def trigger_update_preview(self):
         self.master.preview_frame.gen_preview()
 
     def clear_btn_clicked(self):
@@ -204,6 +234,41 @@ class DescFrame(tk.Frame):
                 messagebox.showerror(
                     '.csv Files Only', 'May only load \'.csv\' files containing '
                                        'lot definitions.')
+
+    def lots_help_btn_clicked(self):
+        """Display info about LotDefDB and default lots."""
+
+        msg = (
+            "A so-called 'standard' township would have been surveyed in such "
+            "a way that there are lots along the northern and western "
+            "boundaries -- i.e. along the boundaries of Sections 1 - 7, 18, "
+            "19, 30, and 31. These lot numbers are predictable (e.g. Lots 1, "
+            "2, 3, and 4 in a 'standard' Section 1 correspond with the NE¼NE¼, "
+            "NW¼NE¼, NE¼NW¼, and NW¼NW¼, respectively). Every other square in "
+            "a 'standard' township is an essentially perfect 40-acre square "
+            "called a 'quarter-quarter' (or 'QQ')."
+            "\n\n"
+            "However, in practice, townships are rarely 'standard'. Natural "
+            "features like rivers, lakes, mountains, the curvature of the "
+            "earth, etc. -- or faulty surveys -- may result in differently "
+            "numbered lots in Sections 1 - 7, 18, 19, 30, and 31; as well as "
+            "lots in any other sections."
+            "\n\n"
+            "By checking 'Trust Default Lots', this program will interpret "
+            "lots in Sections 1 - 7, 18, 19, 30, and 31 as though they are "
+            "lots in a 'standard' township, unless the user has defined lots "
+            "differently in a .csv file that has been loaded. (See the "
+            "included example, plus the documentation, for how to format such "
+            "a .csv file.)"
+            "\n\n"
+            "NOTE: Default lots will ONLY be used where no lots have been "
+            "defined for a given section in a loaded .csv file. (If a .csv "
+            "file has been loaded, but it does not define any lots in Section "
+            "4, T154N-R97W, then default lots would be used for that Section "
+            "4 -- as long as this box is checked.)"
+        )
+        messagebox.showinfo('Default Lots', msg)
+
 
 
 ########################################################################
@@ -305,9 +370,17 @@ class PlatPreview(tk.Frame):
         `self.dummy_set` as appropriate."""
         mpq = self.master.mpq
         lddb = self.master.lddb
+
+        # Get the bool var that decides whether we're supposed to trust
+        # default lots (i.e. pass through to `allow_ld_defaults=`)
+        trust_default_lots = self.master.desc_frame.getvar(
+            name='trust_default_lots')
+        trust_default_lots = bool(trust_default_lots)
+
         # Create a new MP
         new_preview_mp = Plat.MultiPlat.from_queue(
-            mpq, settings=self.settings, lddb=lddb)
+            mpq, settings=self.settings, lddb=lddb,
+            allow_ld_defaults=trust_default_lots)
 
         self.dummy_set = False
 
@@ -442,10 +515,19 @@ class OutputFrame(tk.Frame):
 
     def gen_plat(self):
         """Generate and return the Plat(s)."""
-        # Get the name of the preset `Settings` object we'll create.
+
+        # Get the name of the preset `Settings` object we'll use.
         preset = self.settings_combo.get()
+
+        # Get the bool var that decides whether we're supposed to trust
+        # default lots (i.e. pass through to `allow_ld_defaults=`)
+        trust_default_lots = self.master.desc_frame.getvar(
+            name='trust_default_lots')
+        trust_default_lots = bool(trust_default_lots)
+
         return Plat.MultiPlat.from_queue(
-            mpq=self.master.mpq, settings=preset, lddb=self.master.lddb)
+            mpq=self.master.mpq, settings=preset, lddb=self.master.lddb,
+            allow_ld_defaults=trust_default_lots)
 
     def preview_btn_clicked(self):
         """Generate the MultiPlat and display one of the plats from it. If
@@ -458,7 +540,6 @@ class OutputFrame(tk.Frame):
                 'No plats to preview. Add land descriptions and try again.')
             return
 
-        # TODO: This will probably break.
         index = self.master.preview_frame.preview_index
         if index >= len(mp.plats):
             index = len(mp.plats) - 1

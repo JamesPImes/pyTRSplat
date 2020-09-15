@@ -17,7 +17,7 @@ from pathlib import Path
 from Grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
 from Grid import plssdesc_to_grids, filter_tracts_by_twprge, confirm_file_ext
 from PlatSettings import Settings
-from Queue import PlatQueue, MultiPlatQueue
+from PlatQueue import PlatQueue, MultiPlatQueue
 
 # For drawing the plat images, and coloring / writing on them.
 from PIL import Image, ImageDraw, ImageFont
@@ -63,13 +63,16 @@ class Plat:
     For better results, optionally pass a TwpLotDefinition (or 'tld' for
     short) to `tld=` at init, to specify which lots correspond with
     which QQ in each respective section. (See more info in
-    `grid.TwpLotDefinition` docs and `grid.LotDefDB` docs.)"""
+    `grid.TwpLotDefinition` docs and `grid.LotDefDB` docs.)
+    # TODO: :param: allow_ld_defaults
+
+    """
 
     # TODO: Wherever TLD or LD is referenced in a kwarg, allow it
     #   to pull from self.tld or self.ld.
 
     def __init__(self, twp='', rge='', only_section=None, settings=None,
-                 tld=None):
+                 tld=None, allow_ld_defaults=False):
         self.twp = twp
         self.rge = rge
         self.twprge = twp + rge
@@ -140,13 +143,23 @@ class Plat:
 
         # If a LotDefDB object was passed instead of a TLD or LD object,
         # get the appropriate TLD from it (per twp+rge key); and if none
-        # exists, then use a default TLD object. Also then get the LD
-        # from it, if `only_section` was specified; and if none exists,
-        # then get a default LotDefinitions obj.
+        # exists, then use the init-specified `allow_ld_defaults` to
+        # determine whether to get a default TLD object, or an empty TLD
+        # object.  Also then get the LD from it if `only_section` was
+        # init-specified; and if no LD exists, also rely on
+        # `allow_ld_defaults` to determine whether we get back a default
+        # LD object, or an empty LD object.
+        # (`force_tld_return=True` and `force_ld_return=True` ensure
+        # that the returned objects are not None, but will be at least
+        # an empty version of the respective TLD and LD objects.)
         if isinstance(tld, LotDefDB):
-            tld = tld.get(twp + rge, TwpLotDefinitions())
+            tld = tld.get_tld(
+                twp + rge, allow_ld_defaults=allow_ld_defaults,
+                force_tld_return=True)
             if only_section is not None:
-                ld = tld.get(only_section, LotDefinitions())
+                ld = tld.get_ld(
+                    only_section, allow_ld_defaults=allow_ld_defaults,
+                    force_ld_return=True)
             else:
                 ld = None
         elif isinstance(tld, LotDefinitions):
@@ -165,22 +178,30 @@ class Plat:
         else:
             self.tld = tld
 
+        # Whether or not to pull default TLD's (and LD's) when undefined
+        self.allow_ld_defaults = allow_ld_defaults
+
     @staticmethod
-    def from_twprge(twprge='', only_section=None, settings=None, tld=None):
+    def from_twprge(
+            twprge='', only_section=None, settings=None, tld=None,
+            allow_ld_defaults=False):
         """Generate an empty Plat object by specifying twprge as a single
         string, rather than as twp and rge separately."""
         twp, rge, _ = break_trs(twprge)
 
-        return Plat(twp=twp, rge=rge, only_section=only_section,
-                    settings=settings, tld=tld)
+        return Plat(
+            twp=twp, rge=rge, only_section=only_section, settings=settings,
+            tld=tld, allow_ld_defaults=allow_ld_defaults)
 
     @staticmethod
-    def from_queue(pq, twp='', rge='', only_section=None, settings=None, tld=None):
+    def from_queue(
+            pq, twp='', rge='', only_section=None, settings=None, tld=None,
+            allow_ld_defaults=False):
         """Generate and return a filled-in Plat object from a PlatQueue
         object."""
         sp_obj = Plat(
-            twp=twp, rge=rge, only_section=only_section,
-            settings=settings, tld=tld)
+            twp=twp, rge=rge, only_section=only_section, settings=settings,
+            tld=tld, allow_ld_defaults=allow_ld_defaults)
         sp_obj.process_queue(pq)
         return sp_obj
 
@@ -190,10 +211,13 @@ class Plat:
         object."""
         self.pq.queue(plattable, tracts)
 
-    def process_queue(self, queue=None):
+    def process_queue(self, queue=None, allow_ld_defaults=None):
         """Process all objects in a PlatQueue object. If `queue=None`,
         the PlatQueue object that will be processed is the one stored in
         this Plat's `.pq` attribute."""
+
+        if allow_ld_defaults is None:
+            allow_ld_defaults = self.allow_ld_defaults
 
         # If a different PlatQueue isn't otherwise specified, use the
         # Plat's own `.pq` from init.
@@ -209,7 +233,8 @@ class Plat:
             elif isinstance(itm, TownshipGrid):
                 self.plat_township_grid(itm)
             elif isinstance(itm, Tract):
-                self.plat_tract(itm, write_tract=False)
+                self.plat_tract(itm, write_tract=False,
+                                allow_ld_defaults=allow_ld_defaults)
 
         if self.settings.write_tracts:
             self.write_all_tracts(queue.tracts)
@@ -695,7 +720,9 @@ class Plat:
         return self.output()
 
     @staticmethod
-    def from_tract(tractObj, settings=None, single_sec=False, ld=None):
+    def from_tract(
+            tractObj, settings=None, single_sec=False, ld=None,
+            allow_ld_defaults=False):
         """Return a Plat object generated from a Tract object. Specify
         `single_sec=True` to plat only one section, or `False` (the
         default) to show the entire township."""
@@ -706,15 +733,22 @@ class Plat:
         if single_sec:
             only_sec = str(int(sec))
 
-        platObj = Plat(twp=twp, rge=rge, settings=settings, only_section=only_sec)
+        platObj = Plat(
+            twp=twp, rge=rge, settings=settings, only_section=only_sec,
+            allow_ld_defaults=allow_ld_defaults)
         platObj.plat_tract(tractObj, ld=ld)
         return platObj
 
-    def plat_tract(self, tractObj, write_tract=None, ld=None):
+    def plat_tract(
+            self, tractObj, write_tract=None, ld=None,
+            allow_ld_defaults=None):
         """Project a Tract object onto an existing Plat object. Optionally,
         write the tract description at the bottom with `write_tract=True`.
         If `write_tract` is unspecified, it will default to whatever the
         Plat settings say (i.e. in `platObject.settings.write_tracts`)."""
+
+        if allow_ld_defaults is None:
+            allow_ld_defaults = self.allow_ld_defaults
 
         twp, rge = tractObj.twp, tractObj.rge
         sec = tractObj.sec
@@ -725,9 +759,12 @@ class Plat:
         # If the user fed in a LDDB or TwpLD, rather than a LotDefinitions
         # object, get the appropriate LD from the LDDB or TLD.
         if isinstance(ld, LotDefDB):
-            ld = ld.trs(twp + rge + sec)
+            ld = ld.trs(
+                twp + rge + sec, allow_ld_defaults=allow_ld_defaults)
         elif isinstance(ld, TwpLotDefinitions):
-            ld = ld[int(sec)]
+            ld = ld.get_ld(
+                int(sec), allow_ld_defaults=allow_ld_defaults,
+                force_ld_return=True)
 
         # If the user requested default LotDefs (based on a 'standard'
         # township) by passing 'default' for `ld`, create that LD obj.
@@ -740,7 +777,9 @@ class Plat:
             if self.ld is not None:
                 ld = self.ld
             elif self.tld is not None:
-                ld = self.tld[int(sec)]
+                ld = self.tld.get_ld(
+                    int(sec), allow_ld_defaults=allow_ld_defaults,
+                    force_ld_return=True)
             else:
                 # Otherwise, fall back to an empty LD.
                 ld = LotDefinitions()
@@ -1121,6 +1160,10 @@ class MultiPlat:
     filepath to a .csv file that can be read into a LotDefDB object) to
     `lddb=`, to specify how to handle lots -- i.e. which QQ's are
     intended by which lots. (See more info in `grid.LotDefDB` docs.)
+    Use `allow_ld_defaults=True` to allow any townships for which lots
+    have not been defined in the lddb, to instead use the default lot
+    definitions for Sections 1 - 7, 18, 19, 30, and 31 (inits as `False`
+    unless specified otherwise).
 
     MultiPlat objects can process these types of objects:
         pyTRS.PLSSDesc**, pyTRS.Tract**, SectionGrid, TownshipGrid
@@ -1142,7 +1185,7 @@ class MultiPlat:
     # TODO: Figure out a good way to organize the plats. I'm thinking a
     #  dict, keyed by T&R. Currently, it's a list.
 
-    def __init__(self, settings=None, lddb=None):
+    def __init__(self, settings=None, lddb=None, allow_ld_defaults=False):
 
         # If settings was not specified, create a default Settings object.
         if settings is None:
@@ -1182,12 +1225,17 @@ class MultiPlat:
             lddb = LotDefDB()
         self.lddb = lddb
 
+        # Whether or not to pull default TLD's when they are not set
+        # in our LotDefDB. (See `Grid.LotDefDB.get_tld()` for more info)
+        self.allow_ld_defaults = allow_ld_defaults
+
     @staticmethod
-    def from_queue(mpq, settings=None, lddb=None):
+    def from_queue(mpq, settings=None, lddb=None, allow_ld_defaults=False):
         """Generate and return a MultiPlat object from a MultiPlatQueue
         object."""
 
-        mp_obj = MultiPlat(settings=settings, lddb=lddb)
+        mp_obj = MultiPlat(
+            settings=settings, lddb=lddb, allow_ld_defaults=allow_ld_defaults)
         mp_obj.process_queue(mpq)
         return mp_obj
 
@@ -1205,10 +1253,13 @@ class MultiPlat:
         Plat's MultiPlatQueue object."""
         self.mpq.queue_text(text=text, config=config)
 
-    def process_queue(self, queue=None):
+    def process_queue(self, queue=None, allow_ld_defaults=None):
         """Process all objects in a MultiPlatQueue object. If `queue=None`,
         the MultiPlatQueue object that will be processed is this
         MultiPlat's `.mpq` attribute."""
+
+        if allow_ld_defaults is None:
+            allow_ld_defaults = self.allow_ld_defaults
 
         # If a different MultiPlatQueue isn't otherwise specified, use
         # the Plat's own `.mpq` from init.
@@ -1218,20 +1269,25 @@ class MultiPlat:
         stngs = self.settings
         for twprge, pq in queue.items():
             tld = self.lddb.get(twprge, None)
-            pl_obj = Plat.from_twprge(twprge, settings=stngs, tld=tld)
+            pl_obj = Plat.from_twprge(
+                twprge, settings=stngs, tld=tld,
+                allow_ld_defaults=allow_ld_defaults)
             pl_obj.process_queue(pq)
             self.plats.append(pl_obj)
 
     @staticmethod
-    def from_plssdesc(PLSSDesc_obj, settings=None, lddb=None):
+    def from_plssdesc(
+            PLSSDesc_obj, settings=None, lddb=None, allow_ld_defaults=False):
         """Generate a MultiPlat from a parsed PLSSDesc object.
         (lots/QQs must be parsed within the Tracts for any QQ's to be
         filled on the resulting plats.)"""
 
-        mp_obj = MultiPlat(settings=settings, lddb=lddb)
+        mp_obj = MultiPlat(
+            settings=settings, lddb=lddb, allow_ld_defaults=allow_ld_defaults)
 
         # Generate a dict of TownshipGrid objects from the PLSSDesc object.
-        twp_grids = plssdesc_to_grids(PLSSDesc_obj, lddb=lddb)
+        twp_grids = plssdesc_to_grids(
+            PLSSDesc_obj, lddb=lddb, allow_ld_defaults=allow_ld_defaults)
 
         # Get a dict linking the the PLSSDesc object's parsed Tracts to their
         # respective T&R's (keyed by T&R '000x000y' -- same as the twp_grids dict)
@@ -1245,13 +1301,16 @@ class MultiPlat:
         return mp_obj
 
     @staticmethod
-    def from_text(text, config=None, settings=None, lddb=None):
+    def from_text(
+            text, config=None, settings=None, lddb=None, allow_ld_defaults=False):
         """Parse the text of a PLSS land description (optionally using
         `config=` parameters -- see pyTRS docs), and generate Plat(s)
         for the lands described. Returns a MultiPlat object."""
 
         descObj = PLSSDesc(text, config=config, initParseQQ=True)
-        return MultiPlat.from_plssdesc(descObj, settings=settings, lddb=lddb)
+        return MultiPlat.from_plssdesc(
+            descObj, settings=settings, lddb=lddb,
+            allow_ld_defaults=allow_ld_defaults)
 
     def show(self, index: int):
         """Display one of the plat Image objects, specifically the one
@@ -1311,7 +1370,7 @@ class MultiPlat:
 
 def text_to_plats(
         text, config=None, settings=None, lddb=None,
-        output_filepath=None) -> list:
+        output_filepath=None, allow_ld_defaults=False) -> list:
     """Parse the text of a PLSS land description (optionally using
     `config=` parameters -- see pyTRS docs), and generate plat(s) for
     the lands described. Optionally output to .png or .pdf with
@@ -1326,7 +1385,9 @@ def text_to_plats(
     read into a LotDefDB object) into `lddb=` for better results. (See
     more info in `grid.LotDefDB` docs."""
 
-    mp = MultiPlat.from_text(text=text, config=config, settings=settings, lddb=lddb)
+    mp = MultiPlat.from_text(
+        text=text, config=config, settings=settings, lddb=lddb,
+        allow_ld_defaults=allow_ld_defaults)
     if output_filepath is not None:
         if confirm_file_ext(output_filepath, '.pdf'):
             mp.output_to_pdf(output_filepath)

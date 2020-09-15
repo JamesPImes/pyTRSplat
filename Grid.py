@@ -44,7 +44,8 @@ class SectionGrid:
     ------------------------------------------------------------------
     """
 
-    def __init__(self, sec='', twp='', rge='', ld='default'):
+    def __init__(
+            self, sec='', twp='', rge='', ld=None, allow_ld_defaults=False):
 
         # Note: twp and rge should have their direction specified
         #   ('n' or 's' for twp; and 'e' or 'w' for rge). Without doing
@@ -76,8 +77,10 @@ class SectionGrid:
             secNum = 0
 
         self.ld = {}
-        if ld == 'default':
-            self.ld = LotDefinitions(secNum)
+        if ld is None and allow_ld_defaults:
+            # If ld was not specified, but the user wants to allow
+            # defaults (i.e. for Sections 1 - 7, 18, 19, 30, and 31)
+            self.ld = LotDefinitions(default=secNum)
         elif isinstance(ld, LotDefinitions):
             self.ld = ld
         elif isinstance(ld, TwpLotDefinitions):
@@ -87,7 +90,8 @@ class SectionGrid:
             # LD object
             self.ld = ld.get(int(sec), LotDefinitions())
         else:
-            self.ld = LotDefinitions(None)
+            # Otherwise, an empty LD.
+            self.ld = LotDefinitions()
 
         # A dict for the 16 aliquot divisions of a standard section,
         # with (0, 0) being NWNW and (3, 3) being SESE -- i.e. beginning
@@ -380,7 +384,7 @@ class TownshipGrid:
     # -- all other sections are left-to-right.
     RIGHT_TO_LEFT_SECTIONS = list(range(1, 7)) + list(range(13, 19)) + list(range(25, 31))
 
-    def __init__(self, twp='', rge='', tld='default'):
+    def __init__(self, twp='', rge='', tld=None, allow_ld_defaults=False):
 
         # NOTE: `tld` stands for `TwpLotDefinitions`
 
@@ -395,6 +399,13 @@ class TownshipGrid:
 
         # A dict of (x,y) coords for each section in the Twp, keyed by ints 1 - 36:
         self.section_coords = {}
+
+        if isinstance(tld, TwpLotDefinitions):
+            self.tld = tld
+        elif tld is None and allow_ld_defaults:
+            self.tld = TwpLotDefinitions(list(range(0, 37)))
+        else:
+            self.tld = TwpLotDefinitions()
 
         # Sections "snake" from the NE corner of the township west then
         # down, then they cut back east, then down and west again, etc.,
@@ -413,7 +424,14 @@ class TownshipGrid:
                 y = -secNum % 6
             else:
                 y = secNum % 6
-            self.sections[secNum] = SectionGrid(sec=secNum, twp=twp, rge=rge)
+            # Pull the LotDefinitions from our TLD, if it's been set for
+            # this section. If not set, check with `allow_ld_defaults`
+            # whether to pull a default LD, or to pull an empty LD.
+            ld = self.tld.get_ld(
+                secNum, allow_ld_defaults=allow_ld_defaults,
+                force_ld_return=True)
+            self.sections[secNum] = SectionGrid(
+                sec=secNum, twp=twp, rge=rge, ld=ld)
             self.section_coords[secNum] = (x, y)
 
         # Also add a nonsense 'Section 0' (which never actually exists
@@ -426,11 +444,6 @@ class TownshipGrid:
         self.sections[0] = SectionGrid(sec=0, twp=twp, rge=rge)
         self.section_coords[0] = (-1, -1)
 
-        if tld == 'default':
-            default_tld = TwpLotDefinitions(list(range(1, 37)))
-            self.apply_tld(default_tld)
-        elif isinstance(tld, TwpLotDefinitions):
-            self.apply_tld(tld)
 
     def apply_tld(self, tld):
         """Apply a TwpLotDefinitions object (i.e. set the respective
@@ -625,10 +638,10 @@ class TwpLotDefinitions(dict):
 
     def __init__(self, default_sections=None):
         super().__init__()
-        for i in range(1,37):
-            # Initialize an empty LotDef obj for each of the 36 sections
-            # in a standard Twp.
-            self[i] = LotDefinitions(None)
+        # for i in range(1,37):
+        #     # Initialize an empty LotDef obj for each of the 36 sections
+        #     # in a standard Twp.
+        #     self[i] = LotDefinitions(None)
 
         # Initialize an empty LotDef obj for an non-existing 'section 0'
         # (for error-handling purposes only -- will not contain
@@ -647,6 +660,45 @@ class TwpLotDefinitions(dict):
         # This need not be a defined method, but it's more intuitively
         # named, so... why not.
         self[sec_num] = lot_defs
+
+    def get_ld(self, sec_num: int, allow_ld_defaults=False,
+               force_ld_return=False):
+        """Get the TwpLotDefinitions object for a specified `twprge`
+        (formatted '000x000z' or fewer digits, if not needed).
+
+        If no LotDefinitions has been set for the requested sec_num,
+        then parameter `allow_ld_defaults=True` (set `False` by default)
+        will cause this to return a LotDefinitions object with the lot
+        definitions of that section, as though in a 'standard' township
+        (i.e. for Sections 1 - 7, 18, 19, 30, and 31 -- the sections
+        along the north and/or west boundaries of a standard township).
+
+        If parameter `force_ld_return=True` (set `False` by default),
+        then this method will be forced to return a LotDefinitions
+        object. This has the effect of returning an (empty) LD object
+        when this function otherwise WOULD HAVE returned None (i.e. the
+        LotDefinitions was unset for the requested section, but user
+        specified `allow_ld_defaults=False`). This would have no effect
+        if the LotDefinitions object was set for the requested section,
+        and/or the user passed parameter `allow_ld_defaults=True`."""
+
+        #TODO: docstring. Similar to `LotDefDB.get_tld()`.
+        sec_num = int(sec_num)
+        ld = self.get(sec_num, None)
+        if ld is not None:
+            return ld
+        elif allow_ld_defaults:
+            # If there was no LD set for this sec_num, but the user wants
+            # to allow default LD's, generate and return a section-default
+            # LD now.
+            return LotDefinitions(default=sec_num)
+        elif force_ld_return:
+            # If the LD was not set for this section, and the user
+            # prohibited defaults, but the user still wants to receive a
+            # LotDefinitions object... we return an empty LD obj.
+            return LotDefinitions()
+        else:
+            return None
 
     @staticmethod
     def from_csv(fp, twp: str, rge: str):
@@ -680,6 +732,16 @@ class LotDefDB(dict):
     NOTE: If a string filepath to a properly formatted** .csv file is
     passed as `from_csv=` at init the object will load the data
     represented in the .csv file.
+
+    By design, it is best to use the `.get_tld()` method to access the
+    stored TwpLotDefinitions objects (rather than the native `.get()`
+    method), because `allow_ld_defaults=<bool>` in that method will
+    decide whether to fall back to default lot definitions for any T&R's
+    that have not been set in a given LotDefDB object (i.e. for Sections
+    1 - 7, 18, 19, 30, and 31 -- which are along the north and/or west
+    boundaries of a standard township). Of course, `.get()` also works
+    (as do square brackets for the key), if this functionality isn't
+    needed.
 
     ** For proper .csv formatting, follow these guidelines (and see the
     example `SAMPLE_LDDB.csv` in the documentation):
@@ -750,6 +812,7 @@ class LotDefDB(dict):
             self.setdefault(twp + rge, TwpLotDefinitions())
 
             # Add this lot/qq definition for the section/twp/rge on this row.
+            self[twp + rge].setdefault(sec, LotDefinitions())
             self[twp + rge][sec].set_lot(lot, qq)
 
     def set_twp(self, twprge, tld_obj):
@@ -759,31 +822,75 @@ class LotDefDB(dict):
         # named, so... why not.
         self[twprge] = tld_obj
 
-    def trs(self, trs):
+    def get_tld(self, twprge, allow_ld_defaults=False,
+                force_tld_return=False):
+        """Get the TwpLotDefinitions object for a specified `twprge`
+        (formatted '000x000z' or fewer digits, if not needed).
+
+        If a requested TLD has not been set, this will return `None` --
+        unless the parameter `allow_ld_defaults=True` is set to True, in
+        which case, it will return as a TwpLotDefinitions object with
+        default lot definitions (i.e. for Sections 1 - 7, 18, 19, 30,
+        and 31 -- the sections along the north and/or west boundaries
+        of a standard township)."""
+
+        tld = self.get(twprge, None)
+        if tld is not None:
+            return tld
+        elif allow_ld_defaults:
+            # If there was no TLD set for this twprge, but the user wants
+            # to allow default TLD's, generate and return one now.
+            return TwpLotDefinitions(
+                default_sections=[i for i in range(0, 37)])
+        elif force_tld_return:
+            return TwpLotDefinitions()
+        else:
+            return None
+
+    def trs(self, trs, allow_ld_defaults=None):
         """Access the (section-level) LotDefinitions object for the
         specified `trs`. Returns either the corresponding LotDefinitions
-        object -- or None, if none was found.
+        object -- or None, if none was found**.
             ex: lddb_oj.trs('154n97w14')
         # This would access the LD for Sec 14 of T154N-R97W, if defined
-        in the LotDefDB."""
+        in the LotDefDB.
+
+        **However, if parameter `allow_ld_defaults=True` is passed, then
+        if the LotDefDB does not contain any lot definitions for the
+        requested T&R, it will instead create (but not store) a new
+        TwpLotDefinitions object with default lot definitions (i.e. for
+        Sections 1 - 7, 18, 19, 30, and 31 -- which are along the north
+        and/or west boundaries of a standard township), and will pull
+        LotDefinitions from that.
+
+        IMPORTANT: If ANY lots are defined in a given T&R, then no
+        defaults will be used for that T&R -- i.e. if lots are defined
+        in Section 25, T154N-R97W but not in Section 1 of that township,
+        then falling back to defaults for Section 1 will have no effect.
+        (So if any lots are defined for a T&R, then all lots SHOULD be
+        defined, although nothing would break if they are not.)"""
+
         twp, rge, sec = pyTRS.break_trs(trs)
-        if twp+rge not in self.keys():
+        twprge = twp + rge
+        tld = self.get_tld(twprge, allow_ld_defaults=allow_ld_defaults)
+        if tld is None:
             return None
-        try:
-            return self[twp+rge][int(sec)]
-        except (KeyError, ValueError):
-            return None
+        else:
+            return tld[int(sec)]
 
 
-def plssdesc_to_grids(PLSSDescObj: pyTRS.PLSSDesc, lddb=None) -> dict:
+def plssdesc_to_grids(
+        PLSSDescObj: pyTRS.PLSSDesc, lddb=None, allow_ld_defaults=False) -> dict:
     """Generate a dict of TownshipGrid objects (keyed by T&R
     '000x000x') from a parsed pyTRS.PLSSDesc object. Optionally specify
     `lddb=<LotDefDB>` to define lots and get better results."""
     tl = PLSSDescObj.parsedTracts
-    return tracts_into_twp_grids(tl, lddb=lddb)
+    return tracts_into_twp_grids(
+        tl, lddb=lddb, allow_ld_defaults=allow_ld_defaults)
 
 
-def tracts_into_twp_grids(tract_list, grid_dict=None, lddb=None) -> dict:
+def tracts_into_twp_grids(
+        tract_list, grid_dict=None, lddb=None, allow_ld_defaults=False) -> dict:
     """Incorporate a list of parsed pyTRS.Tract objects into respective
     TownshipGrid objects, and return a dict of those TownshipGrid objs
     (keyed by T&R). If an existing `grid_dict` is passed, it will be
@@ -802,8 +909,9 @@ def tracts_into_twp_grids(tract_list, grid_dict=None, lddb=None) -> dict:
     if not isinstance(lddb, LotDefDB):
         lddb = LotDefDB()
 
-    # We'll incorporate each Tract object into a SectionGrid object. If necessary,
-    # we'll first create TownshipGrid objects that do not yet exist in the grid_dict.
+    # We'll incorporate each Tract object into a SectionGrid object. If
+    # necessary, we'll first create TownshipGrid objects that do not yet
+    # exist in the grid_dict.
     for tractObj in tract_list:
 
         # If there was a T&R error in the parsing by pyTRS, twp and rge
@@ -828,20 +936,25 @@ def tracts_into_twp_grids(tract_list, grid_dict=None, lddb=None) -> dict:
         if sec in ['', None]:
             sec = 0
 
+        twprge = twp + rge
+
         # Get the TLD for this T&R from the lddb, if one exists. If not,
-        # create and use a default TLD object.
-        tld = lddb.get(twp + rge, TwpLotDefinitions())
+        # create and use a default TLD object. (We `force_tld_return` to
+        # ensure that a TwpLotDefinitions object gets returned, instead
+        # of None)
+        tld = lddb.get_tld(
+            twprge, allow_ld_defaults=allow_ld_defaults, force_tld_return=True)
 
         # If a TownshipGrid object does not yet exist for this T&R in
         # the dict, create one, and add it to the dict now.
-        grid_dict.setdefault(twp + rge, TownshipGrid(twp=twp, rge=rge, tld=tld))
+        grid_dict.setdefault(twprge, TownshipGrid(twp=twp, rge=rge, tld=tld))
 
         # Now incorporate the Tract object into a SectionGrid object
         # within the dict. No /new/ SectionGrid objects are created at
         # this point (since a TownshipGrid object creates all 36 of them
         # at init), but SectionGrid objects are updated at this point to
         # incorporate our tracts.
-        TwpGridObj = grid_dict[twp + rge]
+        TwpGridObj = grid_dict[twprge]
         TwpGridObj.incorporate_tract(tractObj, sec)
 
     return grid_dict

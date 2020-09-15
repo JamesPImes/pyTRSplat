@@ -17,7 +17,7 @@ from pyTRS import version as pyTRSversion
 from Grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
 from Grid import tracts_into_twp_grids
 from PlatSettings import Settings
-from Queue import PlatQueue, MultiPlatQueue
+from PlatQueue import PlatQueue, MultiPlatQueue
 
 import _constants
 
