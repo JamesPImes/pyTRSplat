@@ -120,8 +120,8 @@ class SectionGrid:
         }
 
         # Whether this SectionGrid has been 'pinged' by a setter (e.g.,
-        # by `.incorporate_lotList()` -- even if no values were actually
-        # set, or if values were later reset to 0).
+        # by `.incorporate_lot_list()` -- even if no values were
+        # actually set, or if values were later reset to 0).
         self._was_pinged = False
 
     @staticmethod
@@ -240,6 +240,11 @@ class SectionGrid:
         # into components before incorporating.
         for qq in QQList:
             for qq_ in qq.replace(' ', '').split(','):
+                # Also, ensure we're only getting 4-characters max -- i.e.
+                # 'N2NENE' -> 'NENE' by passing through `_smooth_QQs()`.
+                # That returns a list (should be of 1 element), so get
+                # the first (only) element in the returned list.
+                qq_ = _smooth_QQs(qq_)[0]
                 self.turn_on_qq(qq_)
 
     def _unpack_ld(self, lot) -> list:
