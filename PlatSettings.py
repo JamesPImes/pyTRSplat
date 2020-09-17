@@ -183,6 +183,9 @@ class Settings:
         # Distance between tracts.
         self.y_px_between_tracts = 10
 
+        # Spaces to indent on new lines in tract text
+        self.new_line_indent = 8
+
         self.qq_side = 50  # length of each side for a QQ in px
         self.sec_line_stroke = 3  # section-line stroke width in px
         self.ql_stroke = 2  # quarter line stroke width in px
@@ -212,6 +215,41 @@ class Settings:
         # and attempt to load it as Settings data.
         if isinstance(preset, str):
             self._import_preset(preset)
+
+    def deduce_biggest_char(self, font_purpose='tract') -> str:
+        """
+        Deduce which character is the widest, when written with the font
+        currently set for the specified `font_purpose` (i.e. 'header',
+        'tract', 'sec', or 'lot'). Returns that character.
+        """
+
+        # Confirm it's a legal font_purpose
+        purposes = ['header', 'tract', 'sec', 'lot']
+        if font_purpose not in purposes:
+            raise ValueError(f"Possible `font_purposes` are: "
+                             f"{', '.join(purposes)}; "
+                             f"Attempted to check width of character in "
+                             f"font for purpose '{font_purpose}'")
+
+        # Pull the specified font
+        font = getattr(self, f"{font_purpose}font")
+
+        # Get a dummy ImageDraw object
+        from PIL import Image, ImageDraw
+        test = Image.new('RGBA', (1,1))
+        test_draw = ImageDraw.Draw(test, 'RGBA')
+
+        # Check every char to see if it's the widest currently known
+        consideration_set = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_='
+        biggest_width = 0
+        biggest_char = None
+        for char in consideration_set:
+            w, h = test_draw.textsize(text=char, font=font)
+            if w > biggest_width:
+                biggest_width = w
+                biggest_char = char
+
+        return biggest_char
 
     def set_font(self, purpose: str, size=None, typeface=None, RGBA=None):
         """Set the font for the specified purpose:
