@@ -114,7 +114,8 @@ class Settings:
         'x_text_right_marg', 'y_px_before_tracts', 'y_px_between_tracts',
         'qq_side', 'sec_line_stroke', 'ql_stroke', 'qql_stroke', 'sec_line_RGBA',
         'ql_RGBA', 'qql_RGBA', 'qq_fill_RGBA', 'centerbox_wh', 'lot_num_offset_px',
-        'write_header', 'write_tracts', 'write_section_numbers', 'write_lot_numbers'
+        'write_header', 'write_tracts', 'write_section_numbers', 'write_lot_numbers',
+        'paragraph_indent', 'new_line_indent'
     ]
 
     def __init__(self, preset='default'):
@@ -210,6 +211,10 @@ class Settings:
         self.write_tracts = True
         self.write_section_numbers = True
         self.write_lot_numbers = False
+
+        # Tract-writing indents, in terms of spaces (characters, not px):
+        self.paragraph_indent = 0
+        self.new_line_indent = 8
 
         # If `preset` is specified as a string, we assume it is a preset
         # and attempt to load it as Settings data.
