@@ -197,8 +197,6 @@ class TextBox:
         :type harder_limit: bool
         """
 
-        # If we have no text_box, and the user hasn't provided a custom
-        # `w_limit`, then return None.
         font = self.font
 
         if w_limit is None:
@@ -247,7 +245,8 @@ class TextBox:
     def write_paragraph(
             self, text, cursor='text_cursor', font_RGBA=None,
             reserve_last_line=False, override_legal_check=False,
-            paragraph_indent=None, new_line_indent=None) -> list:
+            paragraph_indent=None, new_line_indent=None,
+            wrap_method='thorough') -> list:
         """
         Write the text as though it is a paragraph, with linebreaks
         inserted where necessary.
@@ -257,9 +256,9 @@ class TextBox:
         :param font_RGBA: A 4-tuple specifying the font color. (If not
         specified, will fall back on whatever is in this object's
         `.font_RGBA` attrib.)
-        :param reserve_last_line: Stop writing when the last line in the
-        textbox is reached -- i.e. nothing will be written to that line
-        yet. (Defaults to `False`)
+        :param reserve_last_line: If reached, leave the last line in the
+        textbox empty (and return a list of any unwritten lines).
+        (Defaults to `False`)
         :param override_legal_check: Disregard whether the written text
         would go beyond the boundaries of this TextBox. (Defaults to
         `False`)
@@ -269,6 +268,8 @@ class TextBox:
         :param new_line_indent: How many leading spaces (i.e.
         characters, not px) before each subsequent line. (If not
         specified, defaults to `self.new_line_indent`.)
+        :param wrap_method: 'thorough' (the default) or 'quick'.
+        (Thorough maximizes line length, but takes longer.)
         :return: Returns a list of the lines that could NOT be written.
         """
 
@@ -285,21 +286,40 @@ class TextBox:
             new_line_indent = self.new_line_indent
 
         # Break text into lines.
-        lines = self._wrap_text(
-            text, paragraph_indent=paragraph_indent,
-            new_line_indent=new_line_indent)
+        if wrap_method == 'quick':
+            lines = self._wrap_text(
+                text, paragraph_indent=paragraph_indent,
+                new_line_indent=new_line_indent)
+        elif wrap_method == 'thorough':
+            lines = self._wrap_text_thorough(
+                text, paragraph_indent=paragraph_indent,
+                new_line_indent=new_line_indent)
+            # TODO: Write 'justify' functionality. For now, we just do a
+            #   simple unpack to get the lines.
+            lines = self._wtt_unpack_simple(lines)
+        else:
+            raise ValueError(
+                "`wrap_method` must be either 'quick' or 'thorough'. "
+                f"Argument passed: {wrap_method}")
 
         # Write each line (until we can't anymore)
         while len(lines) > 0:
-            if self.on_last_line and reserve_last_line:
+            if reserve_last_line and self.on_last_line:
                 return lines
 
             line = lines.pop(0)
 
             # Check if we can fit what we're about to write within the margins.
-            is_legal = self._check_legal_textwrite(line, font, cursor)
+            # if override_legal_check or wrap_method == 'thorough':
+            if override_legal_check:
+                # The 'thorough' wrap_method keeps all text within the box
+                # width by design, so we can save some computing time by
+                # skipping the legality check.
+                is_legal = True
+            else:
+                is_legal = self._check_legal_textwrite(line, font, cursor)
 
-            if is_legal or override_legal_check:
+            if is_legal:
                 # Pull coord from the chosen cursor attribute
                 coord = getattr(self, cursor)
                 # Write the text, and set the width/height of the written text
@@ -327,9 +347,9 @@ class TextBox:
         :param font_RGBA: A 4-tuple specifying the font color. (If not
         specified, will fall back on whatever is in this object's
         `.font_RGBA` attrib.)
-        :param reserve_last_line: Stop writing when the last line in the
-        textbox is reached -- i.e. nothing will be written to that line
-        yet. (Defaults to `False`)
+        :param reserve_last_line: If reached, leave the last line in the
+        textbox empty (and return a list of any unwritten lines).
+        (Defaults to `False`)
         :param override_legal_check: Whether to ignore the fact that the
         written text may go outside the textbox, and allow it anyway.
         (Defaults to `False`).
@@ -340,7 +360,7 @@ class TextBox:
         original text -- to mirror the `.write_paragraph()` method).
         """
 
-        if self.on_last_line and reserve_last_line:
+        if reserve_last_line and self.on_last_line:
             return [text]
 
         font = self.font
@@ -364,18 +384,33 @@ class TextBox:
 
         return []
 
+    def _wtt_unpack_simple(self, wtt_list) -> list:
+        """
+        INTERNAL USE:
+        Extract a single-level list of lines of text, out of the list
+        returned by the `._wrap_text_thorough()` method.
+
+        :param wtt_list: The list returned by `._wrap_text_thorough()`
+        :return: A list of lines of text.
+        """
+        final_lines = []
+        for line_dict in wtt_list:
+            final_lines.append(line_dict['txt'])
+        return final_lines
+
     def _write_text(self, coord: tuple, text: str, font, font_RGBA) -> tuple:
         """
-        WARNING: This method is intended for internal use only, as it
-        has no guardrails. `.write_line()` and `.write_paragraph()` have
-        built-in legality checks that will prevent writing
-        beyond textbox boundaries.
-
+        INTERNAL USE:
         Write `text` at the specified `coord`. Returns a tuple of the
         width and height of the written text. Does NOT update a cursor.
         NOTE: This method does not care whether it goes outside the
             textbox, so be sure to handle `._check_legal_textwrite()`
             before calling this method.
+
+        (End users should use `.write_line()` and `.write_paragraph()`,
+        which have built-in legality checks that will prevent writing
+        beyond textbox boundaries.)
+
         :param coord: Where to write the text.
         :param text: What text to write.
         :param font: PIL.ImageFont object that should be used.
@@ -493,6 +528,112 @@ class TextBox:
             i += 1
 
         return final_lines
+
+    def _wrap_text_thorough(
+            self, text, paragraph_indent: int, new_line_indent: int):
+        """
+        INTERNAL USE:
+        Wrap the text to be written, using a more thorough algorithm,
+        which is slower but ensures that lines are as long as they can
+        be. Returns a list containing a dict for each resulting line,
+        with keys:
+            'txt'     -> The text of the line
+            'justify' -> Whether the line can be justified**
+
+        **'Justifiable' here means whether it can be stretched from the
+        left indent to the right edge of the textbox. (All lines will be
+        justifiable, except the final line in the text, and except lines
+        that originally ended in a linebreak or return character.)
+
+        :param paragraph_indent: How many leading spaces (i.e.
+        characters, not px) before the first line. (If not specified,
+        defaults to `self.paragraph_indent`.)
+        :param new_line_indent: How many leading spaces (i.e.
+        characters, not px) before each subsequent line. (If not
+        specified, defaults to `self.new_line_indent`.)
+        :return: A list containing a dict for each resulting line,
+        with keys:
+            'txt'     -> The text of the line
+            'justify' -> Whether the line can be justified.
+        """
+        font = self.font
+
+        final_line_dicts = []
+        max_w = self.im.width
+
+        # In order to maintain linebreaks/returns, but also have desired
+        # indents (and whether a line is justifiable), we need to
+        # manually break our text by linebreak first, and only then run
+        # the algorithm.
+
+        # First split our text by returns and linebreaks.
+        text = text.strip('\r\n')
+        text = text.replace('\r', '\n')
+        rough_lines = text.split('\n')
+
+        first_indent = ' ' * paragraph_indent
+        later_indent = ' ' * new_line_indent
+
+        # Todo: slower algorithm, but can turn off legal_check, I think
+
+        # Construct lines word-by-word, until they are longer than can
+        # be printed within the width of the image. At that point,
+        # approve the last safe line, and start a new line with the word
+        # that put it over the edge.
+        # For each line, also encode whether it is 'justifiable', i.e.
+        # whether it can be stretched from the left indent to the right
+        # edge of the textbox. (All lines will be justifiable, except
+        # the final line in the text, and except lines that originally
+        # ended in a linebreak or return character.)
+        #
+        # Specifically, we constructs a list containing a dict for each
+        # line, with keys:
+        #    'txt'     -> The text of the line
+        #    'justify' -> Whether the line can be justified
+
+        rl_count = 0
+        # TODO: Handle extra-long words (i.e. a single word can't fit
+        #   on a single line by itself -- just break the word at
+        #   whatever char that is, onto the next line).
+        for rough_line in rough_lines:
+
+            justifiable = True
+            indent = later_indent
+            if rl_count == 0:
+                indent = first_indent
+
+            # Strip any pre-existing whitespace
+            rough_line = rough_line.strip()
+            words = rough_line.split(' ')
+            if len(words) == 0:
+                # No words in this rough_line. Move on.
+                continue
+
+            current_line_to_add = indent + words.pop(0)
+            candidate_line = current_line_to_add
+            last_word_is_candidate = False
+            while len(words) > 0:
+                new_word = words.pop(0)
+                candidate_line = current_line_to_add + ' ' + new_word
+                w, h = self.text_draw.textsize(candidate_line, font=font)
+                if w > max_w:
+                    line_dict = {'txt': current_line_to_add,
+                                 'justify': justifiable}
+                    final_line_dicts.append(line_dict)
+                    indent = later_indent
+                    current_line_to_add = indent + new_word
+                    last_word_is_candidate = True
+                else:
+                    last_word_is_candidate = False
+                    current_line_to_add = candidate_line
+            if current_line_to_add == candidate_line or last_word_is_candidate:
+                justifiable = False
+                line_dict = {'txt': current_line_to_add, 'justify': justifiable}
+                final_line_dicts.append(line_dict)
+            rl_count += 1
+
+        return final_line_dicts
+
 
     ################################
     # Cursor Methods
