@@ -13,7 +13,6 @@ from Plat import text_to_plats, Plat, MultiPlat
 # Examples / Testing:
 ########################################################################
 #
-
 # Test handling of flawed pyTRS parses (due to erroneous PLSS descriptions)
 # Force a parse that will result in a 'TRerr'
 er_desc_1 = PLSSDesc(
@@ -92,15 +91,17 @@ sp.queue(t3)
 sp.process_queue()
 
 # Writing custom text on the Plat object we just created.
-sp.write_custom_text('Testing custom 1')  # Continues writing where tracts left off.
-sp.write_custom_text('Testing custom 2', cursor='new_cursor')
-sp.write_custom_text('Testing custom 3', cursor='new_cursor')
+sp.text_box.write_line('Testing custom 1')  # Continues writing where tracts left off.
+sp.text_box.write_line('Testing custom 2', cursor='other_cursor')
+sp.text_box.write_line('Testing custom 3', cursor='other_cursor')
 # This next call uses cursor='text_cursor' (the default), which is still where
-# `.new_cursor` was when writing 'Testing custom 2':
-sp.write_custom_text('This will overwrite the "custom 2" line')
-# Moving `.new_cursor` to a different coord:
-sp.new_cursor = (340, 1900)
-sp.write_custom_text('But this one should be off on its own', cursor='new_cursor')
+# `.other_cursor` was when writing 'Testing custom 2':
+sp.text_box.write_line('This will overwrite the "custom 2" line')
+# Moving `.other_cursor` to a different coord:
+sp.text_box.set_cursor((370, 240), 'other_cursor')
+# equivalently:
+sp.text_box.other_cursor = (370, 240)
+sp.text_box.write_line('But this one should be off on its own', cursor='other_cursor')
 #sp.show()
 
 
