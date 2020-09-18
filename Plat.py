@@ -9,8 +9,6 @@ descriptions'), using the pyTRS parsing module.
 # TODO: Give the option to depict `.unhandled_lots` on plats somewhere.
 #  i.e. warn users that certain lots were not incorporated onto the plat
 
-# TODO: Consider making TextBox its own class.
-
 from pathlib import Path
 
 # Submodules from this project.
@@ -18,6 +16,10 @@ from Grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, L
 from Grid import plssdesc_to_grids, filter_tracts_by_twprge, confirm_file_ext
 from PlatSettings import Settings
 from PlatQueue import PlatQueue, MultiPlatQueue
+# TODO: Note: TextBox is being spun off into its own project, but is
+#   kept here for the moment. Shouldn't change any functionality, beyond
+#   the import.
+from TextBox import TextBox
 
 # For drawing the plat images, and coloring / writing on them.
 from PIL import Image, ImageDraw, ImageFont
@@ -39,6 +41,10 @@ def version():
     """Return the current version and version date as a string."""
     return f'v{__version__} - {__versionDate__}'
 
+
+########################################################################
+# Plat Objects
+########################################################################
 
 class Plat:
     """An object containing an PIL.Image object of a 36-section (in
@@ -120,29 +126,10 @@ class Plat:
 
         # Text box for writing tract info (or other custom text)
         self.text_box = None
-        self.text_draw = None
-        self.text_box_exists = False
-        self.text_box_exhausted = True
-        self.next_line_is_last_line = False
-        self.text_line_width = None
-        # Create the text_box (if possible with the provided settings)
-        # NOTE: `.text_box` and `.text_draw` may remain None!
+        # Create the TractTextBox (if possible with the provided
+        # settings)
+        # NOTE: `.text_box` might remain None, depending on settings!
         self.new_textbox()
-        self.deduce_chars_per_line()
-
-        # Keeping track of the current position where text (e.g., tracts
-        # etc.) can be written -- i.e. where we've written up to, and
-        # where we can still write at in x,y pixel coordinates.
-        # IMPORTANT: These coords refer to position within the
-        # `.text_box` -- NOT within `.image`.
-        self.text_cursor = self.reset_cursor()
-        # NOTE: Other cursors can also be created
-        #   ex: This would create a new cursor at (0, 0) and accessed as
-        #       `platObj.highlighter`:
-        #           >>> platObj.reset_cursor(cursor='highlighter')
-        #   ex: This would create a new cursor at the specified x,y
-        #       coords (120,180) and accessed as `platObj.underliner`:
-        #           >>> platObj.set_cursor(120, 180, cursor='underliner')
 
         # A PlatQueue object holding elements/tracts that will be platted.
         self.pq = PlatQueue()
@@ -250,8 +237,8 @@ class Plat:
                 self.plat_tract(itm, write_tract=False,
                                 allow_ld_defaults=allow_ld_defaults)
 
-        if self.settings.write_tracts:
-            self.write_all_tracts(queue.tracts)
+        if self.settings.write_tracts and self.text_box is not None:
+            self.text_box.write_all_tracts(queue.tracts)
 
     def _gen_header(self, only_section=None):
         """Generate the text of a header containing the T&R and/or
@@ -402,6 +389,28 @@ class Plat:
             font=self.settings.headerfont,
             fill=self.settings.headerfont_RGBA)
 
+    def write_all_tracts(self, tracts):
+        """
+        Pass the list of pyTRS.Tract objects onto the TractTextBox (if
+        it exists) and write them.
+        :param tract_list: A list of pyTRS.Tract objects that should be
+        written to the TextBox.
+        :return: None
+        """
+        if self.text_box is not None:
+            self.text_box.write_all_tracts(tracts)
+
+    def write_tract(self, tract):
+        """
+        Pass the pyTRS.Tract object onto the TractTextBox (if it exists)
+        and write it.
+        :param tract: A pyTRS.Tract object that should be written to the
+        TextBox.
+        :return: None
+        """
+        if self.text_box is not None:
+            self.text_box.write_all_tracts([tract])
+
     def new_textbox(self):
         """Create a textbox Image per the Plat's settings."""
 
@@ -412,14 +421,14 @@ class Plat:
 
         if x0 >= x1 or y0 >= y1:
             self.text_box = None
-            self.text_draw = None
-            self.text_box_exists = False
         else:
-            self.text_box = Image.new(
-                'RGBA', (x1 - x0, y1 - y0), Settings.RGBA_WHITE)
-            self.text_draw = ImageDraw.Draw(self.text_box, 'RGBA')
-            self.text_box_exists = True
-            self.text_box_exhausted = False
+            stngs = self.settings
+            self.text_box = TractTextBox(
+                size=(x1 - x0, y1 - y0),
+                bg_RGBA=(255, 255, 255, 255),
+                typeface=stngs.tractfont_typeface,
+                font_size=stngs.tractfont_size,
+                font_RGBA=stngs.tractfont_RGBA)
 
     def first_text_xy(self, settings=None):
         """Get the top/left-most pixel available for writing text (i.e.
@@ -460,353 +469,6 @@ class Plat:
 
         return (x0, y0)
 
-    def deduce_chars_per_line(
-            self, commit=True, harder_limit=False, w_limit=None):
-        """
-        Deduce (roughly) how many characters we can allow to be written
-        in a single line, using the current `tractfont` in settings.
-
-        :param commit: Save the deduced max line-length to
-        `self.text_line_width`
-        :type commit: bool
-        :param w_limit: Provide a custom width limit (in px) to check
-        against. If not specified, we will check against the width of
-        `self.text_box` (if it exists). Will result in shorter lines
-        written, but less likely to encroach on margins.
-        :type w_limit: int
-        :param harder_limit: Will check how many of a 'wider' character
-        can fit in a single line. (False by default.)
-        :type harder_limit: bool
-        """
-
-        # If we have no text_box, and the user hasn't provided a custom
-        # `w_limit`, then return None.
-        if not self.text_box_exists and w_limit is None:
-            if commit:
-                self.text_line_width = None
-            return None
-        font = self.settings.tractfont
-
-        if w_limit is None:
-            w_limit = self.text_box.width
-        base = 'The Quick Brown Fox Jumps Over The Lazy Dog'
-        if harder_limit:
-            # If using `harder_limit`, will take the widest known
-            # character in the font and only check how many of those
-            # will fit in a line within our textbox.
-            base = self.settings.deduce_biggest_char(font_purpose='tract')
-        test = base[0]
-        num_chars = 1
-        while True:
-            # Add the next char from base to test (and wrap around).
-            test = test + base[num_chars % len(base)]
-            w, h = self.text_draw.textsize(text=test, font=font)
-
-            # Check if we've gone past the width of our textbox
-            if w > w_limit:
-                break
-            else:
-                num_chars += 1
-
-        if commit:
-            self.text_line_width = num_chars
-        return num_chars
-
-    def reset_cursor(self, cursor='text_cursor') -> tuple:
-        """
-        Set the specified cursor (defaults to 'text_cursor') to (0, 0).
-        NOTE: Cursor coords refer to `.text_box` image, not to `.image`!
-
-        :param cursor: The name of the cursor to be set to (0, 0).
-        The named cursor will be stored as a Plat object attribute.
-        Specifically, if a string is NOT passed as `cursor=`, the
-        stored coord will be set to the default `.text_cursor`. However,
-        if the particular cursor IS specified, it will save the
-        resulting coord to that attribute name.
-        Be careful not to overwrite other required attributes.
-        :return: (0, 0)
-        :Example:
-
-        ex: 'setObj.reset_cursor()  # The default
-            -> setObj.text_cursor == (0, 0)
-            -> and returns (0, 0)
-        ex: 'setObj.reset_cursor(cursor='highlight')
-            -> setObj.highlight == (0, 0)
-            -> and returns (0, 0)
-        """
-
-        self.set_cursor((0, 0), cursor)
-        return (0, 0)
-
-    def set_cursor(self, coord, cursor='text_cursor'):
-        """Set the cursor to the specified x and y coords. If a string
-        is NOT passed as `cursor=`, the committed coord will be set to
-        the default `.text_cursor`. However, if the particular cursor
-        IS specified, it will save the resulting coord to that attribute
-        name.
-            ex: 'setObj.set_cursor((200, 1200))
-                -> setObj.text_cursor == (200, 1200)
-            ex: 'setObj.set_cursor((200, 1200), cursor='highlight')
-                -> setObj.highlight == (200, 1200)
-        Be careful not to overwrite other required attributes."""
-
-        setattr(self, cursor, coord)
-
-    # def same_line_cursor(
-    #         self, xy_delta: tuple, cursor='text_cursor', commit=True,
-    #         additional_x_px=0, left_margin=None, additional_indent=0) -> tuple:
-    #     """Move the specified `cursor` to the right, on the same so-called
-    #     'line', after having written some text at that cursor.
-    #     `xy_delta` should be a tuple of (width, height) of text that was
-    #     written. It will move the cursor right that many px (plus the
-    #     optionally specified `additional_x_px` -- e.g., px for an
-    #     additional space character). Returns the resulting coord.
-    #
-    #     If the resulting cursor coord would be illegal (per settings),
-    #     it will move down to a 'new line'. The parameters `left_margin`
-    #     and `additional_indent` have no effect unless we end up moving
-    #     the cursor to the next line (in which case, they have the same
-    #     effect as they do in the `.next_line_cursor()` method).
-    #
-    #     If a string is NOT passed as `cursor=`, the returned (and
-    #     optionally committed) coord will be set to the default
-    #     `.text_cursor`. However, if the particular cursor IS specified,
-    #     it will save the resulting coord to that attribute name (so long
-    #     as `commit=True`).
-    #
-    #     Further, if the cursor is specified but does not yet exist, this
-    #     will read from `.text_cursor` (to calculate the updated coord)
-    #     but save to the specified cursor.
-    #
-    #     Be careful not to overwrite other required attributes."""
-    #
-    #     # Discard the y from xy_delta, but get the x_delta.
-    #     x_delta, _ = xy_delta
-    #
-    #     # Get the x0 and y0 from the cursor.  (Using nested `getattr`
-    #     # calls ensures we get `.text_cursor`, if `cursor=` was
-    #     # specified as a string that wasn't already set; but this won't
-    #     # overwrite the specified `cursor` for committing the coord
-    #     # shortly.)
-    #     x0, y0 = getattr(self, cursor, getattr(self, 'text_cursor'))
-    #
-    #     y = y0
-    #
-    #     total_x_delta = x_delta + additional_x_px
-    #
-    #     # Make sure that the resulting candidate cursor movement is legal.
-    #     # If not, we'll set the coord to the next line instead, by passing
-    #     # through our arguments to `.next_line_cursor()`.
-    #     if self._check_legal_cursor((total_x_delta, 0), cursor):
-    #         coord = (x0 + total_x_delta, y)
-    #     else:
-    #         coord = self.next_line_cursor(
-    #             xy_delta=xy_delta, cursor=cursor, commit=False,
-    #             left_margin=left_margin, additional_indent=additional_indent)
-    #
-    #     if commit:
-    #         self.set_cursor(coord, cursor=cursor)
-    #     return coord
-
-    def next_line_cursor(
-            self, xy_delta: tuple, cursor='text_cursor', commit=True,
-            left_margin=None, additional_indent=0) -> tuple:
-        """
-        Move the specified `cursor` to the so-called 'next line', after
-        having written some text at that cursor.
-
-        :param xy_delta: A 2-tuple of (width, height) of text that was
-        just written.
-        IMPORTANT: Assumes a single line of text was written!
-        :param cursor:
-        If a string is NOT passed as `cursor=`, the returned (and
-        optionally committed) coord will be set to the default
-        `.text_cursor`. However, if the particular cursor IS specified,
-        it will save the resulting coord to that attribute name (so long
-        as `commit=True`).
-        NOTE: If the cursor is specified but does not yet exist, this
-        will read from `.text_cursor` (to calculate the updated coord)
-        but save to the specified cursor.
-        Be careful not to overwrite other required attributes!
-        :param commit: A bool, whether to store the calculated coord to
-        the specified cursor.
-        :param left_margin: How many additional px to indent from the
-        left margin. (Will default to settings, if not specified here.)
-        :param additional_indent: How many px to indent IN ADDITION TO
-        the left_margin.
-        :return: Returns the resulting coord.
-        """
-
-        # If `left_margin` is not specified (as an int), set it to the
-        # x-value of the original cursor position (discard the y value).
-        if not isinstance(left_margin, int):
-            left_margin = 0
-
-        # Set x to the left_margin (plus optional indent).
-        x = left_margin + additional_indent
-
-        # Discard the x from xy_delta, but get the y_delta.
-        _, y_delta = xy_delta
-
-        # Discard the x0 from the cursor, but get y0.  (Nested `getattr`
-        # calls ensures we get `.text_cursor`, if `cursor=` was
-        # specified as a string that wasn't already set; but this won't
-        # overwrite the specified `cursor` for committing the coord
-        # shortly.)
-        _, y0 = getattr(self, cursor, getattr(self, 'text_cursor'))
-
-        # We will add to our y-value the px between tracts, per settings.
-        y_line_spacer = self.settings.y_px_between_tracts
-
-        coord = (x, y0 + y_delta + y_line_spacer)
-
-        # If two lines from now would be illegal, we deduce that the
-        # next line will be the last legal.
-        two_lines_later_legal = self._check_legal_cursor(
-            (0, y_delta * 3 + y_line_spacer * 2), cursor=cursor)
-
-        # But if the next line is already illegal, then the one just
-        # written one is the last line.
-        one_line_later_legal = self._check_legal_cursor(
-            (0, y_delta * 2 + y_line_spacer), cursor=cursor)
-
-        if commit:
-            self.set_cursor(coord, cursor=cursor)
-            if not one_line_later_legal:
-                self.text_box_exhausted = True
-            if one_line_later_legal and not two_lines_later_legal:
-                self.next_line_is_last_line = True
-            else:
-                self.next_line_is_last_line = False
-
-        return coord
-
-    def update_cursor(
-            self, xy_delta, cursor='text_cursor', commit=True) -> tuple:
-        """
-        Update the coord of the cursor, by adding the `x_delta` and
-        `y_delta` to the current coord of the specified `cursor`.
-
-        :param xy_delta: A tuple of (x, y) values, being how far (in px)
-        the cursor has traveled from its currently set coord.
-        :param cursor: The name of the cursor being updated. (Defaults
-        to 'text_cursor'.)
-        If a string is NOT passed as `cursor=`, the committed coord will
-        be set to the default `.text_cursor`. However, if the particular
-        cursor IS specified, it will save the resulting coord to that
-        attribute name (so long as `commit=True`).
-
-        Further, if the cursor is specified but does not yet exist, this
-        will read from `.text_cursor` (to calculate the updated coord)
-        but save to the specified cursor.
-        Be careful not to overwrite other required attributes.
-        :param commit: Whether to store the new coord to the cursor
-        attribute in `self`.
-        :return: Returns the updated coord, and optionally stores it to the
-        cursor attribute with `commit=True` (on by default).
-        """
-
-        if self.text_box is None:
-            return None
-
-        # Pull the specified cursor. If it does not already exist as an
-        # attribute in this object, it will fall back to `.text_cursor`,
-        # which exists for every Settings object, per init.
-        x_delta, y_delta = xy_delta
-        x0, y0 = getattr(self, cursor, getattr(self, 'text_cursor'))
-        coord = (x0 + x_delta, y0 + y_delta)
-
-        # Only if `commit=True` do we set this.
-        if commit:
-            setattr(self, cursor, coord)
-
-        return coord
-
-    def _check_legal_textwrite(self, text, font, cursor='text_cursor') -> bool:
-        """
-        Check if there is enough room to write the specified text,
-        using the specified font within the textbox in `self.text_box`.
-
-        :param text: The text to check.
-        :param font: The font that will be used to write the text.
-        :type font: ImageFont
-        :param cursor: The name of the cursor at which the text will be
-        written. (Defaults to 'text_cursor')
-        :return: A bool, whether or not the text can be written within
-        the margins.
-        """
-
-        if self.text_box is None:
-            return False
-
-        w, h = self.text_draw.textsize(text, font=font)
-
-        # Only `legal` matters for this method.
-        legal = self._check_legal_cursor((w, h), cursor=cursor)
-        return legal
-
-    def _check_cursor_overshoot(
-            self, xy_delta: tuple, cursor='text_cursor') -> tuple:
-        """
-        Check how many px the cursor has gone beyond right and bottom
-        edges of the textbox in `self.text_box`. (Assumes that it is
-        starting from a legal coord.)
-
-        :param xy_delta: A tuple of (x, y) values, being how far (in px)
-        the cursor has traveled from its currently set coord.
-        :param cursor: The name of the cursor being checked. (Defaults
-        to 'text_cursor'.)
-        :return: Returns an (x, y) tuple of how many px past the margins
-        the cursor has gone. (Negative numbers mean that it is within
-        the right/bottom margins, but is agnostic as to the top/left
-        margins.) NOTE: Returns None if `self.text_box` is None.
-        """
-
-        if self.text_box is None:
-            return None
-
-        # Confirm `cursor` points to an existing tuple in self's
-        # attributes. If not, we'll use the `.text_cursor` attribute.
-        cursor_check = getattr(self, cursor, None)
-        if not isinstance(cursor_check, tuple):
-            cursor = 'text_cursor'
-
-        # Get the hypothetical resulting cursor location if xy_delta is
-        # applied. (`commit=False` means it won't be stored yet.)
-        x, y = self.update_cursor(xy_delta, cursor, commit=False)
-
-        x_overshot = x - self.text_box.width
-        y_overshot = y - self.text_box.height
-
-        return (x_overshot, y_overshot)
-
-    def _check_legal_cursor(
-            self, xy_delta: tuple, cursor='text_cursor') -> bool:
-        """
-        Check if there is enough room to move the cursor from its
-        current position by `xy_delta` (a tuple of x,y value) before
-        going outside the dimensions of the textbox in `self.text_box`.
-        (Assumes that it is starting from a legal coord.)
-
-        :param xy_delta: A tuple of (x, y) values, being how far (in px)
-        the cursor has traveled from its currently set coord.
-        :param cursor: The name of the cursor at which the text will be
-        written. (Defaults to 'text_cursor')
-        :return: A bool, whether or not the resulting coord will be
-        within the margins.
-        """
-
-        if self.text_box is None:
-            return False
-
-        x_overshot, y_overshot = self._check_cursor_overshoot(xy_delta, cursor)
-
-        legal = True
-        if x_overshot > 0 or y_overshot > 0:
-            legal = False
-
-        return legal
-
     def output(self, filepath=None):
         """Merge the drawn overlay (i.e. filled QQ's) onto the base
         township plat image and return an Image object. Optionally save
@@ -814,7 +476,7 @@ class Plat:
         merged = Image.alpha_composite(self.image, self.overlay)
 
         if self.text_box is not None:
-            merged.paste(self.text_box, self.first_text_xy())
+            merged.paste(self.text_box.im, self.first_text_xy())
 
         # TODO: Add the option with *args to specify which layers get
         #   included in the output. That also will require me to have
@@ -881,8 +543,8 @@ class Plat:
             self.plat_section_grid(sec)
 
         # Write the Tract data to the bottom of the plat (or not, per settings).
-        if self.settings.write_tracts:
-            self.write_all_tracts(tracts)
+        if self.settings.write_tracts and self.text_box is not None:
+            self.text_box.write_all_tracts(tracts)
 
         return self.output()
 
@@ -959,309 +621,23 @@ class Plat:
         if write_tract is None:
             write_tract = self.settings.write_tracts
 
-        if write_tract:
-            self.write_all_tracts([tractObj])
-
-    def _wrap_text(
-            self, text, first_line_indent=0, new_line_indent=8,
-            custom_line_width=None) -> list:
-        """
-        Break down the text into a list of lines that should fit within
-        the currently set `self.text_line_width`.
-        :param custom_line_width: If specified, will use this as the
-        line width, rather than `self.text_line_width`.
-        :param first_line_indent: How many spaces to write at the start
-        of the first line of text. (Defaults to 0)
-        :param new_line_indent: How many spaces to write at the start
-        of every subsequent line of text. (Defaults to 8)
-        # TODO: configure these indents in Settings object.
-        """
-
-        import textwrap
-        final_lines = []
-        width = custom_line_width
-        if width is None:
-            width = self.text_line_width
-
-        # In order to maintain linebreaks/returns, but also have desired
-        # indents, we need to manually break our text by linebreak first,
-        # and only then run textwrap on each resulting line.
-
-        # First split our text by returns and linebreaks.
-        text = text.replace('\r', '\n')
-        rough_lines = text.split('\n')
-
-        i = 0
-        for rough_line in rough_lines:
-
-            # Strip any pre-existing whitespace
-            rough_line = rough_line.strip()
-
-            # Construct the initial_indent. Keep in mind that we've
-            # already broken the text into rough lines (by linebreak),
-            # so the `initial_indent` that we pass to textwrap will
-            # be identical to `subsequent_indent` for every line except
-            # the first rough_line.
-
-            # For the first rough_line, we use the first_line_indent
-            initial_indent = ' ' * first_line_indent
-            if i > 0:
-                # For all others, we use new_line_indent.
-                initial_indent = ' ' * new_line_indent
-
-            subsequent_indent = ' ' * new_line_indent
-
-            # Wrap rough_line into neater lines and add to final lines
-            neater_lines = textwrap.wrap(
-                rough_line, initial_indent=initial_indent,
-                subsequent_indent=subsequent_indent, width=width)
-            final_lines.extend(neater_lines)
-
-            i += 1
-
-        return final_lines
-
-    def write_all_tracts(self, tracts=None, cursor='text_cursor'):
-        """Write all the tract descriptions at the bottom of the plat,
-        starting at the current coord of the specified `cursor`. If a
-        string is NOT passed as `cursor=` (or a non-existent cursor is
-        specified), it will begin at the default `.text_cursor`. The
-        coord in `cursor` will also be updated as text gets written."""
-
-        if tracts is None or self.text_box is None:
-            return
-
-        # Save line space later in by setting this variable:
-        settings = self.settings
-
-        def write_warning(num_unwritten_tracts, tracts_written):
-            """Could not fit all tracts on the page. Write a warning to
-            that effect at the bottom of the page."""
-
-            # If we wrote at least one tract, we want to include the word
-            # 'other', to avoid any confusion.
-            other = ''
-            if tracts_written > 0:
-                other = ' other'
-
-            plural = ''
-            if num_unwritten_tracts > 1:
-                plural = 's'
-
-            warning = f'[No space to write {num_unwritten_tracts}{other} tract{plural}]'
-
-            font = self.settings.tractfont
-            color = Settings.RGBA_RED
-
-            self.write_custom_text(
-                text=warning, cursor=cursor, font=font, font_RGBA=color,
-                override_legal_check=True)
-
-        pull_ejector = False
-        tracts_written = 0
-        for tract in tracts:
-
-            if pull_ejector or self.next_line_is_last_line:
-                # We either failed to write the last full tract because it would
-                # have gone outside our textbox, or the next line is the last
-                # available within our textbox, and we have at least one more
-                # tract yet to write. So write a warning now.
-                num_unwritten = len(tracts) - tracts_written
-                write_warning(num_unwritten, tracts_written)
-                break
-
-            # We will save the last line to write a warning, unless this
-            # is the last tract to write.
-            save_last_line = tracts_written != len(tracts) - 1
-
-            font_RGBA = self.settings.tractfont_RGBA
-            if len(tract.lotQQList) == 0 or tract.sec == 'secError':
-                # If no lots/QQs were identified, or if this tract has a
-                # 'secError' (i.e. it was a flawed parse where the section
-                # number could not be successfully deduced -- in which case it
-                # could not have been projected onto this plat), then we'll
-                # write the tract in red
-                font_RGBA = Settings.RGBA_RED
-            write_tract_success = self.write_tract(
-                cursor=cursor, tractObj=tract, font_RGBA=font_RGBA,
-                save_last_line=save_last_line)
-            pull_ejector = not write_tract_success
-
-            tracts_written += 1
-
-    def write_tract(
-            self, tractObj: Tract, cursor='text_cursor', font_RGBA=None,
-            override_legal_check=False, save_last_line=True) -> bool:
-        """
-        Write the description of the parsed pyTRS.Tract object in the
-        `.text_box`, at the current coord of the specified `cursor`.
-        First confirms that writing the text would not go past margins;
-        and if so, will not write it. Updates the coord of the `cursor`
-        used.
-
-        :param tractObj: a pyTRS.Tract object, whose description should
-        be written.
-        :param cursor: The name of an existing cursor, at whose coords
-        the text should be written. (Defaults to 'text_cursor')
-        :param font_RGBA: A 4-tuple containing RGBA value to use
-        (defaults to configuration in settings)
-        :param override_legal_check: Ignore whether it is past the
-        margins. (`False` by default)
-        :param save_last_line: A bool, whether or not the last line
-        (before the margins are broken) should be reserved -- i.e., if
-        a tract will be written all the way to the end of the margin,
-        this will dictate whether or not to stop before writing that
-        last line (e.g., in case we want to write a warning message
-        instead).
-        :return: Returns a bool, whether or not every line of the tract
-        was written.
-        """
-
-        if self.text_box is None:
-            return False
-
-        # Extract the text of the TRS+description from the Tract object.
-        text = tractObj.quick_desc()
-
-        # If font color not otherwise specified, pull from settings.
-        if font_RGBA is None:
-            font_RGBA = self.settings.tractfont_RGBA
-
-        # Pull font from settings.
-        font = self.settings.tractfont
-
-        ejector_pull = False
-        lines = self._wrap_text(text)
-        lines_written = 0
-        for line in lines:
-
-            if self.next_line_is_last_line:
-                if save_last_line:
-                    return False
-                elif lines_written == len(lines) - 1:
-                    # This is the last line to write.
-                    continue
-                else:
-                    line = f"{' ' * self.settings.new_line_indent}[...]"
-                    font_RGBA = Settings.RGBA_RED
-                    # Mandate this gets written by overriding legal check.
-                    override_legal_check = True
-                    # Bail out after this line.
-                    ejector_pull = True
-
-            # Check if we can fit what we're about to write within the margins.
-            is_legal = self._check_legal_textwrite(line, font, cursor)
-
-            if is_legal or override_legal_check:
-                # Pull coord from the chosen cursor attribute
-                coord = getattr(self, cursor)
-                # Write the text, and set the width/height of the written text to xy_delta
-                xy_delta = self._write_text(coord, line, font, font_RGBA)
-                # Update the chosen cursor to the next line.
-                self.next_line_cursor(xy_delta, cursor, commit=True)
-
-            lines_written += 1
-
-            if ejector_pull:
-                return False
-
-        return True
+        if write_tract and self.text_box is not None:
+            self.text_box.write_all_tracts([tractObj])
 
     def _write_text(
-            self, coord: tuple, text: str, font, font_RGBA,
-            draw_obj=None) -> tuple:
-        """Write `text` at the specified `coord`. Returns a tuple of the
+            self, draw_obj: ImageDraw.Draw, coord: tuple, text: str,
+            font, font_RGBA) -> tuple:
+        """
+        Write `text` at the specified `coord`. Returns a tuple of the
         width and height of the written text. Does NOT update a cursor.
         NOTE: This method does not care whether it goes past margins, so
             be sure to handle `._check_legal_textwrite()` before calling
             this method.
-        If `draw_obj=` is not specified, it will default to
-        `self.text_draw` (i.e. writing on the `.text_box`)."""
-
-        if draw_obj is None:
-            draw_obj = self.text_draw
-
-        if draw_obj is None:
-            raise TypeError(
-                'Must provide PIL.ImageDraw object as `draw_obj=` on which'
-                ' to write the text (or create a textbox on the Plat with'
-                '`.new_textbox()` method, assuming Plat settings provide'
-                'enough space for a textbox).')
+        """
 
         w, h = draw_obj.textsize(text, font=font)
         draw_obj.text(coord, text, font=font, fill=font_RGBA)
         return (w, h)
-
-    def write_custom_text(
-            self, text, cursor='text_cursor', font=None, font_RGBA=None,
-            override_legal_check=False, suppress_next_line=False,
-            **configure_cursor_update) -> tuple:
-        """Write custom `text` on the image. May specify the location to
-        write at by using EITHER `coord` (a tuple) OR by specifying
-        `cursor` (a string). If `coord` is specified, that will take
-        precedence over `cursor`. If neither is specified, it will
-        default to the cursor 'text_cursor'.
-
-        Returns the width and height of the written text; or returns
-        None if nothing was written.
-
-        Optionally specify `font` (an ImageFont object) and/or
-        `font_RGBA` -- or they will be pulled from settings.
-
-        `override_legal_check=True` (`False` by default) will ignore
-        whether the attempted text goes past margins.
-
-        `suppress_next_line=True` (`False` by default) will update the
-        cursor but only right-ward (not down), unless it is past the
-        margin, in which case, it will go to the 'next line'. (Same
-        behavior as calling the `.same_line_cursor()` method.)
-
-        Further, we can optionally pass the same parameters as in
-        `.same_line_cursor()` and/or `.next_line_cursor()`, which have
-        the same effect here:
-            left_margin=<int> (or `None`)
-            additional_x_px=<int>
-            additional_indent=<int>"""
-
-        if font is None:
-            font = self.settings.tractfont
-
-        if font_RGBA is None:
-            font_RGBA = self.settings.tractfont_RGBA
-
-        xy_delta = (0, 0)
-        coord = getattr(self, cursor, getattr(self, 'text_cursor'))
-        if self._check_legal_textwrite(text, font, cursor) or override_legal_check:
-            # Write the text and get the width and height of the text written.
-            xy_delta = self._write_text(coord, text, font, font_RGBA)
-        else:
-            return None
-
-        # Unpacking the kwargs for configuring the same-line cursor update
-        # (only used if `suppress_next_line==True` -- i.e. keeping our
-        # cursor on the same line, if possible and if requested).
-        additional_x_px = 0
-        left_margin = None
-        additional_indent = 0
-        for k, v in configure_cursor_update.items():
-            if k == 'additional_indent':
-                additional_indent = v
-            elif k == 'left_margin':
-                left_margin = v
-            elif k == 'additional_indent':
-                additional_indent = v
-
-        if suppress_next_line:
-            self.same_line_cursor(
-                xy_delta, cursor=cursor, additional_x_px=additional_x_px,
-                left_margin=left_margin, additional_indent=additional_indent,
-                commit=True)
-        else:
-            self.next_line_cursor(
-                xy_delta, cursor=cursor, commit=True,
-                additional_indent=additional_indent)
-
-        return xy_delta
 
     def write_lots(self, secObj):
         """Write lot numbers in the top-left corner of the respective QQs."""
@@ -1430,6 +806,10 @@ class Plat:
                 fill=settings.secfont_RGBA,
                 font=settings.secfont)
 
+
+########################################################################
+# MultiPlat objects - for creating / processing a collection of Plat objects
+########################################################################
 
 class MultiPlat:
     """An object to create, process, hold, and output one or more Plat
@@ -1683,8 +1063,212 @@ class MultiPlat:
         return output_list
 
 
+class TractTextBox(TextBox):
+    """
+    A TextBox object, with additional methods for writing pyTRS.Tract
+    data at the bottom of the Plat.
+
+    IMPORTANT: After init, any changes to font in the Settings object
+    will have NO EFFECT on the TractTextBox.
+    """
+
+    def __init__(
+            self, size: tuple, typeface=None, font_size=None,
+            bg_RGBA=Settings.RGBA_WHITE, font_RGBA=Settings.RGBA_BLACK,
+            paragraph_indent=None, new_line_indent=None, spacing=None,
+            settings=None):
+        """
+        :param size: 2-tuple of (width, height).
+        :param typeface: The filepath to a truetype font (.ttf file)
+        :param font_size: The size of the font to create.
+        :param bg_RGBA: 4-tuple of the background color. (Defaults to
+        white, full opacity.)
+        :param font_RGBA: 4-tuple of the font color. (Defaults to black,
+        full opacity.)
+        :param paragraph_indent: How many spaces (i.e. characters, not
+        px) to write before the first line of a new paragraph.
+        :param new_line_indent: How many spaces (i.e. characters, not
+        px) to write before every subsequent line of a paragraph.
+        :param spacing: How many px between each line.
+        :param settings: A pyTRSplat.Settings object (or the name of a
+        preset, i.e. a string), which can specify various relevant
+        attribs for this TractTextBox object. (In the event that an
+        attributes was set in the Settings object but ALSO specified as
+        init parameters here; the init parameters will control.)
+        """
+        # If settings is not specified, get a default Settings object.
+        if settings is None:
+            settings = Settings()
+        elif isinstance(settings, str):
+            settings = Settings(preset=settings)
+
+        # If these are not specified, pull them from settings
+        if typeface is None:
+            typeface = settings.tractfont_typeface
+        if font_size is None:
+            font_size = settings.tractfont_size
+        if paragraph_indent is None:
+            paragraph_indent = settings.paragraph_indent
+        if new_line_indent is None:
+            new_line_indent = settings.new_line_indent
+        if spacing is None:
+            spacing = settings.y_px_between_tracts
+
+        TextBox.__init__(
+            self, size=size, typeface=typeface, font_size=font_size,
+            bg_RGBA=bg_RGBA, font_RGBA=font_RGBA, spacing=spacing,
+            paragraph_indent=paragraph_indent, new_line_indent=new_line_indent)
+
+        self.settings = settings
+
+    def write_all_tracts(self, tracts=None, cursor='text_cursor'):
+        """Write all the tract descriptions at the bottom of the plat,
+        starting at the current coord of the specified `cursor`. If a
+        string is NOT passed as `cursor=` (or a non-existent cursor is
+        specified), it will begin at the default `.text_cursor`. The
+        coord in `cursor` will also be updated as text gets written."""
+
+        if tracts is None:
+            return
+
+        # Copy tracts, because we'll pop elements from it.
+        ctracts = tracts.copy()
+
+        # Save line space later in by setting this variable:
+        settings = self.settings
+
+        def write_warning(num_unwritten_tracts, tracts_written):
+            """Could not fit all tracts on the page. Write a warning to
+            that effect at the bottom of the page."""
+
+            # If we wrote at least one tract, we want to include the word
+            # 'other', to avoid any confusion.
+            other = ''
+            if tracts_written > 0:
+                other = ' other'
+
+            plural = ''
+            if num_unwritten_tracts > 1:
+                plural = 's'
+
+            warning = f'[No space to write {num_unwritten_tracts}{other} tract{plural}]'
+
+            self.write_line(
+                text=warning, cursor=cursor, font_RGBA=Settings.RGBA_RED,
+                override_legal_check=True)
+
+        pull_ejector = False
+        tracts_written = 0
+
+        while len(ctracts) > 0:
+
+            if pull_ejector or self.on_last_line:
+                # We either failed to write the last full tract because it would
+                # have gone outside our textbox, or the next line is the last
+                # available within our textbox, and we have at least one more
+                # tract yet to write. So write a warning now.
+                num_unwritten = len(ctracts)
+                write_warning(num_unwritten, tracts_written)
+                break
+
+            tract = ctracts.pop(0)
+
+            # We will reserve_last_line so we can write a warning,
+            # unless this is the last tract to write.
+            reserve_last_line = len(ctracts) != 0
+
+            font_RGBA = self.font_RGBA
+            if len(tract.lotQQList) == 0 or tract.sec == 'secError':
+                # If no lots/QQs were identified, or if this tract has a
+                # 'secError' (i.e. it was a flawed parse where the section
+                # number could not be successfully deduced -- in which case it
+                # could not have been projected onto this plat), then we'll
+                # write the tract in red
+                font_RGBA = Settings.RGBA_RED
+            # Any lines that could not be written will be returned and stored
+            # in list `unwrit_lines` (i.e. empty if all successful)
+            unwrit_lines = self.write_tract(
+                cursor=cursor, tractObj=tract, font_RGBA=font_RGBA,
+                reserve_last_line=reserve_last_line)
+            if len(unwrit_lines) > 0:
+                # We couldn't write all of our lines, so let's bail.
+                pull_ejector = True
+
+            tracts_written += 1
+
+    def write_tract(
+            self, tractObj: Tract, cursor='text_cursor', font_RGBA=None,
+            override_legal_check=False, reserve_last_line=False) -> list:
+        """
+        Write the description of the parsed pyTRS.Tract object at the
+        current coord of the specified `cursor`. First confirms that
+        writing the text would not go past margins; and if so, will not
+        write it. Updates the coord of the `cursor` used.
+
+        :param tractObj: a pyTRS.Tract object, whose description should
+        be written.
+        :param cursor: The name of an existing cursor, at whose coords
+        the text should be written. (Defaults to 'text_cursor')
+        :param font_RGBA: A 4-tuple containing RGBA value to use
+        (defaults to configuration in settings)
+        :param override_legal_check: Ignore whether it is past the
+        margins. (`False` by default)
+        :param reserve_last_line: A bool, whether or not the last line
+        (before the margins are broken) should be reserved -- i.e., if
+        a tract will be written all the way to the end of the margin,
+        this will dictate whether or not to stop before writing that
+        last line, perhaps to write a warning message instead. (Defaults
+        to `False`)
+        :return: Returns a list of all of the lines that were not
+        written (i.e. an empty list, if all were written successfully).
+        """
+
+        # Extract the text of the TRS+description from the Tract object.
+        text = tractObj.quick_desc()
+
+        # If font color not otherwise specified, pull from settings.
+        if font_RGBA is None:
+            font_RGBA = self.settings.tractfont_RGBA
+
+        # Pull font from settings.
+        font = self.settings.tractfont
+
+        # Break description into lines
+        lines = self._wrap_text(text)
+
+        # Write all lines in the description. If any lines could not be written,
+        # store them in list `unwrit_lines`. We reserve_last_line here, because
+        # we want to write an ellipses if more than 1 line remains.
+        unwrit_lines = self.write_paragraph(
+            text=text, cursor=cursor, font_RGBA=font_RGBA,
+            reserve_last_line=True, override_legal_check=override_legal_check)
+
+        if reserve_last_line or len(unwrit_lines) == 0:
+            return unwrit_lines
+
+        # If we had only one more line to write, write it; otherwise,
+        # write an ellipses in red
+        if len(unwrit_lines) == 1:
+            final_text = unwrit_lines[0]
+        else:
+            final_text = "[...]"
+            font_RGBA = Settings.RGBA_RED
+        single_unwrit = self.write_line(
+            text=final_text, indent=self.new_line_indent, font_RGBA=font_RGBA)
+
+        if len(single_unwrit) > 0:
+            # If that last line couldn't be written, return the full
+            # unwrit_lines list (which still includes that line)
+            return unwrit_lines
+        else:
+            # Otherwise, if it was successfully written, pop it off, and
+            # return the remaining unwrit_lines
+            unwrit_lines.pop(0)
+            return unwrit_lines
+
+
 ########################################################################
-# Platting text directly
+# Public / Convenience Methods
 ########################################################################
 
 def text_to_plats(
