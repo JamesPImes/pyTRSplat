@@ -1093,7 +1093,7 @@ class TractTextBox(TextBox):
         :param settings: A pyTRSplat.Settings object (or the name of a
         preset, i.e. a string), which can specify various relevant
         attribs for this TractTextBox object. (In the event that an
-        attributes was set in the Settings object but ALSO specified as
+        attribute was set in the Settings object but ALSO specified as
         init parameters here; the init parameters will control.)
         """
         # If settings is not specified, get a default Settings object.
@@ -1121,12 +1121,22 @@ class TractTextBox(TextBox):
 
         self.settings = settings
 
-    def write_all_tracts(self, tracts=None, cursor='text_cursor'):
-        """Write all the tract descriptions at the bottom of the plat,
-        starting at the current coord of the specified `cursor`. If a
-        string is NOT passed as `cursor=` (or a non-existent cursor is
-        specified), it will begin at the default `.text_cursor`. The
-        coord in `cursor` will also be updated as text gets written."""
+    def write_all_tracts(self, tracts=None, cursor='text_cursor',
+            justify=None):
+        """
+        Write the descriptions of each parsed pyTRS.Tract object at the
+        current coord of the specified `cursor`. Updates the coord of
+        the `cursor` used.
+
+        :param tracts: A list of pyTRS.Tract objects, whose descriptions
+        should be written.
+        :param cursor: The name of an existing cursor, at whose coord
+        the text should be written. (Defaults to 'text_cursor')
+        :param justify: Whether to justify the tract text, if it breaks
+        onto multiple lines. (Defaults to whatever is set in
+        `self.settings.justify_tract_text`)
+        :return:
+        """
 
         if tracts is None:
             return
@@ -1162,7 +1172,7 @@ class TractTextBox(TextBox):
 
         while len(ctracts) > 0:
 
-            if pull_ejector or self.on_last_line:
+            if pull_ejector or self.on_last_line(cursor=cursor):
                 # We either failed to write the last full tract because it would
                 # have gone outside our textbox, or the next line is the last
                 # available within our textbox, and we have at least one more
@@ -1189,7 +1199,7 @@ class TractTextBox(TextBox):
             # in list `unwrit_lines` (i.e. empty if all successful)
             unwrit_lines = self.write_tract(
                 cursor=cursor, tractObj=tract, font_RGBA=font_RGBA,
-                reserve_last_line=reserve_last_line)
+                reserve_last_line=reserve_last_line, justify=justify)
             if len(unwrit_lines) > 0:
                 # We couldn't write all of our lines, so let's bail.
                 pull_ejector = True
@@ -1198,7 +1208,8 @@ class TractTextBox(TextBox):
 
     def write_tract(
             self, tractObj: Tract, cursor='text_cursor', font_RGBA=None,
-            override_legal_check=False, reserve_last_line=False) -> list:
+            override_legal_check=False, reserve_last_line=False,
+            justify=None) -> list:
         """
         Write the description of the parsed pyTRS.Tract object at the
         current coord of the specified `cursor`. First confirms that
@@ -1207,7 +1218,7 @@ class TractTextBox(TextBox):
 
         :param tractObj: a pyTRS.Tract object, whose description should
         be written.
-        :param cursor: The name of an existing cursor, at whose coords
+        :param cursor: The name of an existing cursor, at whose coord
         the text should be written. (Defaults to 'text_cursor')
         :param font_RGBA: A 4-tuple containing RGBA value to use
         (defaults to configuration in settings)
@@ -1219,6 +1230,9 @@ class TractTextBox(TextBox):
         this will dictate whether or not to stop before writing that
         last line, perhaps to write a warning message instead. (Defaults
         to `False`)
+        :param justify: Whether to justify the tract text, if it breaks
+        onto multiple lines. (Defaults to whatever is set in
+        `self.settings.justify_tract_text`)
         :return: Returns a list of all of the lines that were not
         written (i.e. an empty list, if all were written successfully).
         """
@@ -1230,17 +1244,14 @@ class TractTextBox(TextBox):
         if font_RGBA is None:
             font_RGBA = self.settings.tractfont_RGBA
 
-        # Pull font from settings.
-        font = self.settings.tractfont
-
-        # Break description into lines
-        lines = self._wrap_text(text)
+        if justify is None:
+            justify = self.settings.justify_tract_text
 
         # Write all lines in the description. If any lines could not be written,
         # store them in list `unwrit_lines`. We reserve_last_line here, because
         # we want to write an ellipses if more than 1 line remains.
         unwrit_lines = self.write_paragraph(
-            text=text, cursor=cursor, font_RGBA=font_RGBA,
+            text=text, cursor=cursor, font_RGBA=font_RGBA, justify=justify,
             reserve_last_line=True, override_legal_check=override_legal_check)
 
         if reserve_last_line or len(unwrit_lines) == 0:
@@ -1249,12 +1260,14 @@ class TractTextBox(TextBox):
         # If we had only one more line to write, write it; otherwise,
         # write an ellipses in red
         if len(unwrit_lines) == 1:
-            final_text = unwrit_lines[0]
+            final_line = unwrit_lines[0]
+            print(final_line)
+            single_unwrit = self.continue_paragraph(
+                continue_lines=[final_line], font_RGBA=font_RGBA, justify=justify)
         else:
-            final_text = "[...]"
             font_RGBA = Settings.RGBA_RED
-        single_unwrit = self.write_line(
-            text=final_text, indent=self.new_line_indent, font_RGBA=font_RGBA)
+            single_unwrit = self.write_line(
+                text="[...]", indent=self.new_line_indent, font_RGBA=font_RGBA)
 
         if len(single_unwrit) > 0:
             # If that last line couldn't be written, return the full
