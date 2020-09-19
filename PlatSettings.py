@@ -110,12 +110,13 @@ class Settings:
         'dim', 'headerfont_typeface', 'tractfont_typeface', 'secfont_typeface',
         'lotfont_typeface', 'headerfont_size', 'tractfont_size', 'secfont_size',
         'lotfont_size', 'headerfont_RGBA', 'tractfont_RGBA', 'secfont_RGBA',
-        'lotfont_RGBA', 'y_top_marg', 'y_bottom_marg', 'x_text_left_marg',
-        'x_text_right_marg', 'y_px_before_tracts', 'y_px_between_tracts',
-        'qq_side', 'sec_line_stroke', 'ql_stroke', 'qql_stroke', 'sec_line_RGBA',
-        'ql_RGBA', 'qql_RGBA', 'qq_fill_RGBA', 'centerbox_wh', 'lot_num_offset_px',
-        'write_header', 'write_tracts', 'write_section_numbers', 'write_lot_numbers',
-        'paragraph_indent', 'new_line_indent'
+        'lotfont_RGBA', 'y_top_marg','y_bottom_marg', 'y_header_marg',
+        'x_text_left_marg', 'x_text_right_marg', 'y_px_before_tracts',
+        'y_px_between_tracts', 'qq_side', 'sec_line_stroke', 'ql_stroke',
+        'qql_stroke', 'sec_line_RGBA', 'ql_RGBA', 'qql_RGBA', 'qq_fill_RGBA',
+        'centerbox_wh', 'lot_num_offset_px', 'write_header', 'write_tracts',
+        'write_section_numbers', 'write_lot_numbers', 'paragraph_indent',
+        'new_line_indent', 'justify_tract_text'
     ]
 
     def __init__(self, preset='default'):
@@ -176,7 +177,7 @@ class Settings:
 
         # px for tract text right margin (distance from right side of image
         # that we can write up to).
-        self.x_text_right_marg = 0
+        self.x_text_right_marg = 100
 
         # Distance between bottom section line and the first tract text written.
         self.y_px_before_tracts = 40
@@ -215,6 +216,9 @@ class Settings:
         # Tract-writing indents, in terms of spaces (characters, not px):
         self.paragraph_indent = 0
         self.new_line_indent = 8
+
+        # Whether tract text should be justified
+        self.justify_tract_text = True
 
         # If `preset` is specified as a string, we assume it is a preset
         # and attempt to load it as Settings data.
@@ -557,3 +561,8 @@ class Settings:
         hard-coded default."""
         st = Settings(preset=None)
         st.save_preset('default')
+
+for preset in Settings.list_presets():
+    s = Settings(preset=preset)
+    s.x_text_right_marg = s.x_text_left_marg
+    s.save_preset(preset)
