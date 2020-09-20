@@ -24,16 +24,16 @@ class PlatQueue(list):
                 if len(item) == 0:
                     continue
                 elif len(item) == 1:
-                    self.queue(item[0])
+                    self.queue_add(item[0])
                 else:
-                    self.queue(item[0], item[1])
+                    self.queue_add(item[0], item[1])
 
-    def queue(self, plattable, tracts=None):
+    def queue_add(self, plattable, tracts=None):
         """Add a 'plattable' object to the queue, and optionally add
         any corresponding tracts to the `.tracts` list as well. May
-        queue ONLY a single plattable at a time, but any number of Tract
+        add ONLY a single plattable at a time, but any number of Tract
         objects may be be added to the `.tracts` attribute via the
-        `tracts=` kwarg.
+        `tracts=` argument.
         (Passing an object in tracts does NOT add it to the queue!)"""
 
         # Make sure that `tracts` is a list.
@@ -43,7 +43,7 @@ class PlatQueue(list):
             # If tracts was fed as a single Tract object, put it in a list.
             tracts = [tracts]
 
-        # If attempting to queue another PlatQueue object, we'll absorb
+        # If attempting to add another PlatQueue object, we'll absorb
         # it instead.
         if isinstance(plattable, PlatQueue):
             self.absorb(plattable, tracts=tracts)
@@ -87,7 +87,7 @@ class PlatQueue(list):
     def absorb(self, pqObj, tracts=None):
         """Absorb a PlatQueue object into this one. The kwarg `tracts=`
         should not be used directly -- it will only be used when this is
-        called via `.queue()`.
+        called via `.queue_add()`.
         NOTE: Does not destroy the absorbed PlatQueue."""
         if tracts is None:
             tracts = []
@@ -110,8 +110,8 @@ class MultiPlatQueue(dict):
     def __init__(self):
         super().__init__()
 
-    def queue(self, plattable, twprge='', tracts=None):
-        """Add the `plattable` object to the PlatQueue for the
+    def queue_add(self, plattable, twprge='', tracts=None):
+        """Add an object that is plattable to the PlatQueue for the
         respective `twprge` (in the format '000z000y'). If no PlatQueue
         yet exists for that twprge (i.e. if that twprge is not yet a key
         in this MultiPlatQueue object), a PQ object will be created.
@@ -120,8 +120,8 @@ class MultiPlatQueue(dict):
         ignored, but rather are deduced automatically (because there can
         be more than one T&R from a single PLSSDesc object).
 
-        NOTE ALSO: If a Tract object is passed as `plattable`, then
-        `twprge` is optional (as long as the Tract object has a
+        NOTE ALSO: If a Tract object is passed as argument `plattable`,
+        then `twprge` is optional (as long as the Tract object has a
         specified `.twp` and `.rge`), and `tracts` is always optional.
         However, the Tract object's `.twp` and `.rge` will NOT overrule
         a kwarg-specified `twprge=` (if any)."""
@@ -133,7 +133,7 @@ class MultiPlatQueue(dict):
             for twprge, tract_list in twp_to_tract.items():
                 self.setdefault(twprge, PlatQueue())
                 for tract in tract_list:
-                    self[twprge].queue(tract)
+                    self[twprge].queue_add(tract)
             return
 
         def handle_tract(tractObj, twprge=None, tracts=None):
@@ -181,15 +181,15 @@ class MultiPlatQueue(dict):
 
         if len(twprge) == 0:
             raise ValueError(
-                "To queue up objects other than PLSSDesc or Tract, "
-                "'twprge' must be specified as a non-empty string, to "
+                "To add objects other than pyTRS.PLSSDesc or pyTRS.Tract to "
+                "queue, 'twprge' must be specified as a non-empty string, to "
                 "serve as dict key.")
 
         twprge = twprge.lower()
         # If the twprge does not already exist as a key, create a
         # PlatQueue object for that T&R, and add it to the dict now.
         self.setdefault(twprge, PlatQueue())
-        self[twprge].queue(plattable, tracts)
+        self[twprge].queue_add(plattable, tracts)
 
     def absorb(self, mpq):
         """Absorb a MultiPlatQueue object into this one."""
@@ -200,9 +200,9 @@ class MultiPlatQueue(dict):
             # And instruct our new PQ to absorb the PQ from our subordinate MPQ
             self[twprge].absorb(pq)
 
-    def queue_text(self, text, config=None):
+    def queue_add_text(self, text, config=None):
         """Parse the text of a PLSS land description (optionally using
         `config=` parameters -- see pyTRS docs), and add the resulting
         PLSSDesc object to this MultiPlatQueue."""
         descObj = PLSSDesc(text, config=config, initParseQQ=True)
-        self.queue(descObj)
+        self.queue_add(descObj)

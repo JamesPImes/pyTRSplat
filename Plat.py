@@ -152,7 +152,7 @@ class Plat:
         # LD object, or an empty LD object.
         # (`force_tld_return=True` and `force_ld_return=True` ensure
         # that the returned objects are not None, but will be at least
-        # an empty version of the respective TLD and LD objects.)
+        # an empty version of the respective TLD or LD objects.)
         if isinstance(tld, LotDefDB):
             tld = tld.get_tld(
                 twp + rge, allow_ld_defaults=allow_ld_defaults,
@@ -203,16 +203,16 @@ class Plat:
         sp_obj = Plat(
             twp=twp, rge=rge, only_section=only_section, settings=settings,
             tld=tld, allow_ld_defaults=allow_ld_defaults)
-        sp_obj.process_queue(pq)
+        sp_obj.queue_process(pq)
         return sp_obj
 
-    def queue(self, plattable, tracts=None):
+    def queue_add(self, plattable, tracts=None):
         """Queue up an object for platting -- i.e. pass through the
-        arguments to the `.queue()` method in the Plat's PlatQueue
+        arguments to the `.queue_add()` method in the Plat's PlatQueue
         object."""
-        self.pq.queue(plattable, tracts)
+        self.pq.queue_add(plattable, tracts)
 
-    def process_queue(self, queue=None, allow_ld_defaults=None):
+    def queue_process(self, queue=None, allow_ld_defaults=None):
         """Process all objects in a PlatQueue object. If `queue=None`,
         the PlatQueue object that will be processed is the one stored in
         this Plat's `.pq` attribute."""
@@ -226,7 +226,12 @@ class Plat:
             queue = self.pq
 
         for itm in queue:
-            if not isinstance(itm, PlatQueue.SINGLE_PLATTABLES):
+            if isinstance(itm, PLSSDesc):
+                raise TypeError(
+                    f"Cannot process pyTRS.PLSSDesc objects in a PlatQueue "
+                    f"object into a Plat object. "
+                    f"Use MultiPlatQueue and MultiPlat objects instead.")
+            elif not isinstance(itm, PlatQueue.SINGLE_PLATTABLES):
                 raise TypeError(f"Cannot process type in PlatQueue: "
                                 f"{type(itm)}")
             if isinstance(itm, SectionGrid):
@@ -422,13 +427,12 @@ class Plat:
         if x0 >= x1 or y0 >= y1:
             self.text_box = None
         else:
-            stngs = self.settings
             self.text_box = TractTextBox(
                 size=(x1 - x0, y1 - y0),
                 bg_RGBA=(255, 255, 255, 255),
-                typeface=stngs.tractfont_typeface,
-                font_size=stngs.tractfont_size,
-                font_RGBA=stngs.tractfont_RGBA)
+                typeface=self.settings.tractfont_typeface,
+                font_size=self.settings.tractfont_size,
+                font_RGBA=self.settings.tractfont_RGBA)
 
     def first_text_xy(self, settings=None):
         """Get the top/left-most pixel available for writing text (i.e.
@@ -839,8 +843,8 @@ class MultiPlat:
     and `.output_to_png()` methods for saving to files.
 
     A MultiPlatQueue object is stored for each MultiPlat as `.mpq`,
-    which can be added to with the `.queue()` method (or `.queue_text()`
-    method), and processed with the `.process_queue()` method."""
+    which can be added to with the `.queue_add()` method (or
+    `.queue_add_text()` method), and processed with `.queue_process()`."""
 
     # TODO: Wherever LDDB, TLD, or LD is referenced in a kwarg, allow it
     #   to pull from self.lddb.
@@ -902,19 +906,19 @@ class MultiPlat:
         mp_obj.process_queue(mpq)
         return mp_obj
 
-    def queue(self, plattable, twprge='', tracts=None):
+    def queue_add(self, plattable, twprge='', tracts=None):
         """Queue up an object for platting -- i.e. pass through the
-        arguments to the `.queue()` method in the Plat's MultiPlatQueue
+        arguments to the `.queue_add()` method in the Plat's MultiPlatQueue
         object."""
-        self.mpq.queue(plattable=plattable, twprge=twprge, tracts=tracts)
+        self.mpq.queue_add(plattable=plattable, twprge=twprge, tracts=tracts)
 
     def queue_text(self, text, config=None):
         """Parse the text of a PLSS land description (optionally using
         `config=` parameters -- see pyTRS docs), and add the resulting
         PLSSDesc object to this MultiPlat's queue (`.mpq`) -- by passing
-        through the arguments to the `.queue_text()` method in the
+        through the arguments to the `.queue_add_text()` method in the
         Plat's MultiPlatQueue object."""
-        self.mpq.queue_text(text=text, config=config)
+        self.mpq.queue_add_text(text=text, config=config)
 
     def process_queue(self, queue=None, allow_ld_defaults=None):
         """Process all objects in a MultiPlatQueue object. If `queue=None`,
@@ -925,17 +929,17 @@ class MultiPlat:
             allow_ld_defaults = self.allow_ld_defaults
 
         # If a different MultiPlatQueue isn't otherwise specified, use
-        # the Plat's own `.mpq` from init.
+        # the MultiPlat's own `.mpq` from init.
         if queue is None:
             queue = self.mpq
 
-        stngs = self.settings
         for twprge, pq in queue.items():
             tld = self.lddb.get(twprge, None)
+            tld = self.lddb.get_tld(twprge, allow_ld_defaults=allow_ld_defaults)
             pl_obj = Plat.from_twprge(
-                twprge, settings=stngs, tld=tld,
+                twprge, settings=self.settings, tld=tld,
                 allow_ld_defaults=allow_ld_defaults)
-            pl_obj.process_queue(pq)
+            pl_obj.queue_process(pq)
             self.plats.append(pl_obj)
 
     @staticmethod

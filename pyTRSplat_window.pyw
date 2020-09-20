@@ -6,8 +6,6 @@ A basic GUI for pyTRSplat.
 
 # TODO: Allow user to save selected page(s), rather than all.
 
-# TODO: Implement option to view / delete added PLSSDesc objs in mpq.
-
 # TODO: Implement custom settings options.
 
 # TODO: Warn/confirm when error parse detected.
@@ -33,7 +31,12 @@ from PIL import ImageTk
 from pathlib import Path
 
 
+########################################################################
+# Main Application Window
+########################################################################
+
 class MainWindow(tk.Tk):
+
     def __init__(self):
         tk.Tk.__init__(self)
         self.title('pyTRSplat - Text-to-Plat Generator')
@@ -69,6 +72,18 @@ class MainWindow(tk.Tk):
         self.about = About(master=self)
         self.about.grid(row=2, column=1, padx=4, pady=4, sticky='sw')
 
+        #################################
+        # Configurables:
+        #################################
+
+        # Whether to display a pop-up message every time a flawed parse
+        # is noticed in the `.desc_frame`
+        self.warn_flawed_parse = True
+
+        # When clicking preview/save buttons, warn about any lots that
+        # were not defined.
+        self.warn_unhandled_lots = True
+
     @property
     def mpq(self):
         """Return a MultiPlatQueue object from the `self.plssdesc_list`
@@ -90,13 +105,11 @@ class MainWindow(tk.Tk):
 class DescFrame(tk.Frame):
     """A frame for getting / clearing text of description to parse and
     add to the plat, getting LotDefDB from .csv."""
-    def __init__(self, master=None, grandmaster=None):
+    def __init__(self, master=None):
         tk.Frame.__init__(self, master)
         self.master = master
-        if grandmaster is None:
-            grandmaster = master
-        self.grandmaster = grandmaster
-
+        if not hasattr(master, 'warn_flawed_parse'):
+            master.warn_flawed_parse = True
         # a tk var containing Default config parameters for pyTRS parsing.
         self.setvar(name='config_text', value='')
         self.config_popup_tk = None
@@ -130,7 +143,7 @@ class DescFrame(tk.Frame):
 
         # Button to launch description editor
         editor_button = tk.Button(
-            desc_frame, text='View / Edit Descriptions', height=2,
+            desc_frame, text='Open the Description Editor', height=2,
             command=self.editor_btn_clicked)
         editor_button.grid(row=4, column=1, pady=5, sticky='w')
 
@@ -227,8 +240,11 @@ class DescFrame(tk.Frame):
             prompt_after_ok=after_prompt)
 
     def parse_btn_clicked(self):
-        """Pull the entered text, and use the chosen config parameters (if
-        any) to generate a PLSSDesc object, and add it to the queue to plat."""
+        """
+        Pull the entered text, and use the chosen config parameters (if
+        any) to generate a PLSSDesc object, and add it to the queue to
+        plat.
+        """
         config_text = self.getvar(name='config_text')
         descrip_text = self.desc_box_entry.get("1.0", "end-1c")
 
@@ -238,6 +254,24 @@ class DescFrame(tk.Frame):
         # Create a PLSSDesc object from the supplied text and parse it using the
         # specified config parameters (if any).
         desc = pyTRS.PLSSDesc(descrip_text, config=config_text, initParseQQ=True)
+
+        if len(desc.eFlagList) > 0 and self.master.warn_flawed_parse:
+            eFlags = ', '.join(desc.eFlagList)
+            confirm = tk.messagebox.askokcancel(
+                'Flawed Description Identified',
+                'One or more apparent flaws was identified when parsing this '
+                'description, potentially due to non-standard abbreviations, '
+                'typos, etc., or due to limitations in the parsing library:\n\n'
+                f"<flag codes:  {eFlags}>"
+                '\n\n'
+                'The description can still be platted, although results may '
+                'not be as intended.\n\n'
+                '(The Description Editor can also be used at any time to view '
+                '/ edit descriptions, and see additional parsing information.)'
+            )
+
+            if not confirm:
+                return
 
         # Add desc to the plssdesc_list
         self.master.plssdesc_list.append(desc)
@@ -340,7 +374,6 @@ class DescFrame(tk.Frame):
             "that will render a more accurate plat."
         )
         messagebox.showinfo('Default Lots', msg)
-
 
 
 ########################################################################
@@ -766,6 +799,10 @@ class About(tk.Frame):
         messagebox.showinfo('pyTRS disclaimer', pyTRS_constants.__disclaimer__)
 
 
+########################################################################
+# Preview Full Image Display Window
+########################################################################
+
 class FullPreviewWindow(tk.Toplevel):
     """A popup window containing a full-size preview of the requested
     plat page."""
@@ -984,6 +1021,10 @@ class ScrollResizeDisplay(tk.Frame):
         self.scale_box.insert(tk.END, str(self.scale) + '%')
 
 
+########################################################################
+# Description Editor Window / Subframes
+########################################################################
+
 class DescriptionEditor(tk.Toplevel):
     """A widget for viewing, editing, reconfiguring, and reparsing PLSSDesc
     objects that are currently in the MultiPlatQueue.
@@ -1168,7 +1209,7 @@ class DescriptionEditor(tk.Toplevel):
         """Return a new list of the re-saved PLSSDesc objects."""
         new_plssdesc_list = []
         for sde in self.editors:
-            new_plssdesc_list.append(sde.plssdesc_obj)
+            new_plssdesc_list.append(sde.cur_plssdesc_obj)
         return new_plssdesc_list
 
     def export_to_master(self):
@@ -1268,23 +1309,19 @@ class SingleDescriptionEditor(tk.Frame):
         tk.Frame.__init__(self, master, **kw)
         if plssdesc_obj is None:
             plssdesc_obj = pyTRS.PLSSDesc()
-        self.plssdesc_obj = plssdesc_obj
+        self.cur_plssdesc_obj = plssdesc_obj
+        self._orig_plssdesc_obj = plssdesc_obj
 
         # Tracking the PLSSDesc object from which we're currently viewing
         # tracts and flags, and whether the displayed data has been 'saved'
         self.current_display_tract_source = plssdesc_obj
         self.current_display_flag_source = plssdesc_obj
-        self.current_display_tract_status = 'saved'
-        self.current_display_flag_status = 'saved'
-
-        self.replacement_plssdesc_obj = None
+        self.current_display_tract_status = 'parsed'
+        self.current_display_flag_status = 'parsed'
 
         # Tracking whether this Editor object has created a new PLSSDesc
-        # object
+        # object (may also be reset to False by the 'Restore' button)
         self.created_new_plssdesc = False
-
-        # Tracking whether we've reparsed since last saving.
-        self.reparse_since_last_save = False
 
         # The first 'original description' (`.origDesc`) that had been
         # stored in the PLSSDesc object as of init. (`.origDesc` may
@@ -1293,23 +1330,24 @@ class SingleDescriptionEditor(tk.Frame):
         # The new description that we'll use, if we end up replacing
         # our original PLSSDesc object.
         self.new_desc_text = self._first_orig_desc
-        self.current_display_desc_status = 'saved'
+        self.current_display_desc_status = 'parsed'
 
-        # The first Config text (decompiled from `.config`) that had
-        # been used to parse the PLSSDesc object as of init. (`.config`
-        # may change after this point, but this will not.)
+        # The pyTRS Config text (decompiled from our PLSSDesc obj's
+        # `.config` attrib) that was last used to parse the text. Hold
+        # onto it to use in case the user hits the 'CANCEL' button in
+        # the config_popup.
         #
-        # NOTE: Dictated layout gets stripped out. (This is due to a
-        # limitation in .decompile_to_text() from the pyTRS module that
-        # causes bugs here if left in.)
+        # NOTE: The layout gets stripped out of the config text. (This
+        # is due to a limitation in .decompile_to_text() from the pyTRS
+        # module that causes bugs here if left in.)
         first_config = plssdesc_obj.config.decompile_to_text()
         first_config = SingleDescriptionEditor.strip_layout(first_config)
-        self._first_config = first_config
+        self._last_used_config = first_config
 
         # The new config parameters that we'll use, if we end up
         # replacing our original PLSSDesc object. (Can be changed by
         # clicking 'Reconfigure' button.)
-        self.setvar(name='config_text', value=self._first_config)
+        self.setvar(name='config_text', value=self._last_used_config)
 
         # Frame holding controls and orig description
         control_orig_desc_frame = tk.Frame(self)
@@ -1348,12 +1386,10 @@ class SingleDescriptionEditor(tk.Frame):
             command=self.reparse)
         reparse_btn.grid(row=0, column=2, padx=btn_padx, sticky='n')
 
-        save_changes_btn = tk.Button(
-            control_frame, text='Save Changes', height=2, padx=2,
-            command=self.save_clicked)
-        save_changes_btn.grid(row=0, column=3, padx=btn_padx, sticky='n')
-
-        # TODO: Reset button / functionality.
+        restore_btn = tk.Button(
+            control_frame, text='Restore', height=2, padx=2,
+            command=self.restore)
+        restore_btn.grid(row=0, column=3, padx=btn_padx, sticky='n')
 
         # We display more info (i.e. lots/QQs, warning/error flags) in
         # the tables, depending on `.more_info`. However, we only show
@@ -1407,13 +1443,13 @@ class SingleDescriptionEditor(tk.Frame):
         # here, but initialized as a TractTable obj in `.display_new_tracts`)
         self.tract_table = None
         self.display_new_tracts(
-            source_plssdesc=self.plssdesc_obj, status='saved')
+            source_plssdesc=self.cur_plssdesc_obj, status='saved')
 
         # Warning and Error Flags are displayed in `.flag_table` (set to
         # None here, but initialized as a FlagTable obj in `.display_new_flags`)
         self.flag_table = None
         self.display_new_flags(
-            source_plssdesc=self.plssdesc_obj, status='saved')
+            source_plssdesc=self.cur_plssdesc_obj, status='saved')
 
     def toggle_more_info(self):
         """Toggle whether 'more info' should be displayed, and enact."""
@@ -1530,30 +1566,84 @@ class SingleDescriptionEditor(tk.Frame):
             pady=self.tract_table_padx_pady[1], sticky='nw')
 
     def reparse(self):
-        """Reparse the pyTRS.PLSSDesc object at the specified index in
+        """
+        Reparse the pyTRS.PLSSDesc object at the specified index in
         `self.plssdesc_list`, using the optionally re-specified `config`
         parameters. (If `config` has not been specified, will use
         whatever was already in the PLSSDesc object.)
 
         Note: This will create a new PLSSDesc object and set it to
-        `self.replacement_plssdesc_obj`. Beware lists that contain the
-        original PLSSDesc object, as those will NOT be automatically
-        updated with this new object."""
+        `self.cur_plssdesc_obj`. Beware lists that contain the original
+        PLSSDesc object, as those will NOT be automatically updated with
+        this new object.
+        """
+
+        # Close any subordinate popups.
+        try:
+            self.config_popup_tk.destroy()
+        except:
+            pass
+        try:
+            self.new_desc_pop_up_tk.destroy()
+        except:
+            pass
 
         config = self.getvar(name='config_text')
         if config == 'CANCEL':
             # If the user hit the cancel button in the config popup, use
             # the original config
-            config = self._first_config
+            config = self._last_used_config
         desc = self.new_desc_text
         d_obj = pyTRS.PLSSDesc(desc, config=config, initParseQQ=True)
-        self.replacement_plssdesc_obj = d_obj
+        # Set the main PLSSDesc obj to the new replacement.
+        self.cur_plssdesc_obj = d_obj
+        # Update our last-used config text (again stripping out layout)
+        cf = d_obj.config.decompile_to_text()
+        self._last_used_config = SingleDescriptionEditor.strip_layout(cf)
+
+        # Update our displays.
+        self.display_new_descrip(status='parsed')
+        self.display_new_tracts(source_plssdesc=d_obj, status='parsed')
+        self.display_new_flags(source_plssdesc=d_obj, status='parsed')
+        # And keep track of the fact that we've created a new PLSSDesc obj.
         self.created_new_plssdesc = True
-        self.display_new_descrip(status='not_saved')
-        self.display_new_tracts(source_plssdesc=d_obj, status='not_saved')
-        self.display_new_flags(source_plssdesc=d_obj, status='not_saved')
-        self.created_new_plssdesc = True
-        self.reparse_since_last_save = True
+
+    def restore(self):
+        """
+        Restore the original pyTRS.PLSSDesc object, as it existed at the
+        creation of this editor instance.
+        """
+
+        confirm = tk.messagebox.askyesno(
+            'Confirm Restore',
+            'Discard all changes made to this description since opening '
+            'this editor window?')
+        self.focus()
+        self.grab_set()
+        if not confirm:
+            return
+
+        # TODO: Prompt "Are You Sure"
+
+        # Close any subordinate popups.
+        try:
+            self.config_popup_tk.destroy()
+            self.config_popup_tk = None
+        except:
+            pass
+        try:
+            self.new_desc_pop_up_tk.destroy()
+            self.new_desc_pop_up_tk = None
+        except:
+            pass
+
+        d_obj = self._orig_plssdesc_obj
+        self.cur_plssdesc_obj = d_obj
+        self.display_new_tracts(source_plssdesc=d_obj, status='parsed')
+        self.display_new_flags(source_plssdesc=d_obj, status='parsed')
+        self.created_new_plssdesc = False
+        self.new_desc_text = self.cur_plssdesc_obj.origDesc
+        self.display_new_descrip(status='parsed')
 
     def reconfig_btn_clicked(self):
         """Re-Config button was clicked; launch popup window to get Config
@@ -1581,73 +1671,6 @@ class SingleDescriptionEditor(tk.Frame):
             show_save=False, show_cancel=True,
             config_window=self.config_popup_tk, main_window=self,
             prompt_after_ok=after_prompt)
-
-    def save_clicked(self):
-        """Close open sub-editor popup windows, and save the reparsed
-        changes, if any."""
-
-        # Close any subordinate popups.
-        try:
-            self.config_popup_tk.destroy()
-        except:
-            pass
-        try:
-            self.new_desc_pop_up_tk.destroy()
-        except:
-            pass
-
-        if not self.reparse_since_last_save:
-            confirm = tk.messagebox.askyesno(
-                'Reparse first?',
-                'You have not yet reparsed this description, so saving '
-                'would have no effect.\n\n'
-                'Reparse and save now?')
-            self.focus()
-            self.grab_set()
-
-            if confirm:
-                self.reparse()
-            else:
-                return
-
-        if self.current_display_desc_status == 'not_activated':
-            confirm = tk.messagebox.askyesnocancel(
-                'Reparse first?',
-                'You have unparsed edits to this description that would'
-                'not be included in saving.\n\n'
-                'Do you want to reparse before saving?')
-            self.focus()
-            self.grab_set()
-
-            if confirm:
-                self.reparse()
-            elif confirm is None:
-                return
-
-        self._save_changes()
-
-    def _save_changes(self):
-        """Save the reparsed changes, if any (i.e. store the reparsed
-        PLSSDesc object to `self.plssdesc_obj`)."""
-
-        if self.replacement_plssdesc_obj is not None:
-            # Set the main PLSSDesc obj to the new replacement.
-            self.plssdesc_obj = self.replacement_plssdesc_obj
-
-        self.current_display_tract_status = 'saved'
-        self.current_display_flag_status = 'saved'
-        if self.current_display_desc_status == 'not_saved':
-            # If the edited description was not reparsed, then it should
-            # remain red, because it has not been incorporated into the
-            # newly saved PLSSDesc object.
-            self.current_display_desc_status = 'saved'
-            self.display_new_descrip(status='saved')
-        self.display_new_tracts(
-            source_plssdesc=self.plssdesc_obj, status='saved')
-        self.display_new_flags(
-            source_plssdesc=self.plssdesc_obj, status='saved')
-
-        self.reparse_since_last_save = False
 
     @staticmethod
     def strip_layout(config_text) -> str:
@@ -1866,27 +1889,14 @@ class FlagTable(tk.Frame):
             i += 1
 
 
+########################################################################
+# Main
+########################################################################
+
 def main():
     app = MainWindow()
     app.mainloop()
 
-# desc = '''T154N-R97W
-# Sec 14: NE/4 asdjfakjsdfh akjsdfh laksdjf lkasjdf lkasjdf laksdjf lakjsdf lkasjlk jlofgisjasldkfj asiodfj laksjdf asdjf ;alksdjf ;alksdjf alksjdf
-# Sec 15: W/2
-# Sec 22: N/2
-# '''
-#
-# desc2 = '''T158N-R98W
-# Sec 1: Lots 1 - 3, S/2N/2
-# '''
-#
-# d = pyTRS.PLSSDesc(desc, initParseQQ=True)
-# d2 = pyTRS.PLSSDesc(desc2, initParseQQ=True)
-#
-# root = tk.Tk()
-# t = DescriptionEditor(master=root, plssdesc_list=[d, d2])
-# #t.grid(row=1, column=1)
-# root.mainloop()
 
 if __name__ == '__main__':
     main()
