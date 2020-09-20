@@ -16,9 +16,13 @@ class TextBox:
     An object containing a PIL.Image object with added functionality for
     streamlined text writing. (Currently in 'RGBA' mode only.)
 
-    Access the PIL.Image object of the textbox in `.im` attribute.
-    Access a PIL.ImageDraw object of the textbox in `.text_draw`
+    Access the PIL.Image object of the writable area in `.im` attribute
+    (excludes margins, if any).
+    Access a PIL.ImageDraw object of the writable area in `.text_draw`
     attribute.
+    IMPORTANT: To get a copy of the PIL.Image (that leaves the `.im`
+    attribute separate and intact), use the `.render()` method, which
+    will include the margins (if any).
 
     Use `.write_paragraph()` to write paragraphs (or paragraph-like
     text) with automatic linebreaks and indents.
@@ -32,9 +36,10 @@ class TextBox:
     """
 
     def __init__(
-            self, size: tuple, typeface=None, font_size=None,
+            self, size: tuple, typeface=None, font_size=12,
             bg_RGBA=(255, 255, 255, 255), font_RGBA=(0, 0, 0, 255),
-            paragraph_indent=0, new_line_indent=0, spacing=4):
+            paragraph_indent=0, new_line_indent=0, spacing=4,
+            margins=None):
         """
         :param size: 2-tuple of (width, height).
         :param typeface: The filepath to a truetype font (.ttf file)
@@ -48,10 +53,29 @@ class TextBox:
         :param new_line_indent: How many spaces (i.e. characters, not
         px) to write before every subsequent line of a paragraph.
         :param spacing: How many px between each line.
+        :param margins: Either `None` or a 4-tuple specifying how many
+        px for each margin (left, upper, right, lower -- mirroring PIL's
+        conventions.)  Defaults to `None`.
+            IMPORTANT: If using margins, keep in mind that the `.im`
+                attribute of a TextBox object refers to the writable
+                area. To get an output Image that includes the margins,
+                use the `.render()` method.
+            NOTE ALSO: If margins are used, it will reduce the area that
+                will be written in accordingly. `size` of the TextBox
+                will not be increased to accommodate. If margins cannot
+                fit, it will raise a ValueError at init.
         """
 
-        self.im = Image.new(mode='RGBA', size=size, color=bg_RGBA)
-        self.text_draw = ImageDraw.Draw(self.im, 'RGBA')
+        self._bg_RGBA = bg_RGBA
+        self._size = size
+        self._margins = margins
+
+        # The Image object of the writable area
+        self.im = None
+        # The ImageDraw object for the writable area
+        self.text_draw = None
+        # Create and set `self.im` and `self.text_draw` here:
+        self._new_tb()
 
         # IMPORTANT: Set font with `.set_truetype_font()` method.
         self.font = ImageFont.load_default()
@@ -77,8 +101,47 @@ class TextBox:
         # The main cursor (coord location where text can be written)
         self.text_cursor = (0, 0)
 
+    def _new_tb(self):
+        """
+        INTERNAL:
+        Create a new image for the text area. If margins were specified
+        at init, adjust the size of the writable area appropriately.
+        Store the Image and the ImageDraw objects to `.im` and
+        `.text_draw` attributes, respectively.
+        """
+        tb_wid, im_height = self._size
+        margins = self._margins
+        if margins is not None:
+            left_right_marg = margins[0] + margins[2]
+            upper_lower_marg = margins[1] + margins[3]
+            tb_wid -= left_right_marg
+            im_height -= upper_lower_marg
+            if tb_wid <= 0 or im_height <= 0:
+                raise ValueError(
+                    'Specified margins are larger than the size of the TextBox')
+
+        self.im = Image.new('RGBA', (tb_wid, im_height), color=self._bg_RGBA)
+        self.text_draw = ImageDraw.Draw(self.im, 'RGBA')
+
+    def render(self) -> Image:
+        """
+        Get a unique PIL.Image object of the textbox. Margins will be
+        included if they were set at init. (Leaves `self.im` in place
+        by creating a copy, so the returned Image object can be
+        manipulated without modifying the original.)
+
+        :return: A copy of the PIL.Image object containing the written
+        text, and containing the margins (if any).
+        """
+        if self._margins is None:
+            return self.im.copy()
+        left, upper, _, _ = self._margins
+        margin_im = Image.new('RGBA', self._size, color=self._bg_RGBA)
+        margin_im.paste(self.im, (left, upper))
+        return margin_im
+
     ################################
-    # Properties / Configuring the TextBox
+    # Properties (and property-like methods) / Configuring the TextBox
     ################################
 
     @property
@@ -87,24 +150,40 @@ class TextBox:
         The height (in px) needed to write a line of text (not including
         space between lines).
         """
-        return self.text_draw.textsize('X,j', font=self.font)[1]
+        return self.text_draw.textsize('XT', font=self.font)[1]
 
-    def on_last_line(self, cursor='text_cursor'):
+    def lines_left(self, cursor='text_cursor') -> int:
+        """
+        Calculate how many lines can still be written between the coord
+        of the specified cursor and the bottom of the textbox, using the
+        currently set font and line spacing.
+
+        :return: An integer of how many lines can still be written.
+        """
+        # Get coord, but fall back to the default `.text_cursor` if needed
+        _, y_current = getattr(self, cursor, self.text_cursor)
+        y_max = self.im.height
+        y_remain = y_max - y_current
+
+        # Store line_height so it doesn't have to be realculated.
+        line_height = self.text_line_height
+
+        # Subtract the height of our bottom line from the available px
+        y_remain -= line_height
+        if y_remain < 0:
+            # No room even to fit even a single line_height
+            return 0
+
+        # All other lines require an additional line space.
+        return 1 + (y_remain // (line_height + self.spacing))
+
+    def on_last_line(self, cursor='text_cursor') -> bool:
         """
         Whether we're on the last line, at the specified cursor
         (defaults to 'text_cursor'), using the currently set font.
         """
 
-        # nested getattr() call to fall back to the default `.text_cursor`
-        y_current = getattr(self, cursor, getattr(self, 'text_cursor'))[1]
-        y_max = self.im.height
-        y_remain = y_max - y_current
-
-        # TODO: This calculation probably leaves room for some edge
-        #   cases to slip through the cracks -- e.g., where
-        #   `self.spacing` > `self.text_line_height`
-        # Check if there's room for only one_line (ignoring spacer)
-        return y_remain // self.text_line_height == 1
+        return self.lines_left(cursor) == 1
 
     def is_exhausted(self, cursor='text_cursor') -> bool:
         """
@@ -116,6 +195,17 @@ class TextBox:
         # line of text
         return self._check_legal_cursor(
             (0, self.text_line_height), cursor=cursor)
+
+    def at_new_line(self, cursor='text_cursor') -> bool:
+        """
+        Check whether the cursor is at the start of a new line.
+
+        :param cursor: The name of the cursor to check. (Defaults to
+        'text_cursor'.)
+        :return: A bool.
+        """
+        x, y = getattr(self, cursor, self.text_cursor)
+        return x == 0
 
     def set_truetype_font(self, size=None, typeface=None, RGBA=None):
         """
@@ -496,7 +586,7 @@ class TextBox:
 
         # Try to get the specified cursor, but fall back to
         # `.text_cursor`, if it doesn't exist
-        coord = getattr(self, cursor, getattr(self, 'text_cursor'))
+        coord = getattr(self, cursor, self.text_cursor)
         legal = self._check_legal_textwrite(indented_text, font, cursor)
         if legal or override_legal_check:
             # Write the text and get the width and height of the text written.
@@ -504,7 +594,7 @@ class TextBox:
         else:
             return [text]
 
-        self.next_line_cursor(xy_delta, cursor=cursor, commit=True)
+        self.next_line_cursor(cursor=cursor, commit=True)
 
         return []
 
@@ -618,7 +708,7 @@ class TextBox:
             return [orig_text]
 
         # Write the indent.
-        coord = getattr(self, cursor, getattr(self, 'text_cursor'))
+        coord = getattr(self, cursor, self.text_cursor)
         coord, xy_delta = update_coord(coord, (0, 0), (indent_w, indent_h))
 
         words_left = len(words)
@@ -642,7 +732,7 @@ class TextBox:
 
             words_left -= 1
 
-        self.next_line_cursor(xy_delta, cursor=cursor, commit=True)
+        self.next_line_cursor(cursor=cursor, commit=True)
         return []
 
     @staticmethod
@@ -965,10 +1055,14 @@ class TextBox:
 
         return final_line_dicts
 
-
     ################################
     # Cursor Methods
     ################################
+    # Note regarding cursors: The coords stored as cursors are in
+    # reference to the writable area, and do not account for margins.
+    # That is, (0, 0) would point to the upper-left corner of the
+    # writable area (`self.im`), even if that would not be (0, 0) of the
+    # Image object that is eventually output by `.render()`.
 
     def reset_cursor(self, cursor='text_cursor') -> tuple:
         """
@@ -1009,16 +1103,58 @@ class TextBox:
         """
         setattr(self, cursor, coord)
 
-    def next_line_cursor(
-            self, xy_delta=None, cursor='text_cursor', commit=True) -> tuple:
+    def same_line_cursor(
+            self, xy_delta, cursor='text_cursor', commit=True,
+            add_space=True, space_font=None,
+            prevent_linebreak=False) -> tuple:
         """
-        Move the specified `cursor` to the so-called 'next line', after
-        having written some text at that cursor.
+        Move the specified `cursor` right on the same line, after having
+        written some text at that cursor (the size of which is passed as
+        `xy_delta`). If the cursor has moved up to or past the right
+        edge of the textbox, will instead move the cursor to the next
+        line (unless parameter `prevent_linebreak=True`, which is off by
+        default).
 
-        :param xy_delta: A 2-tuple of (width, height) of text that was
-        just written. If not specified, will rely on the px height in
-        `self.text_line_height` attribute.
-        IMPORTANT: Assumes a single line of text was written!
+        IMPORTANT: Does not check legality of resulting cursor position!
+
+        :param xy_delta: 2-tuple of how many px have been written --
+        although the y-value gets ignored.
+        :param cursor: The name of the cursor being moved. (Defaults to
+        'text_cursor'.)
+
+        If the cursor is specified but does not yet exist, this will
+        read from `.text_cursor` (to calculate the updated coord) but
+        save to the specified cursor (if parameter `commit` is True).
+        :param commit: Whether to save the coord to the cursor attrib.
+        (Defaults to `True`)
+        :param add_space: Whether to add another space at the end of
+        the cursor, using the font specified in `space_font`.
+        :param space_font: If writing an additional space (i.e.
+        `add_space=True`), use the specified font. (Defaults to whatever
+        is set at `self.font`.)
+        :param prevent_linebreak: A bool, specifying whether to prevent
+        a linebreak if we've found the end of the line. (Defaults to
+        `False`)
+        :return: The resulting coord.
+        """
+        x0, y0 = getattr(self, cursor, self.text_cursor)
+        x_delta, _ = xy_delta
+        space_px = 0
+        if add_space:
+            if space_font is None:
+                space_font = self.font
+            space_px, _ = self.text_draw.textsize(' ', space_font)
+        x1 = x0 + x_delta + space_px
+        if not prevent_linebreak and x1 >= self.im.width:
+            return self.next_line_cursor(cursor=cursor, commit=commit)
+        return (x1, y0)
+
+    def next_line_cursor(self, cursor='text_cursor', commit=True) -> tuple:
+        """
+        Move the specified `cursor` to the so-called 'next line'.
+
+        IMPORTANT: Does not check legality of resulting cursor position!
+
         :param cursor:
         If a string is NOT passed as `cursor=`, the returned (and
         optionally committed) coord will be set to the default
@@ -1037,18 +1173,14 @@ class TextBox:
         # Set x to the left edge of the textbox
         x = 0
 
-        # Discard the x from xy_delta, but get the y_delta.
-        _, y_delta = xy_delta
+        # Discard the x0 from the cursor, but get y0.  (Fall back to
+        # self.text_cursor, if `cursor=` was specified as a string that
+        # wasn't already set)
+        _, y0 = getattr(self, cursor, self.text_cursor)
 
-        # Discard the x0 from the cursor, but get y0.  (Nested `getattr`
-        # calls ensures we get `.text_cursor`, if `cursor=` was
-        # specified as a string that wasn't already set; but this won't
-        # overwrite the specified `cursor` for committing the coord
-        # shortly.)
-        _, y0 = getattr(self, cursor, getattr(self, 'text_cursor'))
-
-        # We will add to our y-value the `.spacing`.
-        coord = (x, y0 + y_delta + self.spacing)
+        # We will add to our y-value the `.spacing` and the newly
+        # calculated line height (using the currently set font).
+        coord = (x, y0 + self.text_line_height + self.spacing)
 
         if commit:
             self.set_cursor(coord, cursor=cursor)
@@ -1084,7 +1216,7 @@ class TextBox:
         # attribute in this object, it will fall back to `.text_cursor`,
         # which exists for every TextBox object, per init.
         x_delta, y_delta = xy_delta
-        x0, y0 = getattr(self, cursor, getattr(self, 'text_cursor'))
+        x0, y0 = getattr(self, cursor, self.text_cursor)
         coord = (x0 + x_delta, y0 + y_delta)
 
         # Only if `commit=True` do we set this.
@@ -1146,9 +1278,6 @@ class TextBox:
         """
 
         x_overshot, y_overshot = self._check_cursor_overshoot(xy_delta, cursor)
-
-        legal = True
         if x_overshot > 0 or y_overshot > 0:
-            legal = False
-
-        return legal
+            return False
+        return True
