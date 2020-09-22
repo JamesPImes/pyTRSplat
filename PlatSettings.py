@@ -51,23 +51,27 @@ class Settings:
     # object.
     ####################################################################
 
-    # 'Arial'-like font
-    DEFAULT_TYPEFACE = r'assets/fonts/LiberationSans-Regular.ttf'
-    DEFAULT_TYPEFACE_BOLD = r'assets/fonts/LiberationSans-Bold.ttf'
-    DEFAULT_TYPEFACE_BOLDITAL = r'assets/fonts/LiberationSans-BoldItalic.ttf'
-    DEFAULT_TYPEFACE_ITAL = r'assets/fonts/LiberationSans-Italic.ttf'
+    TYPEFACES = {
+        # 'Arial'-like font
+        'Sans-Serif': r'assets/fonts/LiberationSans-Regular.ttf',
+        'Sans-Serif (Bold)': r'assets/fonts/LiberationSans-Bold.ttf',
+        'Sans-Serif (Bold-Italic)': r'assets/fonts/LiberationSans-BoldItalic.ttf',
+        'Sans-Serif (Italic)': r'assets/fonts/LiberationSans-Italic.ttf',
 
-    # 'Times New Roman'-like font
-    DEFAULT_TYPEFACE_SERIF = r'assets/fonts/LiberationSerif-Regular.ttf'
-    DEFAULT_TYPEFACE_SERIF_BOLD = r'assets/fonts/LiberationSerif-Bold.ttf'
-    DEFAULT_TYPEFACE_SERIF_BOLDITAL = r'assets/fonts/LiberationSerif-BoldItalic.ttf'
-    DEFAULT_TYPEFACE_SERIF_ITAL = r'assets/fonts/LiberationSerif-Italic.ttf'
+        # 'Times New Roman'-like font
+        'Serif': r'assets/fonts/LiberationSerif-Regular.ttf',
+        'Serif (Bold)': r'assets/fonts/LiberationSerif-Bold.ttf',
+        'Serif (Bold-Italic)': r'assets/fonts/LiberationSerif-BoldItalic.ttf',
+        'Serif (Italic)': r'assets/fonts/LiberationSerif-Italic.ttf',
 
-    # 'Courier'-like font
-    DEFAULT_TYPEFACE_MONO = r'assets/fonts/LiberationMono-Regular.ttf'
-    DEFAULT_TYPEFACE_MONO_BOLD = r'assets/fonts/LiberationMono-Bold.ttf'
-    DEFAULT_TYPEFACE_MONO_BOLDITAL = r'assets/fonts/LiberationMono-BoldItalic.ttf'
-    DEFAULT_TYPEFACE_MONO_ITAL = r'assets/fonts/LiberationMono-Italic.ttf'
+        # 'Courier'-like font
+        'Mono': r'assets/fonts/LiberationMono-Regular.ttf',
+        'Mono (Bold)': r'assets/fonts/LiberationMono-Bold.ttf',
+        'Mono (Bold-Italic)': r'assets/fonts/LiberationMono-BoldItalic.ttf',
+        'Mono (Italic)': r'assets/fonts/LiberationMono-Italic.ttf'
+    }
+
+    DEFAULT_TYPEFACE = TYPEFACES['Sans-Serif']
 
     # Where we'll look for .txt files of preset data.
     PRESET_DIRECTORY = r'assets/presets/'
@@ -169,7 +173,7 @@ class Settings:
         # Distance between top section line and the T&R written above it.
         self.y_header_marg = 15
 
-        # Bottom margin before triggering 'panic' button.
+        # Bottom margin below which tracts cannot be written
         self.y_bottom_marg = 80
 
         # px indent for tract text (from the left side of the image).
@@ -182,7 +186,7 @@ class Settings:
         # Distance between bottom section line and the first tract text written.
         self.y_px_before_tracts = 40
 
-        # Distance between tracts.
+        # Distance between lines of text when writing tracts.
         self.y_px_between_tracts = 10
 
         # Spaces to indent on new lines in tract text
@@ -327,7 +331,6 @@ class Settings:
         setattr(self, f"{purpose}font_size", size)
         setattr(self, f"{purpose}font_typeface", typeface)
 
-
     @staticmethod
     def _font_purpose_error_check(purpose: str) -> bool:
         """Confirm the specified `purpose` is legal. If so, return
@@ -381,10 +384,29 @@ class Settings:
             raise ValueError("Filename must end in '.txt'")
 
         with open(fp, 'r') as file:
-            settingLines = file.readlines()
+            setting_lines = file.readlines()
 
-        for line in settingLines:
+        self._parse_text_to_settings(setting_lines)
+
+    def _parse_text_to_settings(self, text):
+        """
+        INTERNAL USE:
+        Parse appropriately formatted text into Settings attributes.
+
+        :param text: Either a block of text (a string) of attribute data
+        separated by linebreaks, or a list of already-separated
+        attribute data (i.e. a list of strings).
+        :return: Returns nothing, but sets the appropriate attributes to
+        this Settings object.
+        """
+        setting_lines = text
+        if isinstance(text, str):
+            setting_lines = text.split('\n')
+
+        for line in setting_lines:
             # Ignore data stored in angle brackets
+            if len(line) == 0:
+                continue
             if line[0] == '<':
                 continue
 
@@ -561,8 +583,3 @@ class Settings:
         hard-coded default."""
         st = Settings(preset=None)
         st.save_preset('default')
-
-for preset in Settings.list_presets():
-    s = Settings(preset=preset)
-    s.x_text_right_marg = s.x_text_left_marg
-    s.save_preset(preset)
