@@ -10,6 +10,7 @@ from tkinter import messagebox, filedialog
 
 import Plat
 from PlatSettings import Settings
+from ImgDisplay import ScrollResizeDisplay
 
 class SettingsEditor(tk.Frame):
     """
@@ -23,8 +24,28 @@ class SettingsEditor(tk.Frame):
 
     def __init__(
             self, master=None, first_settings_obj=None,
-            show_ok=True, show_save_preset=True, show_load_preset=True,
-            show_save_custom=False, show_load_custom=False):
+            show_ok=False, show_cancel=False, show_save_preset=True,
+            show_load_preset=True, show_save_custom=False,
+            show_load_custom=False):
+        """
+        The controller for an _EditorFrame object, including high-level
+        functions (Load, Save, etc.). Note that OK and Cancel buttons
+        can be placed or hidden with parameters `show_ok=True` and
+        `show_cancel=True`, but they have no effect in this class. To
+        give them any effect, create a subclass and customize
+        `ok_btn_clicked()` and `cancel_btn_clicked()`, as needed for a
+        given application.
+
+        :param master:
+        :param first_settings_obj: The Settings object whose data will
+        populate the fields when the frame is first loaded.
+        :param show_ok:
+        :param show_cancel:
+        :param show_save_preset:
+        :param show_load_preset:
+        :param show_save_custom:
+        :param show_load_custom:
+        """
         tk.Frame.__init__(self, master=master)
         self.master = master
 
@@ -36,13 +57,21 @@ class SettingsEditor(tk.Frame):
 
         ctrl_next_col = 0
         self.preview_btn = tk.Button(
-            control_frame, text='Preview', command=self.preview_btn_clicked)
+            control_frame, text='View Example Plat', command=self.preview_btn_clicked)
         self.preview_btn.grid(row=0, column=ctrl_next_col, padx=4, pady=4, sticky='w')
         ctrl_next_col += 1
         tk.Label(control_frame, width=2).grid(row=0, column=ctrl_next_col)
         ctrl_next_col += 1
 
-        # TODO: OK button
+        # SAVE PRESET -----------------------------
+        self.ok_button = tk.Button(
+            control_frame, text='OK', command=self.ok_btn_clicked, padx=4)
+
+        if show_ok:
+            self.ok_button.grid(row=0, column=ctrl_next_col)
+            ctrl_next_col += 1
+            tk.Label(control_frame, width=2).grid(row=0, column=ctrl_next_col)
+            ctrl_next_col += 1
 
         # TODO: Cancel button
 
@@ -94,8 +123,24 @@ class SettingsEditor(tk.Frame):
         self.editor.grid(
             row=self.EFRAME_ROW, column=self.EFRAME_COLUMN, sticky='nesw')
 
+    def ok_btn_clicked(self):
+        """
+        No effect. Customize this method if using the OK button for an
+        application.
+        """
+        pass
+
     def preview_btn_clicked(self):
+        """
+        Show an example plat using the current settings.
+        """
+
+        # Compile a Settings object
         set_obj = self.editor.compile_settings()
+        if set_obj is False:
+            return False
+
+        # Create a dummy PLSSDesc object, and generate a MultiPlat
         t = (
             'T154N-R97W\n'
             'Sec 1: Lots 1 - 3, S/2N/2\n'
@@ -115,8 +160,17 @@ class SettingsEditor(tk.Frame):
         d = Plat.PLSSDesc(t, initParseQQ=True)
         mp = Plat.MultiPlat.from_plssdesc(
             d, settings=set_obj, allow_ld_defaults=True)
-        # TODO: Use tkinter preview window
-        mp.show(0)
+        im = mp.output()[0]
+
+        # Launch a preview window with this plat
+        try:
+            self.preview_window.destroy()
+        except:
+            pass
+        self.preview_window = tk.Toplevel(self)
+        self.preview_window.title('pyTRSplat - Settings Editor [Example Plat]')
+        disp = ScrollResizeDisplay(self.preview_window, img=im)
+        disp.pack()
 
     def save_preset_btn_clicked(self):
         # TODO: Check / confirm overwrite.
@@ -238,7 +292,7 @@ class _EditorFrame(tk.Frame):
             padx=self.MW_PADX, pady=self.MW_PADY, sticky='w')
         next_avail_row += 1
 
-        self.qq_side = self.IntVarSetter(
+        self.qq_side = self.QQSideSetter(
             self, var_name='qq_side',
             display_name='Side length of each QQ square', start_val=ls.qq_side)
         self.qq_side.grid(
@@ -445,9 +499,10 @@ class _EditorFrame(tk.Frame):
         """
         Compile all of the configured parameters into a Settings object,
         and return that object.
+        IMPORTANT: Returns `False` if any fields contained invalid values.
         """
 
-        #TODO: Error-check any impossible parameters (e.g., margins too big, etc.)
+        #TODO: Error-check any impossible parameters (margins too big, etc.)
 
         settings = []
         w = self.page_width.compile()
@@ -478,8 +533,8 @@ class _EditorFrame(tk.Frame):
         settings.append(self.qq_fill_RGBA.compile())
 
         # Check for any errors:
-        for set in settings:
-            if set is False:
+        for setting in settings:
+            if setting is False:
                 return False
         settings_text = '\n'.join(settings)
         set_obj = Settings()
@@ -498,10 +553,20 @@ class _EditorFrame(tk.Frame):
         Compile parameters that are configured in Checkbuttons within
         the main window. Return as string.
         """
-        txt = ''
-        for var_name in ['write_header', 'write_section_numbers',
-                    'write_lot_numbers', 'write_tracts', 'justify_tract_text']:
-            txt = f"{txt}{var_name}={bool(self.getvar(name=var_name))}\n"
+        # txt = ''
+        # # Each of these var_names is ALSO the name of the attribute of
+        # # `self` that stores the corresponding BooleanVar. So using
+        # # `getattr()` gets the BooleanVar object, on which we call
+        # # `.get()` to get the value.
+        # for var_name in ['write_header', 'write_section_numbers',
+        #             'write_lot_numbers', 'write_tracts', 'justify_tract_text']:
+        #     txt = f"{txt}{var_name}={bool(getattr(self, var_name).get())}\n"
+
+        txt = f"write_header={bool(self.write_header.get())}\n"
+        txt = f"{txt}write_section_numbers={bool(self.write_section_numbers.get())}\n"
+        txt = f"{txt}write_lot_numbers={bool(self.write_lot_numbers.get())}\n"
+        txt = f"{txt}write_tracts={bool(self.write_tracts.get())}\n"
+        txt = f"{txt}justify_tract_text={bool(self.justify_tract_text.get())}\n"
         return txt
 
     class RGBASetter(tk.Frame):
@@ -669,6 +734,55 @@ class _EditorFrame(tk.Frame):
                     "Error: Enter a numerical value for "
                     f"<{self.display_name}>")
                 return False
+
+    class QQSideSetter(IntVarSetter):
+        """
+        A frame for setting qq_side variable, while also showing the
+        resulting margins.
+        """
+        def __init__(self, master=None, var_name='', display_name='',
+                start_val=0):
+            _EditorFrame.IntVarSetter.__init__(
+                self, master, var_name, display_name, start_val)
+
+            marg_per_qq_btn = tk.Button(
+                self, text="Calculate Left/Right Page Margins:", padx=3,
+                command=self.marg_per_qq)
+            marg_per_qq_btn.grid(row=0, column=3, sticky='e')
+            self.lr_marg = tk.Entry(self, width=_EditorFrame.MID_ENTRYBOX_WIDTH)
+            self.marg_per_qq()
+            self.lr_marg.grid(row=0, column=4, sticky='w')
+
+            qq_per_margin_btn = tk.Button(
+                self, text="Calculate QQ side length per specified L/R margins", padx=3,
+                command=self.qq_per_margin)
+            qq_per_margin_btn.grid(row=0, column=5, sticky='e')
+
+        def qq_per_margin(self):
+            """Calculate the qq_side, per lr_marg."""
+            try:
+                w = int(self.master.page_width.v.get())
+                lr_marg = int(self.lr_marg.get())
+            except ValueError:
+                return False
+            qq_side = (w - (lr_marg * 2)) // 24
+            if qq_side <= 0:
+                return False
+            self.v.delete(0, 'end')
+            self.v.insert(tk.END, qq_side)
+
+        def marg_per_qq(self):
+            """Calculate the lr_marg, per qq_side and width."""
+            try:
+                w = int(self.master.page_width.v.get())
+                qq_side = int(self.v.get())
+            except ValueError:
+                return False
+            lr_marg = (w - (qq_side * 4 * 6)) // 2
+            if lr_marg <= 0:
+                return False
+            self.lr_marg.delete(0, 'end')
+            self.lr_marg.insert(tk.END, lr_marg)
 
     class QQColorSetter(RGBASetter):
         """

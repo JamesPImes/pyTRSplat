@@ -385,7 +385,8 @@ class Plat:
         W = self.image.width
         w, h = self.draw.textsize(text, font=self.settings.headerfont)
 
-        # Center horizontally and write `settings.y_header_marg` px above top section
+        # Center horizontally and write `settings.y_header_marg` px
+        # above top section
         text_x = (W - w) / 2
         text_y = self.settings.y_top_marg - h - self.settings.y_header_marg
         self.draw.text(
@@ -432,7 +433,8 @@ class Plat:
                 bg_RGBA=(255, 255, 255, 255),
                 typeface=self.settings.tractfont_typeface,
                 font_size=self.settings.tractfont_size,
-                font_RGBA=self.settings.tractfont_RGBA)
+                font_RGBA=self.settings.tractfont_RGBA,
+                settings=self.settings)
 
     def first_text_xy(self, settings=None):
         """Get the top/left-most pixel available for writing text (i.e.
@@ -1148,9 +1150,6 @@ class TractTextBox(TextBox):
         # Copy tracts, because we'll pop elements from it.
         ctracts = tracts.copy()
 
-        # Save line space later in by setting this variable:
-        settings = self.settings
-
         def write_warning(num_unwritten_tracts, tracts_written):
             """Could not fit all tracts on the page. Write a warning to
             that effect at the bottom of the page."""
@@ -1267,7 +1266,8 @@ class TractTextBox(TextBox):
             final_line = unwrit_lines[0]
             print(final_line)
             single_unwrit = self.continue_paragraph(
-                continue_lines=[final_line], font_RGBA=font_RGBA, justify=justify)
+                continue_lines=[final_line], font_RGBA=font_RGBA,
+                justify=justify)
         else:
             font_RGBA = Settings.RGBA_RED
             single_unwrit = self.write_line(

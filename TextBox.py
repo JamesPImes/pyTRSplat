@@ -822,7 +822,7 @@ class TextBox:
             'txt'     -> The text of the line
             'justifiable' -> Whether the line can be justified**
 
-        **'Justifiable' here means whether it can be stretched from the
+        **'justifiable' here means whether it can be stretched from the
         left indent to the right edge of the textbox. (All lines will be
         justifiable, except the final line in the text, and except lines
         that originally ended in a linebreak or return character.)
@@ -952,7 +952,7 @@ class TextBox:
             'txt'     -> The text of the line
             'justifiable' -> Whether the line can be justified**
 
-        **'Justifiable' here means whether it can be stretched from the
+        **'justifiable' here means whether it can be stretched from the
         left indent to the right edge of the textbox. (All lines will be
         justifiable, except the final line in the text, and except lines
         that originally ended in a linebreak or return character.)

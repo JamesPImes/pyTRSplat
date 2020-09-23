@@ -6,15 +6,13 @@ A basic GUI for pyTRSplat.
 
 # TODO: Allow user to save selected page(s), rather than all.
 
-# TODO: Implement custom settings options.
-
-# TODO: Warn/confirm when error parse detected.
-
 # TODO: Warn/confirm of unhandled lots (i.e. lots for which no definition exists) before
 #  saving / preview.
 
 import Plat
 import _constants
+from SettingsEditor import SettingsEditor
+from ImgDisplay import ScrollResizeDisplay
 
 from pyTRS.interface_tools.config_popup import prompt_config
 from pyTRS import pyTRS
@@ -90,7 +88,7 @@ class MainWindow(tk.Tk):
         and `self.ad_hoc_mpq`."""
         mpq = Plat.MultiPlatQueue()
         for obj in self.plssdesc_list:
-            mpq.queue(obj)
+            mpq.queue_add(obj)
         mpq.absorb(self.ad_hoc_mpq)
         return mpq
 
@@ -561,6 +559,9 @@ class OutputFrame(tk.Frame):
         tk.Frame.__init__(self, master)
         self.master = master
 
+        # Most recent custom Settings object, as configured in SettingsEditor
+        self.current_custom_settings = None
+
         ####################################
         # Choosing Plat Settings
         ####################################
@@ -573,17 +574,23 @@ class OutputFrame(tk.Frame):
             self.settings_frame, text='Output settings:')
         self.settings_label.grid(row=2, column=1, pady=3, sticky='e')
 
+        self.avail_settings = Plat.Settings.list_presets()
         self.settings_combo = Combobox(self.settings_frame, width=9)
-        avail_presets = Plat.Settings.list_presets()
-        self.settings_combo['values'] = avail_presets
+        self.settings_combo['values'] = self.avail_settings
         self.settings_combo.grid(row=2, column=2, sticky='w')
         # Set the combo to 'default' preset. (If that doesn't exist, set to
         # whatever's first in the list.)
         try:
-            settings_index = avail_presets.index('default')
+            settings_index = self.avail_settings.index('default')
         except ValueError:
             settings_index = 0
         self.settings_combo.current(settings_index)
+
+        self.current_editor = None
+        launch_editor_btn = tk.Button(
+            self.settings_frame, text='Customize Settings', padx=3,
+            command=self.editor_btn_clicked)
+        launch_editor_btn.grid(row=3, column=1, sticky='w')
 
         ####################################
         # Full Page Preview / Save buttons
@@ -607,15 +614,64 @@ class OutputFrame(tk.Frame):
             width=12, command=self.save_btn_clicked)
         self.save_button.grid(row=2, column=2, padx=4, pady=5, sticky='e')
 
+    def editor_btn_clicked(self):
+        """
+        Launch a CustomSettingsEditor window.
+        :return:
+        """
+        try:
+            self.current_editor.destroy()
+        except:
+            pass
+        self.current_editor = tk.Toplevel(self)
+        self.current_editor.title('pyTRSplat - Customize Plat Settings')
+
+        set_obj = self._get_settings(force_settings_return=True)
+
+        editor = CustomSettingsEditor(
+            master=self.current_editor, output_frame=self,
+            first_settings_obj=set_obj)
+        if self.settings_combo.get() == '<customized>':
+            editor.load_preset_name.delete(0, tk.END)
+            editor.load_preset_name.insert(tk.END, '<customized>')
+
+        editor.pack()
+        self.current_editor.focus()
+        self.current_editor.grab_set()
+
     ####################################
     # Generating the Plat(s)
     ####################################
+
+    def _get_settings(self, force_settings_return=False):
+        """
+        Get the appropriate Settings object, according to prior user
+        input.
+        """
+        cur_set_name = self.settings_combo.get()
+        if cur_set_name == '<customized>':
+            set_obj = self.current_custom_settings
+        elif cur_set_name in self.avail_settings:
+            set_obj = Plat.Settings(preset=cur_set_name)
+        elif force_settings_return:
+            set_obj = Plat.Settings(preset=None)
+        else:
+            tk.messagebox.showerror(
+                'Unrecognized Settings Name',
+                'Choose one of the available settings.')
+            self.focus()
+            self.grab_set()
+            return False
+
+        return set_obj
 
     def gen_plat(self):
         """Generate and return the Plat(s)."""
 
         # Get the name of the preset `Settings` object we'll use.
-        preset = self.settings_combo.get()
+        set_obj = self._get_settings()
+        if set_obj is False:
+            return
 
         # Get the bool var that decides whether we're supposed to trust
         # default lots (i.e. pass through to `allow_ld_defaults=`)
@@ -624,7 +680,7 @@ class OutputFrame(tk.Frame):
         trust_default_lots = bool(trust_default_lots)
 
         return Plat.MultiPlat.from_queue(
-            mpq=self.master.mpq, settings=preset, lddb=self.master.lddb,
+            mpq=self.master.mpq, settings=set_obj, lddb=self.master.lddb,
             allow_ld_defaults=trust_default_lots)
 
     def preview_btn_clicked(self):
@@ -821,204 +877,6 @@ class FullPreviewWindow(tk.Toplevel):
         else:
             display_window = ScrollResizeDisplay(self, img=img)
             display_window.grid(row=1, column=1, sticky='n')
-
-
-        #
-        # preview_display = tk.Label(display_frame, image=big_preview)
-        # preview_display.image = big_preview
-        # preview_display.grid(row=1, column=1, sticky='n')
-
-
-class ScrollResizeDisplay(tk.Frame):
-    """A frame that displays an image, which can be scaled and scrolled
-    with built-in controls and scrollers."""
-
-    def __init__(self, master=None, img=None, **kw):
-        tk.Frame.__init__(self, master=master, **kw)
-        self.master = master
-
-        #########################################
-        # Control Frame / Buttons
-        #########################################
-
-        control_frame = tk.Frame(master=self)
-        control_frame.grid(row=1, column=1)
-
-        # Smaller button
-        img_smaller_btn = tk.Button(
-            control_frame, text='-', padx=4,
-            command=lambda: self.adjust_display_scale(-10))
-        img_smaller_btn.grid(row=1, column=1, padx=4, pady=4, sticky='n')
-
-        # Bigger button
-        img_bigger_btn = tk.Button(
-            control_frame, text='+', padx=4,
-            command=lambda: self.adjust_display_scale(10))
-        img_bigger_btn.grid(row=1, column=2, padx=4, pady=4, sticky='n')
-
-        ###################
-        # Simple subframe for Scale display / zoom button pair
-        ###################
-        # Create the scale_frame and put it in the control_frame
-        self.scale_frame = tk.Frame(control_frame)
-        self.scale_frame.grid(row=1, column=3, padx=6, sticky='e')
-        # Box to display the current scale / get the zoomed scale
-        self.scale_box = tk.Entry(self.scale_frame, width=6)
-        self.scale_box.grid(row=1, column=2, ipady=2, padx=2, sticky='w')
-        scale_zoom_btn = tk.Button(
-            self.scale_frame, text='Zoom to:', padx=2,
-            command=self.zoom_btn_clicked)
-        scale_zoom_btn.grid(row=1, column=1, sticky='e')
-        ###################
-
-        # Reset to full-size button
-        reset_scale_btn = tk.Button(
-            control_frame, text='Full Size', padx=4,
-            command=lambda: self.set_display_scale(100))
-        reset_scale_btn.grid(row=1, column=4, padx=4, pady=4, sticky='w')
-
-        # Fit to width button
-        fit_page_w_btn = tk.Button(
-            control_frame, text='Fit Page Width', padx=4,
-            command=self.set_window_page_width)
-        fit_page_w_btn.grid(row=1, column=5, padx=4, pady=4, sticky='n')
-
-        # Fit to height button
-        fit_page_h_btn = tk.Button(
-            control_frame, text='Fit Page Height', padx=4,
-            command=self.set_window_page_height)
-        fit_page_h_btn.grid(row=1, column=6, padx=4, pady=4, sticky='n')
-
-        #########################################
-        # Image / Canvas
-        #########################################
-
-        # Current scale of the original preview image (where `100` means 100%).
-        self.scale = 100
-        # Min/Max scale settings
-        self.min_scale = 10
-        self.max_scale = 300
-
-        self.canvas_w = 800
-        self.canvas_h = 600
-
-        self.img = img
-        self.shown_img = ImageTk.PhotoImage(img)
-
-        ###################
-        # A subframe for holding the canvas and its scrollbars
-        ###################
-        cvs_frame = tk.Frame(self)
-        cvs_frame.grid(row=2, column=1, sticky='n')
-
-        self.cvs = tk.Canvas(
-            cvs_frame, height=self.canvas_h, width=self.canvas_w)
-        self.cvs.create_image(
-            0, 0, tags='displayed_preview', anchor='nw', image=self.shown_img)
-        self.cvs.grid(row=0, column=0, sticky='n')
-
-        # TODO: Better scrolling controls. Currently, if the image scales past
-        #   the width of the canvas, can't scroll any farther than that.
-
-        self.v_scroller = tk.Scrollbar(cvs_frame, orient='vertical', width=24)
-        self.v_scroller.grid(row=0, column=1, sticky='ns')
-        self.h_scroller = tk.Scrollbar(cvs_frame, orient='horizontal', width=24)
-        self.h_scroller.grid(row=1, column=0, sticky='ew')
-
-        self.cvs.config(
-            xscrollcommand=self.h_scroller.set,
-            yscrollcommand=self.v_scroller.set)
-
-        self.v_scroller.config(command=self.cvs.yview)
-        self.h_scroller.config(command=self.cvs.xview)
-        self.cvs.config(scrollregion=self.cvs.bbox('all'))
-        # TODO: Mouse-drag controls.
-        ###################
-
-        # If our image is wider than the canvas, show the page-width
-        # view by default
-        if self.img.width > self.canvas_w:
-            self.set_window_page_width()
-
-    def resize_displayed_image(self, scale=None):
-        """Resize the original `.img` to the scale in `self.scale` (a
-        percentage represented as an int -- i.e. `scale=100` meaning
-        100%; `scale=50` meaning 50%)."""
-
-        if scale is None:
-            scale = self.scale
-
-        img = self.img.copy()
-        w0, h0 = img.size
-        w1 = int(w0 * (scale / 100))
-        h1 = int(h0 * (scale / 100))
-        resized_img = img.resize((w1, h1))
-        self.update_display_image(resized_img)
-
-    def update_display_image(self, new_img):
-        self.shown_img = ImageTk.PhotoImage(new_img)
-        self.cvs.itemconfig('displayed_preview', image=self.shown_img)
-
-    def adjust_display_scale(self, increment=10):
-        """Make the displayed image bigger or smaller by the specified
-        `increment`; and updates the displaed image. (Defaults to 10%
-        larger.)"""
-
-        # Set the new scale.
-        self.set_display_scale(self.scale + increment)
-
-    def set_display_scale(self, scale=100):
-        """Set the size of the displayed image to the specified `scale`;
-        and updates the displayed image. Defaults to `100` (i.e. 100%)."""
-
-        # Set the new scale.
-        self.scale = scale
-
-        # Force it within the min/max, as necessary.
-        if self.scale < self.min_scale:
-            self.scale = self.min_scale
-        if self.scale > self.max_scale:
-            self.scale = self.max_scale
-
-        # Enact the new scale.
-        self.resize_displayed_image()
-
-        # Update the text in the scale box.
-        self.update_scale_box()
-
-    def set_window_page_width(self):
-        """Fit the size of the displayed image to the width of the canvas."""
-        self.set_display_scale(scale=int(self.canvas_w / self.img.width * 100))
-
-    def set_window_page_height(self):
-        """Fit the size of the displayed image to the height of the canvas."""
-        self.set_display_scale(scale=int(self.canvas_h / self.img.height * 100))
-
-    def zoom_btn_clicked(self):
-        """Set the scale to the value specified by the user in the
-        scale_box."""
-        input_scale = self.scale_box.get()
-        while True:
-            input_scale_chk = input_scale
-            input_scale_chk = input_scale_chk.strip('%')
-            input_scale_chk = input_scale_chk.strip()
-            if input_scale_chk == input_scale:
-                break
-            input_scale = input_scale_chk
-        try:
-            input_scale = int(input_scale)
-        except ValueError:
-            messagebox.showerror('Numbers Only', 'Input only numbers!')
-            self.update_scale_box()
-            self.focus()
-            return
-
-        self.set_display_scale(input_scale)
-
-    def update_scale_box(self):
-        """Update the text displayed inside the scale_box."""
-        self.scale_box.delete(0, 'end')
-        self.scale_box.insert(tk.END, str(self.scale) + '%')
 
 
 ########################################################################
@@ -1887,6 +1745,48 @@ class FlagTable(tk.Frame):
             eflag_lbl.grid(sticky='nw')
 
             i += 1
+
+
+########################################################################
+# Plat Settings Editor
+########################################################################
+
+class CustomSettingsEditor(SettingsEditor):
+    """
+    An editor for configuring plat settings, somewhat customized for
+    this application.
+    """
+    def __init__(self, master=None, output_frame=None, first_settings_obj=None,
+            show_save_preset=True, show_load_preset=True,
+            show_save_custom=False, show_load_custom=False):
+        SettingsEditor.__init__(
+            self, master, first_settings_obj=first_settings_obj, show_ok=True,
+            show_save_preset=show_save_preset, show_load_preset=show_load_preset,
+            show_save_custom=show_save_custom, show_load_custom=show_load_custom)
+        self.master = master
+
+        # Output frame is where the resulting data should be stored.
+        self.output_frame = output_frame
+        self.ok_button.config(text='Update Plat With These Settings')
+
+    def ok_btn_clicked(self):
+        """
+        Compile the Settings object and pass it to the main window.
+        """
+        set_obj = self.editor.compile_settings()
+        if set_obj is False:
+            return
+        output_frame = self.output_frame
+        output_frame.current_custom_settings = set_obj
+
+        # Update the displayed presets in the output frame
+        output_frame.avail_settings = Plat.Settings.list_presets()
+        output_frame.avail_settings.append('<customized>')
+        output_frame.settings_combo['values'] = output_frame.avail_settings
+        output_frame.settings_combo.current(len(output_frame.avail_settings) - 1)
+
+        # Destroy the toplevel containing this frame.
+        self.master.destroy()
 
 
 ########################################################################
