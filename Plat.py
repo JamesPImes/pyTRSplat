@@ -182,6 +182,9 @@ class Plat:
         # Whether or not to pull default TLD's (and LD's) when undefined
         self.allow_ld_defaults = allow_ld_defaults
 
+        # A dict to track all unhandled lots, keyed by section number (int)
+        self.unhandled_lots_by_sec = {}
+
     @staticmethod
     def from_twprge(
             twprge='', only_section=None, settings=None, tld=None,
@@ -500,13 +503,18 @@ class Plat:
         self.output().show()
 
     def plat_section_grid(self, secGrid: SectionGrid, qq_fill_RGBA=None):
-        """Project a SectionGrid object onto an existing Plat Object
-        (i.e. fill in any QQ hits per the `SectionGrid.QQgrid` values)."""
+        """
+        Project a SectionGrid object onto an existing Plat Object
+        (i.e. fill in any QQ hits per the `SectionGrid.QQgrid` values).
+        Add any lot names in the `.unhandled_lots` list of the
+        SectionGrid object to the Plat's `.unhandled_lots_by_sec` dict.
+        """
         secNum = int(secGrid.sec)
         for coord in secGrid.filled_coords():
             self.fill_qq(secNum, coord, qq_fill_RGBA=qq_fill_RGBA)
         if self.settings.write_lot_numbers:
             self.write_lots(secGrid)
+        self.unhandled_lots_by_sec[secNum] = secGrid.unhandled_lots
 
     @staticmethod
     def from_section_grid(secGrid: SectionGrid, tracts=None, settings=None):
@@ -897,6 +905,16 @@ class MultiPlat:
         # Whether or not to pull default TLD's when they are not set
         # in our LotDefDB. (See `Grid.LotDefDB.get_tld()` for more info)
         self.allow_ld_defaults = allow_ld_defaults
+
+    @property
+    def all_unhandled_lots(self):
+        """
+        Get a nested dict of all of the unhandled lots in each plat.
+        """
+        uhl = {}
+        for pl_obj in self.plats:
+            uhl[pl_obj.twprge] = pl_obj.unhandled_lots_by_sec
+        return uhl
 
     @staticmethod
     def from_queue(mpq, settings=None, lddb=None, allow_ld_defaults=False):
