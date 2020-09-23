@@ -6,11 +6,14 @@ A basic GUI for pyTRSplat.
 
 # TODO: Allow user to save selected page(s), rather than all.
 
-# TODO: Warn/confirm of unhandled lots (i.e. lots for which no definition exists) before
-#  saving / preview.
+# TODO: Bugfix: SettingsEditor sporadically / unpredictably complains
+#   when calling `.compile_checkbuttons()`. Have tried several methods,
+#   each of which works mostly, and then once in a while, it will break.
 
 import Plat
 import _constants
+from Grid import SectionGrid, LotDefDB
+from Grid import _simplify_lot_number
 from SettingsEditor import SettingsEditor
 from ImgDisplay import ScrollResizeDisplay
 
@@ -157,6 +160,12 @@ class DescFrame(tk.Frame):
             command=self.lddb_btn_clicked)
         lddb_button.grid(row=5, column=1, pady=5, sticky='w')
 
+        # Button to manually define lots
+        manual_lddb_button = tk.Button(
+            desc_frame, text='Define lots', height=2,
+            command=self.manual_lddb_clicked)
+        manual_lddb_button.grid(row=5, column=1, pady=5, sticky='e')
+
         self.lddp_fp_text = tk.StringVar('')
         self.lddp_fp_text.set(f"Current lot definitions: [None loaded]")
         lddb_label = tk.Label(desc_frame, textvariable=self.lddp_fp_text)
@@ -178,6 +187,25 @@ class DescFrame(tk.Frame):
             command=self.lots_help_btn_clicked)
         lots_help_btn.grid(
             row=1, column=1, sticky='w')
+
+    def manual_lddb_clicked(self):
+        """
+        Check if any undefined lots currently exist. If so, launch the
+        definer.
+        """
+        # Use tiny settings for speed. Only want the unhandled lots.
+        mp = self.master.output_frame.gen_plat(use_tiny=True)
+
+        # Pass the MultiPlat through the unhandled lots checker in the
+        # OutputFrame, which will launch the definer, if any were found.
+        # (Returns None if the definer was launched.)
+        results = self.master.output_frame._check_for_unhandled_lots(
+            mp, warn=False)
+        if results is not None:
+            messagebox.showinfo(
+                'No Undefined Lots',
+                'No currently undefined lots were identified.')
+            return
 
     def editor_btn_clicked(self):
         """Launch (or refocus-on) a DescriptionEditor popup window, for
@@ -312,7 +340,7 @@ class DescFrame(tk.Frame):
             if lddb_fp.lower().endswith('.csv'):
                 try:
                     # Load the LDDB
-                    self.master.lddb = Plat.LotDefDB(from_csv=lddb_fp)
+                    self.master.lddb._import_csv(lddb_fp)
 
                     # Update the preview window
                     self.master.preview_frame.gen_preview()
@@ -381,6 +409,31 @@ class DescFrame(tk.Frame):
 class PlatPreview(tk.Frame):
     """A frame displaying a preview of the plat, plus its controls."""
 
+    ###################
+    # Plat.Settings object
+    ###################
+    # Generate a Settings object for the mini-preview, with no
+    # margins. (Hard-coded here, rather than creating it as a preset,
+    # so that it will never be changed to unexpected settings.)
+    setObj = Plat.Settings(preset=None)
+    setObj.qq_side = 8
+    setObj.centerbox_wh = 12
+    setObj.sec_line_stroke = 1
+    setObj.qql_stroke = 1
+    setObj.ql_stroke = 1
+    setObj.sec_line_RGBA = (0, 0, 0, 255)
+    setObj.ql_RGBA = (128, 128, 128, 255)
+    setObj.qql_RGBA = (230, 230, 230, 255)
+    setObj.dim = (
+        setObj.qq_side * 4 * 6 + setObj.sec_line_stroke,
+        setObj.qq_side * 4 * 6 + setObj.sec_line_stroke)
+    setObj.y_top_marg = 0
+    setObj.set_font('sec', size=11)
+    setObj.write_header = False
+    setObj.write_tracts = False
+    setObj.write_lot_numbers = False
+    PREVIEW_SETTINGS = setObj
+
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
         self.master = master
@@ -424,32 +477,6 @@ class PlatPreview(tk.Frame):
             textvariable=self.preview_footer_text)
         preview_disp_footer.grid(row=3, column=1, sticky='n')
 
-
-        ###################
-        # Plat.Settings object
-        ###################
-        # Generate a Settings object for the mini-preview, with no
-        # margins. (Hard-coded here, rather than creating it as a preset,
-        # so that it will never be changed to unexpected settings.)
-        setObj = Plat.Settings(preset=None)
-        setObj.qq_side = 8
-        setObj.centerbox_wh = 12
-        setObj.sec_line_stroke = 1
-        setObj.qql_stroke = 1
-        setObj.ql_stroke = 1
-        setObj.sec_line_RGBA = (0, 0, 0, 255)
-        setObj.ql_RGBA = (128, 128, 128, 255)
-        setObj.qql_RGBA = (230, 230, 230, 255)
-        setObj.dim = (
-            setObj.qq_side * 4 * 6 + setObj.sec_line_stroke,
-            setObj.qq_side * 4 * 6 + setObj.sec_line_stroke)
-        setObj.y_top_marg = 0
-        setObj.set_font('sec', size=11)
-        setObj.write_header = False
-        setObj.write_tracts = False
-        setObj.write_lot_numbers = False
-        self.settings = setObj
-
         # Update the `self.previews` list (starts as an empty list).
         self.gen_preview()
 
@@ -482,7 +509,7 @@ class PlatPreview(tk.Frame):
 
         # Create a new MP
         new_preview_mp = Plat.MultiPlat.from_queue(
-            mpq, settings=self.settings, lddb=lddb,
+            mpq, settings=self.PREVIEW_SETTINGS, lddb=lddb,
             allow_ld_defaults=trust_default_lots)
 
         self.dummy_set = False
@@ -490,7 +517,7 @@ class PlatPreview(tk.Frame):
         # If there's nothing yet in the MPQ, manually create a 'dummy' plat
         # and append it, so that there's something to show (an empty plat)
         if len(mpq.keys()) == 0:
-            dummy = Plat.Plat(settings=self.settings)
+            dummy = Plat.Plat(settings=self.PREVIEW_SETTINGS)
             new_preview_mp.plats.append(dummy)
             self.dummy_set = True
 
@@ -665,11 +692,14 @@ class OutputFrame(tk.Frame):
 
         return set_obj
 
-    def gen_plat(self):
+    def gen_plat(self, use_tiny=False):
         """Generate and return the Plat(s)."""
 
-        # Get the name of the preset `Settings` object we'll use.
-        set_obj = self._get_settings()
+        if use_tiny:
+            set_obj = PlatPreview.PREVIEW_SETTINGS
+        else:
+            # Get the name of the preset `Settings` object we'll use.
+            set_obj = self._get_settings()
         if set_obj is False:
             return
 
@@ -683,11 +713,75 @@ class OutputFrame(tk.Frame):
             mpq=self.master.mpq, settings=set_obj, lddb=self.master.lddb,
             allow_ld_defaults=trust_default_lots)
 
+    def _check_for_unhandled_lots(self, mp, warn=None):
+        """
+        Check for any unhandled lots in any of the plats. Raise a
+        warning if any are found. (Warning may be disabled in main
+        window settings.)
+        :param mp: A MultiPlat object.
+        :param warn: Whether to warn of discovered unhandled lots and
+        ask the user whether to define them now. (If not specified,
+        defaults to what is configured in `.warn_unhandled_lots` in main
+        app Tk window.) If set to `False`, will automatically launch the
+        definer if any undefined lots were identified.
+        :return: If user declines to define lots now, returns a 2-tuple:
+            First element: bool (whether or not unhandled lots are found
+                -- i.e. `True` means there is at least 1 unhandled lot;
+            Second element: A dict containing all the unhandled lots,
+                keyed by TRS (a string -- i.e. `154n97w01` for Sec 1,
+                T154N-R97W), whose values are a list of lots that had
+                no definition.
+        If the user DOES decide to define lots now, this returns None
+        and starts up a series of lot definers.
+        """
+        confirm = True
+        if warn is None:
+            warn = self.master.warn_unhandled_lots
+            confirm = False
+
+        uhl = mp.all_unhandled_lots
+        ret_uhl = {}  # the unhandled lots that will be returned (keyed by TRS)
+        for twprge, plat_level_uhl in uhl.items():
+            for sec_num, sec_uhl in plat_level_uhl.items():
+                if len(sec_uhl) > 0:
+                    trs = twprge + str(sec_num).rjust(2, '0')
+                    ret_uhl[trs] = sec_uhl
+                    # TODO: check if it's a 'default' lot
+                    #   (i.e. Sections 1-7 etc.)
+
+        uhl_found = len(ret_uhl) > 0
+        if uhl_found and warn:
+            txt = ''
+            for trs, lots in ret_uhl.items():
+                txt = f"{txt}\n{trs}: {', '.join(lots)}"
+            txt.strip()
+            confirm = tk.messagebox.askyesno(
+                'Undefined Lots',
+                'One or more lots were identified in the parsed '
+                'description(s) for which no definitions have been given:\n'
+                f"{txt}\n\n"
+                'These cannot be depicted on the plat until defined. '
+                'Do so now?'
+            )
+
+        if confirm and uhl_found:
+            self.lot_definers = SeriesLotDefiner(
+                self, target_lddb=self.master.lddb, lots_to_define=ret_uhl)
+            return None
+
+        return (uhl_found, ret_uhl)
+
     def preview_btn_clicked(self):
         """Generate the MultiPlat and display one of the plats from it. If
         the desired `index` is greater than the number of plats generated,
         will show the final one."""
         mp = self.gen_plat()
+
+        if self.master.warn_unhandled_lots:
+            confirm = self._check_for_unhandled_lots(mp)
+            if confirm is None:
+                return
+
         if len(mp.plats) == 0:
             messagebox.showinfo(
                 'No plats',
@@ -698,19 +792,23 @@ class OutputFrame(tk.Frame):
         if index >= len(mp.plats):
             index = len(mp.plats) - 1
 
-        #mp.show(index)
         # output() returns a list (in this case, only one page), so grab
         # the first (only) element from it.
         preview_img = mp.output(pages=index)[0]
         preview_window = FullPreviewWindow(
-            master=self, img=preview_img,
-            settings_name=self.settings_combo.get())
+            self, img=preview_img, settings_name=self.settings_combo.get())
 
     def save_btn_clicked(self):
         """Generate plats and save them to .png or .pdf at user-selected
         filepath."""
 
         mp = self.gen_plat()
+
+        if self.master.warn_unhandled_lots:
+            confirm = self._check_for_unhandled_lots(mp)
+            if confirm is None:
+                return
+
         if len(mp.plats) == 0:
             messagebox.showinfo(
                 'No plats',
@@ -1788,6 +1886,210 @@ class CustomSettingsEditor(SettingsEditor):
         # Destroy the toplevel containing this frame.
         self.master.destroy()
 
+
+########################################################################
+# On-The-Fly Lot Definitions
+########################################################################
+
+class SectionFiller(tk.Frame):
+    """
+    A frame with 4x4 button grid for manually turning on/off QQ's.
+    """
+    def __init__(
+            self, master=None, sec=0, twp='', rge='', trs='', ld=None,
+            allow_ld_defaults=False, button_on_text='X'):
+        """
+        Specify EITHER `trs` OR `sec`, `twp`, and `rge`. If both sets
+        are specified, will use `trs` only.
+
+        :param ld: Same purpose as for Grid.SectionGrid obj.
+        :param allow_ld_defaults: Same purpose as for Grid.SectionGrid
+        obj.
+        :param button_on_text: Character that should be displayed inside
+        a QQ button when it's clicked.
+        """
+        tk.Frame.__init__(self, master)
+        self.master = master
+
+        self.go_btn = tk.Button(self, text='Go', command=self.go_btn_clicked)
+        self.go_btn.grid(row=0, column=1)
+
+        if trs != '':
+            self.sec_grid = SectionGrid.from_trs(
+                trs, ld=ld, allow_ld_defaults=allow_ld_defaults)
+        else:
+            self.sec_grid = SectionGrid(
+                sec, twp, rge, ld=ld, allow_ld_defaults=allow_ld_defaults)
+
+        self.twprge = self.sec_grid.twprge
+        self.sec = self.sec_grid.sec
+        self.trs = self.sec_grid.trs
+
+        grid_frame = tk.Frame(self)
+        grid_frame.grid(row=3, column=1, sticky='n')
+        self.buttons = []
+        for k, v in self.sec_grid.QQgrid.items():
+            btn = self._QQButton(
+                grid_frame, qq=k, qq_dict=v, on_text=button_on_text)
+            self.buttons.append(btn)
+
+    def go_btn_clicked(self):
+        """
+        Customizable method. Redefine this method depending on
+        application. Gets called any time a QQ button gets clicked.
+        """
+        pass
+
+    def qq_btn_clicked(self, qq_name):
+        """
+        Customizable method. Redefine this method depending on
+        application. Gets called any time a QQ button gets clicked.
+
+        :param qq_name: The name of the QQ button that was clicked
+            (e.g., 'NENE')
+        """
+        pass
+
+    class _QQButton(tk.Button):
+        """
+        A button for toggling a QQ.
+        """
+        W = 2
+        H = 1
+        def __init__(self, master=None, qq='', qq_dict=None, on_text='X', **kw):
+            tk.Button.__init__(self, master, **kw)
+            self.master = master
+            self.qq = qq
+            self.on_text = on_text
+            self.qq_dict = qq_dict
+            self.grid(row=qq_dict['coord'][1], column=qq_dict['coord'][0])
+            self.config(command=self.toggle, width=self.W, height=self.H)
+            self.config(text=self.on_text * self.qq_dict['val'])
+
+        def toggle(self):
+            self.qq_dict['val'] = (self.qq_dict['val'] + 1) % 2
+            self.config(text=self.on_text * self.qq_dict['val'])
+            self.master.master.qq_btn_clicked(self.qq)
+
+
+class SeriesLotDefiner(tk.Toplevel):
+    def __init__(self, master=None, target_lddb=None, lots_to_define=None):
+        tk.Toplevel.__init__(self, master)
+
+        # The LotDefDB object that will be updated:
+        self.target_lddb = target_lddb
+
+        # All of the lots we need to define -- i.e. an `unhandled_lots`
+        # dict (`ret_uhl`) from `OutputFrame._check_for_unhandled_lots()`
+        self.lots_to_define = lots_to_define
+        self.cur_definer = None
+        self.trs_keys = list(lots_to_define.keys())
+        self.cur_twprge = None
+        self.cur_lots = []
+
+        self.next_one()
+
+    def next_one(self):
+        try:
+            self.cur_definer.destroy()
+        except:
+            pass
+
+        if len(self.cur_lots) == 0:
+            if len(self.trs_keys) == 0:
+                self.done()
+                return None
+            self.cur_twprge = self.trs_keys.pop(0)
+            self.cur_lots = self.lots_to_define[self.cur_twprge]
+
+        lot = self.cur_lots.pop(0)
+        self.cur_definer = SingleLotDefiner(
+            self, target_lddb=self.target_lddb, trs=self.cur_twprge, lot_num=lot)
+        self.cur_definer.cancel_btn.grid(row=7, column=1)
+        self.cur_definer.grid(row=0, column=0, padx=14, pady=14, sticky='nesw')
+        self.cur_definer.focus()
+        self.cur_definer.grab_set()
+
+    def done(self):
+        # TODO: Maybe a success message?
+        self.master.master.trigger_update_preview()
+        self.destroy()
+
+    def canceled(self):
+        # TODO: Maybe a confirm / abandon message?
+        self.master.master.trigger_update_preview()
+        self.destroy()
+
+class SingleLotDefiner(SectionFiller):
+    """
+    A simple frame for defining lots on the fly.
+    """
+    def __init__(
+            self, master=None, target_lddb=None, sec=0, twp='', rge='', trs='',
+            lot_num=0):
+        """
+        Specify EITHER `trs` OR `sec`, `twp`, and `rge`. If both sets
+        are specified, will use `trs` only.
+
+        :param target_lddb: The LotDefDB object to be updated.
+        :param button_on_text: Character that should be displayed inside
+        a QQ button when it's clicked.
+        """
+        lot_num = _simplify_lot_number(lot_num)
+
+        SectionFiller.__init__(
+            self, master, sec=sec, twp=twp, rge=rge, trs=trs,
+            button_on_text=lot_num)
+        self.lot_num = lot_num
+
+        if not isinstance(target_lddb, LotDefDB):
+            raise ValueError(
+                'Existing LotDefDB object must be provided as `lddb`')
+        self.target_lddb = target_lddb
+
+        self.go_btn.config(text='Confirm Lot Definition')
+        lbl = Label(self, text=f"{self.trs}: Lot {lot_num}")
+        lbl.grid(row=1, column=1)
+
+        leaveit_btn = tk.Button(
+            self, text='Leave Undefined', command=self.leaveit_btn_clicked)
+        leaveit_btn.grid(row=5, column=1)
+
+        self.cancel_btn = tk.Button(
+            self, text='Cancel', command=self.cancel_btn_clicked)
+
+    def go_btn_clicked(self):
+        """
+        Set or update the definition of this lot in the target_lddb.
+        """
+
+        filled = self.sec_grid.filled_qqs()
+        if len(filled) == 0:
+            # TODO: Prompt confirm
+            print("PLACEHOLDER: Leave undefined?")
+        definition = ','.join(filled)
+
+        tld = self.target_lddb.get_tld(self.twprge, force_tld_return=True)
+
+        try:
+            sec_num = int(self.sec)
+        except:
+            sec_num = 0
+        ld = tld.get_ld(sec_num, force_ld_return=True)
+        ld.set_lot(self.lot_num, definition)
+        tld.set_section(sec_num, ld)
+        self.target_lddb.set_twp(self.twprge, tld)
+
+        if hasattr(self.master, 'next_one'):
+            self.master.next_one()
+
+    def leaveit_btn_clicked(self):
+        if hasattr(self.master, 'next_one'):
+            self.master.next_one()
+
+    def cancel_btn_clicked(self):
+        if hasattr(self.master, 'canceled'):
+            self.master.canceled()
 
 ########################################################################
 # Main
