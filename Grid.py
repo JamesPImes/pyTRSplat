@@ -67,7 +67,7 @@ class SectionGrid:
         sec = str(int(sec)).rjust(2, '0')
 
         self.sec = sec
-        self.tr = twp+rge
+        self.twprge = twp + rge
         self.trs = f"{twp}{rge}{sec}".lower()
         self.unhandled_lots = []
 
@@ -125,13 +125,26 @@ class SectionGrid:
         self._was_pinged = False
 
     @staticmethod
-    def from_trs(trs='', ld='default'):
+    def from_trs(trs='', ld=None, allow_ld_defaults=False):
         """Create and return a SectionGrid object by passing in a TRS
         (e.g., '154n97w14'), rather than the separate Sec, Twp, Rge
         components. Also takes optional `ld` argument for specifying
         LotDefinitions object."""
         twp, rge, sec = pyTRS.break_trs(trs)
-        return SectionGrid(sec, twp, rge, ld)
+        return SectionGrid(
+            sec, twp, rge, ld=ld, allow_ld_defaults=allow_ld_defaults)
+
+    @staticmethod
+    def from_tract(tractObj : pyTRS.Tract, ld=None, allow_ld_defaults=False):
+        """Return a SectionGrid object created from a parsed pyTRS.Tract
+        object and incorporate the lotList and QQList from that Tract."""
+        twp, rge, sec = tractObj.twp, tractObj.rge, tractObj.sec
+        secObj = SectionGrid(
+            sec=sec, twp=twp, rge=rge, ld=ld,
+            allow_ld_defaults=allow_ld_defaults)
+        secObj.incorporate_tract(tractObj)
+
+        return secObj
 
     def apply_lddb(self, lddb):
         """Apply the appropriate LotDefinitions object from a LotDefDB
@@ -179,16 +192,6 @@ class SectionGrid:
                 ar[y][x] = []
 
         return ar
-
-    @staticmethod
-    def from_tract(tractObj : pyTRS.Tract, ld='default'):
-        """Return a SectionGrid object created from a parsed pyTRS.Tract
-        object and incorporate the lotList and QQList from that Tract."""
-        twp, rge, sec = tractObj.twp, tractObj.rge, tractObj.sec
-        secObj = SectionGrid(sec=sec, twp=twp, rge=rge, ld=ld)
-        secObj.incorporate_tract(tractObj)
-
-        return secObj
 
     def incorporate_tract(self, tractObj : pyTRS.Tract):
         """Check the lotList and QQList of a parsed pyTRS.Tract object,
@@ -362,6 +365,16 @@ class SectionGrid:
                 if ar[y][x] != 0:
                     filled.append((x,y))
         return filled
+
+    def filled_qqs(self) -> list:
+        """
+        Return a list of QQs in the SectionGrid that contain a hit.
+        """
+        hits = []
+        for qq, v in self.QQgrid.items():
+            if v['val'] != 0:
+                hits.append(qq)
+        return hits
 
     def has_any(self):
         """Return a bool, whether at least one QQ is filled anywhere in
