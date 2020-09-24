@@ -1,19 +1,15 @@
 # Copyright (c) 2020, James P. Imes. All rights reserved.
 
 """
-A basic GUI for pyTRSplat.
+A GUI application for converting text of PLSS land descriptions ('legal
+descriptions') to plats using the pyTRSplat module.
 """
 
 # TODO: Allow user to save selected page(s), rather than all.
 
-# TODO: Bugfix: SettingsEditor sporadically / unpredictably complains
-#   when calling `.compile_checkbuttons()`. Have tried several methods,
-#   each of which works mostly, and then once in a while, it will break.
-
 import Plat
+import Grid
 import _constants
-from Grid import SectionGrid, LotDefDB
-from Grid import _simplify_lot_number
 from SettingsEditor import SettingsEditor
 from ImgDisplay import ScrollResizeDisplay
 
@@ -23,13 +19,13 @@ from pyTRS import version as pyTRSversion
 import pyTRS._constants as pyTRS_constants
 
 import tkinter as tk
-from tkinter.ttk import Combobox
+from tkinter.ttk import Combobox, Checkbutton
 from tkinter import messagebox, filedialog
 from tkinter import Label
 
-from PIL import ImageTk
-
 from pathlib import Path
+
+from PIL import ImageTk
 
 
 ########################################################################
@@ -43,31 +39,43 @@ class MainWindow(tk.Tk):
         self.title('pyTRSplat - Text-to-Plat Generator')
 
         # Store an empty LotDefDB object as `.lddb`
-        self.lddb = Plat.LotDefDB()
+        self.lddb = Grid.LotDefDB()
 
-        # Store a (currently empty) queue of ad-hoc objects to be added
-        # to the plat(s) -- e.g. SectionGrid, TownshipGrid, etc.
-        # TODO: Currently has no functionality. Will eventually add the
-        #   option to manually add QQ's with an editor.
+        # Store (initially empty) queue of ad-hoc objects to be added to
+        # the plat(s) -- e.g. SectionGrid, TownshipGrid, etc.
         self.ad_hoc_mpq = Plat.MultiPlatQueue()
 
         # Store a plain list (currently empty) of PLSSDesc objects that
         # will be platted
         self.plssdesc_list = []
 
+        # A tab-notebook for switching between adding descriptions and
+        # manually adding QQ's
+        self.adder_tabs = tk.ttk.Notebook(self)
+        self.adder_tabs.grid(row=1, column=1)
+
         # A widget for entering land descriptions, configuring parse,
         # loading LotDefDB, etc.
         self.desc_frame = DescFrame(master=self)
-        self.desc_frame.grid(row=1, column=1)
+        self.adder_tabs.add(
+            self.desc_frame, text='Add lands by description text')
+
+        # A widget for adding QQ's manually (into `.ad_hoc_mpq`)
+        self.manual_platter = ManualPlatter(
+            master=self, mpq_owner=self)
+        self.adder_tabs.add(self.manual_platter, text="Add QQ's manually")
+
+        right_side_frame = tk.Frame(self)
+        right_side_frame.grid(row=1, column=2, sticky='ns')
 
         # A widget for displaying a mini preview of the plat so far
-        self.preview_frame = PlatPreview(master=self)
+        self.preview_frame = PlatPreview(right_side_frame, preview_owner=self)
         self.preview_frame.grid(row=1, column=2, sticky='n')
 
         # A widget for output settings / buttons. (Contains the plat
         # generator at `.output_frame.gen_plat()`
-        self.output_frame = OutputFrame(master=self)
-        self.output_frame.grid(row=2, column=2, sticky='n')
+        self.output_frame = OutputFrame(right_side_frame, output_owner=self)
+        self.output_frame.grid(row=2, column=2, pady=24, sticky='s')
 
         # Widget containing 'About' and 'disclaimer' buttons.
         self.about = About(master=self)
@@ -82,7 +90,8 @@ class MainWindow(tk.Tk):
         self.warn_flawed_parse = True
 
         # When clicking preview/save buttons, warn about any lots that
-        # were not defined.
+        # were not defined. If True and any are found, will prompt user
+        # to define them now.
         self.warn_unhandled_lots = True
 
     @property
@@ -144,7 +153,7 @@ class DescFrame(tk.Frame):
 
         # Button to launch description editor
         editor_button = tk.Button(
-            desc_frame, text='Open the Description Editor', height=2,
+            desc_frame, text='Description Editor', height=2,
             command=self.editor_btn_clicked)
         editor_button.grid(row=4, column=1, pady=5, sticky='w')
 
@@ -162,7 +171,7 @@ class DescFrame(tk.Frame):
 
         # Button to manually define lots
         manual_lddb_button = tk.Button(
-            desc_frame, text='Define lots', height=2,
+            desc_frame, text='Define Lots', height=2,
             command=self.manual_lddb_clicked)
         manual_lddb_button.grid(row=5, column=1, pady=5, sticky='e')
 
@@ -176,7 +185,7 @@ class DescFrame(tk.Frame):
 
         self.trust_default_lots = tk.BooleanVar(
             desc_frame, value=True, name='trust_default_lots')
-        lots_chkbtn = tk.Checkbutton(
+        lots_chkbtn = Checkbutton(
             default_lots_frame, text='Trust Default Lots', onvalue=True,
             offvalue=False, variable=self.trust_default_lots,
             command=self.trigger_update_preview)
@@ -312,17 +321,19 @@ class DescFrame(tk.Frame):
         self.master.preview_frame.gen_preview()
 
     def clear_btn_clicked(self):
-        """Clear all plats and descriptions (reset to start)"""
+        """
+        Clear all plats and descriptions (reset to start).
+        NOTE: Does NOT clear manually added QQ's.
+        """
         prompt = messagebox.askyesno(
             'Confirm?',
-            'Delete all added descriptions and reset plats to blank?',
+            'Delete all added descriptions? (Does not delete manually added '
+            "QQ's.)",
             icon='warning')
 
         if prompt is True:
             # Set the `.plssdesc_list` to an empty list
             self.master.plssdesc_list = []
-            # Set the `.ad_hoc_mpq` to an empty MPQ obj
-            self.master.ad_hoc_mpq = Plat.MultiPlatQueue()
 
             # Generate a new preview (which will be an empty plat)
             self.master.preview_frame.gen_preview()
@@ -368,16 +379,18 @@ class DescFrame(tk.Frame):
         msg = (
             "By checking 'Trust Default Lots', this program will interpret "
             "lots in Sections 1 - 7, 18, 19, 30, and 31 as though they are "
-            "lots in a 'standard' township, unless the user has defined lots "
-            "differently in a .csv file that has been loaded. (See the "
-            "included example, plus the documentation, for how to format such "
-            "a .csv file.)"
+            "lots in a 'standard' township, unless the user has otherwise "
+            "defined lots for a given section manually (with the 'Define "
+            "Lots' function) and/or by loading a .csv file containing lot "
+            "definitions (to see how to format such a .csv file, see the "
+            "included `SAMPLE_LDDB.csv` and/or the documentation)."
             "\n\n"
             "NOTE: Default lots will ONLY be used where no lots have been "
-            "defined for a given section in a loaded .csv file. (If a .csv "
-            "file has been loaded, but it does not define any lots in Section "
-            "4, T154N-R97W, then default lots would be used for that Section "
-            "4 -- as long as this box is checked.)"
+            "defined for a given section individually or in a loaded .csv "
+            "file. (If a .csv file has been loaded, and/or if some lots have "
+            "been defined individually, but not any lots for Section 4, "
+            "T154N-R97W, then default lots would be used for that Section 4 "
+            "-- as long as this box is checked.)"
             "\n\n\n"
             "MORE INFO:\n"
             "A so-called 'standard' township would have been surveyed in such "
@@ -396,8 +409,9 @@ class DescFrame(tk.Frame):
             "lots in any other sections."
             "\n\n"
             "'Trust Default Lots' may be useful as a backup option, but "
-            "defining specific lots in a .csv spreadsheet and loading from "
-            "that will render a more accurate plat."
+            "a more accurate plat can be achieved by defining specific lots "
+            "individually with the 'Define Lots' feature, and/or by defining "
+            "them in a .csv spreadsheet and loading from that."
         )
         messagebox.showinfo('Default Lots', msg)
 
@@ -434,9 +448,13 @@ class PlatPreview(tk.Frame):
     setObj.write_lot_numbers = False
     PREVIEW_SETTINGS = setObj
 
-    def __init__(self, master=None):
+    def __init__(self, master=None, preview_owner=None):
         tk.Frame.__init__(self, master)
         self.master = master
+
+        if preview_owner is None:
+            preview_owner = master
+        self.preview_owner = preview_owner
 
         # A list of Image objects of previews of the plats
         self.previews = []
@@ -498,12 +516,12 @@ class PlatPreview(tk.Frame):
         """Generate a new list of preview plats (Image objects) and set
         it to `self.previews`. (Discards the old previews.) Updates
         `self.dummy_set` as appropriate."""
-        mpq = self.master.mpq
-        lddb = self.master.lddb
+        mpq = self.preview_owner.mpq
+        lddb = self.preview_owner.lddb
 
         # Get the bool var that decides whether we're supposed to trust
         # default lots (i.e. pass through to `allow_ld_defaults=`)
-        trust_default_lots = self.master.desc_frame.getvar(
+        trust_default_lots = self.preview_owner.desc_frame.getvar(
             name='trust_default_lots')
         trust_default_lots = bool(trust_default_lots)
 
@@ -582,9 +600,13 @@ class OutputFrame(tk.Frame):
     button, and corresponding functionality. Also contains the plat
     generator. (Interacts with the `preview_frame` and `.mpq` of
     `master`."""
-    def __init__(self, master=None):
+    def __init__(self, master=None, output_owner=None):
         tk.Frame.__init__(self, master)
         self.master = master
+
+        if output_owner is None:
+            output_owner = master
+        self.output_owner = output_owner
 
         # Most recent custom Settings object, as configured in SettingsEditor
         self.current_custom_settings = None
@@ -658,9 +680,9 @@ class OutputFrame(tk.Frame):
         editor = CustomSettingsEditor(
             master=self.current_editor, output_frame=self,
             first_settings_obj=set_obj)
-        if self.settings_combo.get() == '<customized>':
-            editor.load_preset_name.delete(0, tk.END)
-            editor.load_preset_name.insert(tk.END, '<customized>')
+        # Pre-fill the 'Load Preset' combo with what was set in the OutputFrame
+        editor.load_preset_name.delete(0, tk.END)
+        editor.load_preset_name.insert(tk.END, self.settings_combo.get())
 
         editor.pack()
         self.current_editor.focus()
@@ -685,7 +707,8 @@ class OutputFrame(tk.Frame):
         else:
             tk.messagebox.showerror(
                 'Unrecognized Settings Name',
-                'Choose one of the available settings.')
+                "Choose one of the available settings. Or use 'Customize "
+                "Settings' to configure the plats.")
             self.focus()
             self.grab_set()
             return False
@@ -705,13 +728,13 @@ class OutputFrame(tk.Frame):
 
         # Get the bool var that decides whether we're supposed to trust
         # default lots (i.e. pass through to `allow_ld_defaults=`)
-        trust_default_lots = self.master.desc_frame.getvar(
+        trust_default_lots = self.output_owner.desc_frame.getvar(
             name='trust_default_lots')
         trust_default_lots = bool(trust_default_lots)
 
         return Plat.MultiPlat.from_queue(
-            mpq=self.master.mpq, settings=set_obj, lddb=self.master.lddb,
-            allow_ld_defaults=trust_default_lots)
+            mpq=self.output_owner.mpq, settings=set_obj,
+            lddb=self.output_owner.lddb, allow_ld_defaults=trust_default_lots)
 
     def _check_for_unhandled_lots(self, mp, warn=None):
         """
@@ -736,7 +759,7 @@ class OutputFrame(tk.Frame):
         """
         confirm = True
         if warn is None:
-            warn = self.master.warn_unhandled_lots
+            warn = self.output_owner.warn_unhandled_lots
             confirm = False
 
         uhl = mp.all_unhandled_lots
@@ -766,7 +789,8 @@ class OutputFrame(tk.Frame):
 
         if confirm and uhl_found:
             self.lot_definers = SeriesLotDefiner(
-                self, target_lddb=self.master.lddb, lots_to_define=ret_uhl)
+                self, top_owner=self.output_owner,
+                target_lddb=self.output_owner.lddb, lots_to_define=ret_uhl)
             return None
 
         return (uhl_found, ret_uhl)
@@ -776,8 +800,10 @@ class OutputFrame(tk.Frame):
         the desired `index` is greater than the number of plats generated,
         will show the final one."""
         mp = self.gen_plat()
+        if mp is None:
+            return
 
-        if self.master.warn_unhandled_lots:
+        if self.output_owner.warn_unhandled_lots:
             confirm = self._check_for_unhandled_lots(mp)
             if confirm is None:
                 return
@@ -785,10 +811,11 @@ class OutputFrame(tk.Frame):
         if len(mp.plats) == 0:
             messagebox.showinfo(
                 'No plats',
-                'No plats to preview. Add land descriptions and try again.')
+                "No plats to preview. Add land descriptions or manually add "
+                "QQ's and try again.")
             return
 
-        index = self.master.preview_frame.preview_index
+        index = self.output_owner.preview_frame.preview_index
         if index >= len(mp.plats):
             index = len(mp.plats) - 1
 
@@ -803,8 +830,10 @@ class OutputFrame(tk.Frame):
         filepath."""
 
         mp = self.gen_plat()
+        if mp is None:
+            return
 
-        if self.master.warn_unhandled_lots:
+        if self.output_owner.warn_unhandled_lots:
             confirm = self._check_for_unhandled_lots(mp)
             if confirm is None:
                 return
@@ -812,7 +841,8 @@ class OutputFrame(tk.Frame):
         if len(mp.plats) == 0:
             messagebox.showinfo(
                 'No plats',
-                'No plats to save. Add land descriptions and try again.')
+                "No plats to save. Add land descriptions or manually add "
+                "QQ's and try again.")
             return
 
         write_it = False
@@ -822,7 +852,7 @@ class OutputFrame(tk.Frame):
 
         # Look at how many images are in the `previews` list to see how
         # many plats there will be.
-        num_plats = len(self.master.preview_frame.previews)
+        num_plats = len(self.output_owner.preview_frame.previews)
 
         while True:
             save_fp = filedialog.asksaveasfilename(
@@ -1915,10 +1945,10 @@ class SectionFiller(tk.Frame):
         self.go_btn.grid(row=0, column=1)
 
         if trs != '':
-            self.sec_grid = SectionGrid.from_trs(
+            self.sec_grid = Grid.SectionGrid.from_trs(
                 trs, ld=ld, allow_ld_defaults=allow_ld_defaults)
         else:
-            self.sec_grid = SectionGrid(
+            self.sec_grid = Grid.SectionGrid(
                 sec, twp, rge, ld=ld, allow_ld_defaults=allow_ld_defaults)
 
         self.twprge = self.sec_grid.twprge
@@ -1973,11 +2003,17 @@ class SectionFiller(tk.Frame):
 
 
 class SeriesLotDefiner(tk.Toplevel):
-    def __init__(self, master=None, target_lddb=None, lots_to_define=None):
+    def __init__(
+            self, master=None, top_owner=None, target_lddb=None,
+            lots_to_define=None):
         tk.Toplevel.__init__(self, master)
 
         # The LotDefDB object that will be updated:
         self.target_lddb = target_lddb
+
+        if top_owner is None:
+            top_owner = master
+        self.top_owner = top_owner
 
         # All of the lots we need to define -- i.e. an `unhandled_lots`
         # dict (`ret_uhl`) from `OutputFrame._check_for_unhandled_lots()`
@@ -2012,12 +2048,12 @@ class SeriesLotDefiner(tk.Toplevel):
 
     def done(self):
         # TODO: Maybe a success message?
-        self.master.master.trigger_update_preview()
+        self.top_owner.trigger_update_preview()
         self.destroy()
 
     def canceled(self):
         # TODO: Maybe a confirm / abandon message?
-        self.master.master.trigger_update_preview()
+        self.top_owner.trigger_update_preview()
         self.destroy()
 
 class SingleLotDefiner(SectionFiller):
@@ -2035,14 +2071,14 @@ class SingleLotDefiner(SectionFiller):
         :param button_on_text: Character that should be displayed inside
         a QQ button when it's clicked.
         """
-        lot_num = _simplify_lot_number(lot_num)
+        lot_num = Grid._simplify_lot_number(lot_num)
 
         SectionFiller.__init__(
             self, master, sec=sec, twp=twp, rge=rge, trs=trs,
             button_on_text=lot_num)
         self.lot_num = lot_num
 
-        if not isinstance(target_lddb, LotDefDB):
+        if not isinstance(target_lddb, Grid.LotDefDB):
             raise ValueError(
                 'Existing LotDefDB object must be provided as `lddb`')
         self.target_lddb = target_lddb
@@ -2090,6 +2126,202 @@ class SingleLotDefiner(SectionFiller):
     def cancel_btn_clicked(self):
         if hasattr(self.master, 'canceled'):
             self.master.canceled()
+
+
+########################################################################
+# Manually Adding QQ's to Plat
+########################################################################
+
+class ManualPlatter(tk.Frame):
+    """
+    A frame for manually adding QQ's to the plats.
+    """
+
+    PLATTER_ROW = 3
+    PLATTER_COL = 1
+    TWPRGE_WID = 5
+    NSEW_WID = 2
+
+    def __init__(self, master=None, mpq_owner=None):
+        tk.Frame.__init__(self, master)
+        self.master = master
+        if mpq_owner is None:
+            mpq_owner = master
+        self.mpq_owner = mpq_owner
+        self.target_mpq = mpq_owner.ad_hoc_mpq
+
+        # Space at the top.
+        lbl = Label(self, text='')
+        lbl.grid(row=0, column=1)
+
+        # Frame for defining Twp, Rge, Sec
+        trs_frame = tk.Frame(self)
+        trs_frame.grid(row=1, column=1, padx=20)
+
+        trs_col = 0
+
+        lbl = tk.Label(trs_frame, text='Twp:')
+        lbl.grid(row=0, column=trs_col)
+        trs_col += 1
+
+        self.twp_num = tk.Entry(trs_frame, width=self.TWPRGE_WID)
+        self.twp_num.grid(row=0, column=trs_col)
+        trs_col += 1
+
+        self.twp_ns = Combobox(trs_frame, width=self.NSEW_WID)
+        self.twp_ns['values'] = ['N', 'S']
+        self.twp_ns.current(0)
+        self.twp_ns.grid(row=0, column=trs_col)
+        trs_col += 1
+
+        lbl = tk.Label(trs_frame, text='  Rge:')
+        lbl.grid(row=0, column=trs_col)
+        trs_col += 1
+
+        self.rge_num = tk.Entry(trs_frame, width=self.TWPRGE_WID)
+        self.rge_num.grid(row=0, column=trs_col)
+        trs_col += 1
+
+        self.rge_ew = Combobox(trs_frame, width=self.NSEW_WID)
+        self.rge_ew['values'] = ['W', 'E']
+        self.rge_ew.current(0)
+        self.rge_ew.grid(row=0, column=trs_col)
+        trs_col += 1
+
+        lbl = tk.Label(trs_frame, text='  Sec:')
+        lbl.grid(row=0, column=trs_col)
+        trs_col += 1
+
+        self.sec_num = Combobox(trs_frame, width=self.NSEW_WID)
+        self.sec_num['values'] = [i for i in range(1,37)]
+        self.sec_num.current(0)
+        self.sec_num.grid(row=0, column=trs_col)
+        trs_col += 1
+
+        clear_all_btn = tk.Button(
+            self, text="Clear All Manually Added QQ's", height=2,
+            command=self.clear_btn_clicked)
+        clear_all_btn.grid(row=10, column=1, padx=10, pady=30)
+
+        # The current ManualSectionPlatter object -- initialized as
+        # None, then set in `.new_platter().
+        self.cur_platter = None
+        self.new_platter()
+
+    def child_go_btn_clicked(self):
+        """Add the QQ's to the target MultiPlatQueue."""
+
+        # Compile TRS
+        twprge, sec = self._compile_trs()
+        # If invalid characters were identified, `.compile_trs()` returns
+        # `False`, so check for that now.
+        if twprge is False:
+            return
+
+        # Assign sec number to the SectionGrid object in the current platter
+        sg = self.cur_platter.sec_grid
+        sg.sec = sec
+
+        # Add the SectionGrid object to the target MPQ, for the specified twprge
+        self.target_mpq.queue_add(sg, twprge)
+
+        # Get a new platter
+        self.new_platter()
+
+        # Update mini-preview
+        try:
+            self.mpq_owner.trigger_update_preview()
+        except:
+            pass
+
+    def _compile_trs(self):
+        """
+
+        :return:
+        """
+        # Compile TRS
+        twp_num = self.twp_num.get()
+        NS = self.twp_ns.get().lower()
+        rge_num = self.rge_num.get()
+        EW = self.rge_ew.get().lower()
+        sec = self.sec_num.get()
+
+        for chk in [twp_num, rge_num]:
+            if len(chk) > 3 or not chk.isnumeric():
+                tk.messagebox.showerror(
+                    'Invalid Twp / Rge',
+                    'Enter Township and Range as 1 to 3 digits.'
+                )
+                return False, False
+
+        if len(sec) > 2 or not sec.isnumeric():
+            tk.messagebox.showerror(
+                'Invalid Sec',
+                'Enter Section as 1 or 2 digits.'
+            )
+            return False, False
+
+        if NS.lower() not in ['n', 's']:
+            tk.messagebox.showerror(
+                'Invalid N/S',
+                'Township must be designated as either N or S.'
+            )
+            return False, False
+
+        if EW.lower() not in ['e', 'w']:
+            tk.messagebox.showerror(
+                'Invalid E/W',
+                'Range must be designated as either E or W.'
+            )
+            return False, False
+
+        return (twp_num + NS.lower() + rge_num + EW.lower(), sec)
+
+    def clear_btn_clicked(self):
+        """
+        Clear all manually added QQ's from the plats.
+        NOTE: Does NOT clear parsed descriptions.
+        """
+        prompt = messagebox.askyesno(
+            'Confirm?',
+            "Delete all manually added QQ's from plats? (Does not delete "
+            "parsed text descriptions.)",
+            icon='warning')
+
+        if prompt is True:
+            # Set the mpq owner's `.ad_hoc_mpq` to an empty MPQ
+            self.master.ad_hoc_mpq = Plat.MultiPlatQueue()
+
+            # Re-define our target_mpq to point to this new MPQ
+            self.target_mpq = self.master.ad_hoc_mpq
+
+            # Generate a new preview (which will be an empty plat)
+            self.master.preview_frame.gen_preview()
+
+    def new_platter(self):
+        try:
+            self.cur_platter.destroy()
+        except:
+            pass
+        self.cur_platter = ManualSectionPlatter(self)
+        self.cur_platter.grid(
+            row=self.PLATTER_ROW, column=self.PLATTER_COL, pady=10)
+
+
+class ManualSectionPlatter(SectionFiller):
+    """
+    For manually platting QQ's in a section.
+    """
+
+    def __init__(self, master=None):
+        SectionFiller.__init__(self, master)
+        self.master = master
+        self.go_btn.config(text="Add Selected QQ's to Plat", height=2)
+        self.go_btn.grid(row=0, column=1, pady=20)
+
+    def go_btn_clicked(self):
+        self.master.child_go_btn_clicked()
+
 
 ########################################################################
 # Main

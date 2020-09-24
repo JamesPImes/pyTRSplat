@@ -1125,7 +1125,6 @@ class TractTextBox(TextBox):
             settings = Settings()
         elif isinstance(settings, str):
             settings = Settings(preset=settings)
-
         # If these are not specified, pull them from settings
         if typeface is None:
             typeface = settings.tractfont_typeface
@@ -1185,7 +1184,7 @@ class TractTextBox(TextBox):
             warning = f'[No space to write {num_unwritten_tracts}{other} tract{plural}]'
 
             self.write_line(
-                text=warning, cursor=cursor, font_RGBA=Settings.RGBA_RED,
+                text=warning, cursor=cursor, font_RGBA=self.settings.warningfont_RGBA,
                 override_legal_check=True)
 
         pull_ejector = False
@@ -1214,8 +1213,8 @@ class TractTextBox(TextBox):
                 # 'secError' (i.e. it was a flawed parse where the section
                 # number could not be successfully deduced -- in which case it
                 # could not have been projected onto this plat), then we'll
-                # write the tract in red
-                font_RGBA = Settings.RGBA_RED
+                # write the tract in the configured warning color
+                font_RGBA = self.settings.warningfont_RGBA
             # Any lines that could not be written will be returned and stored
             # in list `unwrit_lines` (i.e. empty if all successful)
             unwrit_lines = self.write_tract(
@@ -1287,7 +1286,7 @@ class TractTextBox(TextBox):
                 continue_lines=[final_line], font_RGBA=font_RGBA,
                 justify=justify)
         else:
-            font_RGBA = Settings.RGBA_RED
+            font_RGBA = self.settings.warningfont_RGBA
             single_unwrit = self.write_line(
                 text="[...]", indent=self.new_line_indent, font_RGBA=font_RGBA)
 

@@ -120,7 +120,7 @@ class Settings:
         'qql_stroke', 'sec_line_RGBA', 'ql_RGBA', 'qql_RGBA', 'qq_fill_RGBA',
         'centerbox_wh', 'lot_num_offset_px', 'write_header', 'write_tracts',
         'write_section_numbers', 'write_lot_numbers', 'paragraph_indent',
-        'new_line_indent', 'justify_tract_text'
+        'new_line_indent', 'justify_tract_text', 'warningfont_RGBA'
     ]
 
     def __init__(self, preset='default'):
@@ -157,6 +157,8 @@ class Settings:
         self.tractfont_RGBA = Settings.RGBA_BLACK
         self.secfont_RGBA = Settings.RGBA_BLACK
         self.lotfont_RGBA = Settings.RGBA_BLACK
+        # Color to use to write warnings/errors (not tied to any specific font)
+        self.warningfont_RGBA = Settings.RGBA_RED
 
         # Default font objects will be set by `._update_fonts()` shortly.
         self.headerfont = None

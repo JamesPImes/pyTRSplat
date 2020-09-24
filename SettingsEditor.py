@@ -5,7 +5,7 @@ A GUI editor for Settings objects in the pyTRSplat module.
 """
 
 import tkinter as tk
-from tkinter.ttk import Combobox
+from tkinter.ttk import Combobox, Checkbutton
 from tkinter import messagebox, filedialog
 
 import Plat
@@ -343,11 +343,11 @@ class _EditorFrame(tk.Frame):
         next_avail_row += 1
 
         #################################
-        # WHAT TO WRITE
+        # WHAT TO WRITE / FONTS / TEXT CONFIGURE
         #################################
         self.write_header = tk.BooleanVar(
             self, value=ls.write_header, name='write_header')
-        self.write_header_chkbtn = tk.Checkbutton(
+        self.write_header_chkbtn = Checkbutton(
             self, text='Write Header in Top Margin', onvalue=True,
             offvalue=False, variable=self.write_header)
         self.write_header_chkbtn.grid(
@@ -373,7 +373,7 @@ class _EditorFrame(tk.Frame):
 
         self.write_section_numbers = tk.BooleanVar(
             self, value=ls.write_section_numbers, name='write_section_numbers')
-        self.write_section_numbers_chkbtn = tk.Checkbutton(
+        self.write_section_numbers_chkbtn = Checkbutton(
             self, text='Write Section Numbers', onvalue=True,
             offvalue=False, variable=self.write_section_numbers)
         self.write_section_numbers_chkbtn.grid(
@@ -391,7 +391,7 @@ class _EditorFrame(tk.Frame):
 
         self.write_lot_numbers = tk.BooleanVar(
             self, value=ls.write_lot_numbers, name='write_lot_numbers')
-        self.write_lot_numbers_chkbtn = tk.Checkbutton(
+        self.write_lot_numbers_chkbtn = Checkbutton(
             self, text='Write lot numbers within the appropriate QQ(s)',
             onvalue=True, offvalue=False, variable=self.write_lot_numbers)
         self.write_lot_numbers_chkbtn.grid(
@@ -417,7 +417,7 @@ class _EditorFrame(tk.Frame):
 
         self.write_tracts = tk.BooleanVar(
             self, value=ls.write_tracts, name='write_tracts')
-        self.write_tracts_chkbtn = tk.Checkbutton(
+        self.write_tracts_chkbtn = Checkbutton(
             self, text='Write all tracts at the bottom', onvalue=True,
             offvalue=False, variable=self.write_tracts)
         self.write_tracts_chkbtn.grid(
@@ -431,6 +431,18 @@ class _EditorFrame(tk.Frame):
             self, font_size=ls.tractfont_size, display_name='Tract Font',
             var_name='tractfont', typeface=tf, RGBA=ls.tractfont_RGBA)
         self.tract_font.grid(row=next_avail_row, column=1, sticky='w')
+        next_avail_row += 1
+
+        # A customized RGBASetter for warningfont_RGBA, since we don't
+        # need to set typeface or size:
+        wfont_txt = 'Font color for writing errors/warnings'
+        self.warning_font_RGBA = _EditorFrame.RGBASetter(
+            self, display_name=wfont_txt, show_opacity=False,
+            var_name='warningfont_RGBA', RGBA=ls.warningfont_RGBA)
+        self.warning_font_RGBA.rgba_frame.grid(row=0, column=1)
+        lbl = tk.Label(self.warning_font_RGBA, text=wfont_txt)
+        lbl.grid(row=0, column=0)
+        self.warning_font_RGBA.grid(row=next_avail_row, column=1, sticky='w')
         next_avail_row += 1
 
         #################################
@@ -487,13 +499,27 @@ class _EditorFrame(tk.Frame):
 
         self.justify_tract_text = tk.BooleanVar(
             self, value=ls.justify_tract_text, name='justify_tract_text')
-        self.justify_chkbtn = tk.Checkbutton(
+        self.justify_tract_text_chkbtn = Checkbutton(
             self, text='Justify tract text', onvalue=True, offvalue=False,
             variable=self.justify_tract_text)
-        self.justify_chkbtn.grid(
+        self.justify_tract_text_chkbtn.grid(
             row=next_avail_row, column=1, sticky='w', padx=self.MW_PADX,
             pady=self.MW_PADY)
         next_avail_row += 1
+
+        # Set the bool variables, according to the attributes in `ls`
+        # (i.e. enact the settings in the `load_settings` object).
+        # Note: This is not optimal design, but it seems to solve a
+        # weird bug. Back when these values were set at the time that
+        # the variables/checkbuttons themselves were created, the
+        # _EditorFrame would fail to actually set them (to either True
+        # or False), maybe 5% of the time. When clicking "Load Preset"
+        # button repeatedly, with nothing different, would sometimes get
+        # different results, and I could not reliably recreate the bug.
+        # This is ineligant, but seems(?) to fix it...
+        for var_name in ['write_header', 'write_section_numbers',
+                    'write_lot_numbers', 'write_tracts', 'justify_tract_text']:
+            getattr(self, var_name).set(getattr(ls, var_name))
 
     def compile_settings(self):
         """
@@ -516,6 +542,12 @@ class _EditorFrame(tk.Frame):
         settings.append(self.tract_font.compile())
         settings.append(self.section_numbers_font.compile())
         settings.append(self.lot_font.compile())
+        warning_RGBA = self.warning_font_RGBA.compile_RGBA()
+        if warning_RGBA is False:
+            settings.append(warning_RGBA)
+        else:
+            settings.append(
+                f"warningfont_RGBA={warning_RGBA}")
         settings.append(self.compile_checkbuttons())
         settings.append(self.y_top_marg.compile())
         settings.append(self.lot_num_offset_px.compile())
@@ -553,20 +585,28 @@ class _EditorFrame(tk.Frame):
         Compile parameters that are configured in Checkbuttons within
         the main window. Return as string.
         """
-        # txt = ''
-        # # Each of these var_names is ALSO the name of the attribute of
-        # # `self` that stores the corresponding BooleanVar. So using
-        # # `getattr()` gets the BooleanVar object, on which we call
-        # # `.get()` to get the value.
-        # for var_name in ['write_header', 'write_section_numbers',
-        #             'write_lot_numbers', 'write_tracts', 'justify_tract_text']:
-        #     txt = f"{txt}{var_name}={bool(getattr(self, var_name).get())}\n"
+        txt = ''
+        # For each of these var_names, check the state of the checkbutton
+        # and set the val accordingly.
+        #
+        # Note: This is not optimal design, but it seems to solve a
+        # weird bug. Checking the BooleanVar values with .get() seemed
+        # to set the state of the checkboxes to 'alternate' maybe 5% of
+        # the time, and I couldn't recreate it reliably to debug it.
+        # This is ineligant, but seems(?) to fix it...
+        for var_name in ['write_header', 'write_section_numbers',
+                    'write_lot_numbers', 'write_tracts', 'justify_tract_text']:
+            chkbtn = getattr(self, var_name + '_chkbtn')
+            val = False
+            if 'selected' in chkbtn.state():
+                val = True
+                chkbtn.state(['selected'])
+            else:
+                chkbtn.state(['!selected'])
+            chkbtn.state(['!alternate'])
 
-        txt = f"write_header={bool(self.write_header.get())}\n"
-        txt = f"{txt}write_section_numbers={bool(self.write_section_numbers.get())}\n"
-        txt = f"{txt}write_lot_numbers={bool(self.write_lot_numbers.get())}\n"
-        txt = f"{txt}write_tracts={bool(self.write_tracts.get())}\n"
-        txt = f"{txt}justify_tract_text={bool(self.justify_tract_text.get())}\n"
+            txt = f"{txt}{var_name}={val}\n"
+
         return txt
 
     class RGBASetter(tk.Frame):
@@ -581,19 +621,22 @@ class _EditorFrame(tk.Frame):
 
         def __init__(
                 self, master=None, display_name='', var_name='',
-                RGBA=(0, 0, 0, 255)):
+                RGBA=(0, 0, 0, 255), show_opacity=True):
             """
             :param display_name: The public display name of the variable
             (for warning message purposes).
             :param var_name: The name of the variable (corresponding to
             the attribute name of a Settings object).
             :param RGBA: The starting RGBA values.
+            :param show_opacity: Whether to give the option to set
+            opacity.
             """
 
             tk.Frame.__init__(self, master=master)
             self.master = master
             self.display_name = display_name
             self.var_name = var_name
+            self.show_opacity = show_opacity
 
             # RGBA
             self.R, self.G, self.B, self.A = None, None, None, None
@@ -615,10 +658,13 @@ class _EditorFrame(tk.Frame):
                     if i < 0 or i > 255:
                         raise ValueError
             except ValueError:
+                opacity_txt = ''
+                if self.show_opacity:
+                    opacity_txt = ' and Opacity'
                 self.master.warning(
                     'Invalid RGBA',
                     "Error: Enter numerical values (0 to 255) for "
-                    f"RGB and Opacity for <{self.display_name}>.")
+                    f"RGB{opacity_txt} for <{self.display_name}>.")
                 return False
             return f"{r},{g},{b},{a}"
 
@@ -648,13 +694,15 @@ class _EditorFrame(tk.Frame):
             """
             DISPLAY_COLOR_PREVIEW = True
 
-            def __init__(self, master=None, RGBA=(0, 0, 0, 255)):
+            def __init__(
+                    self, master=None, RGBA=(0, 0, 0, 255)):
                 tk.Frame.__init__(self, master)
                 self.master = master
                 lbl = tk.Label(self, text='RGB color values (0-255):')
                 lbl.grid(
                     row=0, column=0, sticky='w',
                     padx=_EditorFrame.INNER_LBL_PADX)
+                self.show_opacity = master.show_opacity
 
                 self.master.R = tk.Entry(
                     self, width=_EditorFrame.SM_ENTRYBOX_WIDTH)
@@ -687,15 +735,16 @@ class _EditorFrame(tk.Frame):
                     self.preview_label.grid(row=0, column=5, sticky='w')
 
                 lbl = tk.Label(self, text='Opacity (0-255):')
-                lbl.grid(
-                    row=0, column=6, sticky='w',
-                    padx=_EditorFrame.INNER_LBL_PADX)
                 self.master.A = tk.Entry(
                     self, width=_EditorFrame.SM_ENTRYBOX_WIDTH)
-                self.master.A.grid(
-                    row=0, column=7, sticky='w',
-                    padx=_EditorFrame.ENTRYBOX_PADX)
                 self.master.A.insert(tk.END, str(RGBA[3]))
+                if self.show_opacity:
+                    lbl.grid(
+                        row=0, column=6, sticky='w',
+                        padx=_EditorFrame.INNER_LBL_PADX)
+                    self.master.A.grid(
+                        row=0, column=7, sticky='w',
+                        padx=_EditorFrame.ENTRYBOX_PADX)
 
             def update_preview(self):
                 rgb_as_hex = self.master.rgb_to_hex()
@@ -793,7 +842,7 @@ class _EditorFrame(tk.Frame):
                 self, master=None, display_name='QQ Fill',
                 var_name='qq_fill_RGBA', RGBA=Settings.RGBA_BLUE_OVERLAY):
             _EditorFrame.RGBASetter.__init__(
-                self, master, display_name, var_name, RGBA)
+                self, master, display_name, var_name, RGBA, show_opacity=True)
             lbl = tk.Label(self, text=display_name, anchor='e')
             lbl.grid(row=0, column=0)
 
@@ -826,7 +875,7 @@ class _EditorFrame(tk.Frame):
                 self, master=None, font_size=12, display_name='', var_name='',
                 typeface='Sans-Serif', RGBA=(0,0,0,255)):
             _EditorFrame.RGBASetter.__init__(
-                self, master, display_name, var_name, RGBA)
+                self, master, display_name, var_name, RGBA, show_opacity=False)
 
             # Font size
             lbl = tk.Label(self, text='Font size:', anchor='e')
@@ -908,7 +957,7 @@ class _EditorFrame(tk.Frame):
                 self, master=None, var_name='', display_name='', stroke=1,
                 RGBA=(0, 0, 0, 255)):
             _EditorFrame.RGBASetter.__init__(
-                self, master, display_name, var_name, RGBA)
+                self, master, display_name, var_name, RGBA, show_opacity=False)
             self.master = master
             lbl = tk.Label(
                 self, text=display_name + ':', width=self.MAIN_LBL_WID, anchor='w')
