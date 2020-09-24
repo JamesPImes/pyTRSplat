@@ -14,7 +14,7 @@ Section 6: Lots 1 - 7, S/2NE/4, SE/4NW/4, E/2SW/4, SE/4
 Section 13: That portion of the E/2 lying north of the river and west of the private road right-of-way as more particularly described in Book 1234 / Page 567, recorded on January 1, 1964 in the records of Example County, as amended in that Right-of-Way Amendment Agreement dated December 10, 1987, recorded on December 11, 1987 as Document No. 1987-1234567 of the records of Example County.
 Section 14: NE/4
 ```
-...results in the following square plat (using one setting):
+...results in the following square plat (using one custom setting):
 
 ![sample_plat_01](documentation/sample_plat_02.png)
 
@@ -64,7 +64,7 @@ plats = pyTRSplat.text_to_plats(
 # want to use them for something else.
 
 # Optionally customize the plat output by creating a Settings object
-set_obj = Settings(preset='letter')
+set_obj = pyTRSplat.Settings(preset='letter')
 set_obj.write_header = False  # Disable writing of header
 set_obj.qq_side = 12  # 12px per side of each QQ square
 
