@@ -3,7 +3,7 @@
 A python module and application for generating customizable plat images of PLSS descriptions (or 'legal descriptions') of land. Uses the [pyTRS library](https://github.com/mesji/pyTRS) for parsing raw land descriptions into their component parts and the [Pillow (PIL) library](https://python-pillow.org/) for drawing the plats.
 
 
-### Sample Output
+### Sample Outputs
 
 Processing the following example PLSS land description...
 ```
@@ -14,9 +14,15 @@ Section 6: Lots 1 - 7, S/2NE/4, SE/4NW/4, E/2SW/4, SE/4
 Section 13: That portion of the E/2 lying north of the river and west of the private road right-of-way as more particularly described in Book 1234 / Page 567, recorded on January 1, 1964 in the records of Example County, as amended in that Right-of-Way Amendment Agreement dated December 10, 1987, recorded on December 11, 1987 as Document No. 1987-1234567 of the records of Example County.
 Section 14: NE/4
 ```
-...results in the following plat (which could optionally be configured for different sizes, fonts, colors, page size/shape, etc.):
+...results in the following square plat (using one setting):
+
+![sample_plat_01](documentation/sample_plat_02.png)
+
+...or the following letter-sized plat (using a different setting):
 
 ![sample_plat_01](documentation/sample_plat_01.png)
+
+...or could be configured any number of ways for different sizes, fonts, colors, page size/shape, etc.
 
 
 ### Included GUI Application
