@@ -40,7 +40,7 @@ twp,rge,sec,lot,qq,COMMENTS
 154n,97w,19,4,SWSW,
 154n,97w,21,1,SENE,
 154n,97w,21,2,NESE,
-154n,97w,21,3,S2SE,
+154n,97w,21,3,S2SE,"Can define more than 40-acres per lot, if appropriate. In this case, Lot 3 crosses into both the SESE and the SWSE"
 154n,97w,22,1,N2NE,
 154n,97w,22,2,NENW,
 154n,97w,22,3,NWNW,
