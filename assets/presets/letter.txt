@@ -1,4 +1,4 @@
-dim=1700,2200
+dim=1700,2800
 headerfont_typeface=assets/fonts/LiberationSans-Regular.ttf
 tractfont_typeface=assets/fonts/LiberationSans-Regular.ttf
 secfont_typeface=assets/fonts/LiberationSans-Regular.ttf
@@ -35,3 +35,4 @@ write_lot_numbers=True
 paragraph_indent=0
 new_line_indent=8
 justify_tract_text=True
+warningfont_RGBA=255,0,0,255

@@ -35,3 +35,4 @@ write_lot_numbers=False
 paragraph_indent=0
 new_line_indent=8
 justify_tract_text=True
+warningfont_RGBA=255,0,0,255
