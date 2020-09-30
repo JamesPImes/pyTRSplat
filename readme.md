@@ -99,8 +99,8 @@ plats_2 = pyTRSplat.text_to_plats(
 [`pyTRSplat.Settings` objects](https://github.com/JamesPImes/pyTRSplat#configure-the-output-with-settings-objects-including-presets-and-custom-settings) -- Configure the output styling and behavior of `Plat` and `MultiPlat` objects, including the `pyTRSplat.text_to_plats()` function.
 
 [`pyTRSplat.LotDefDB`, `pyTRSplat.TwpLotDefinitions`, and `pyTRSplat.LotDefinitions` objects](https://github.com/JamesPImes/pyTRSplat#objects-for-explicit-lot-defintions----lotdefinitions-twplotdefinitions-and-lotdefdb) -- Define how lots should be interpreted.
-*(See especially [loading lot definitions from .csv files](https://github.com/JamesPImes/pyTRSplat#loading-lot-definitions-data-from-csv-files-for-use-in-multiplat-and-plat-objects) for the easiest way to define lots.)*
-*(See also ["Why do we need lot definitions, anyway?"](https://github.com/JamesPImes/pyTRSplat#why-do-we-need-lot-definitions-anyway))*
+* *__(See especially [loading lot definitions from .csv files](https://github.com/JamesPImes/pyTRSplat#loading-lot-definitions-data-from-csv-files-for-use-in-multiplat-and-plat-objects) for the easiest way to define lots.)__*
+* *(See also ["Why do we need lot definitions, anyway?"](https://github.com/JamesPImes/pyTRSplat#why-do-we-need-lot-definitions-anyway))*
 
 ['Default lots' and the `allow_ld_defaults=<bool>` parameter](https://github.com/JamesPImes/pyTRSplat#default-lots-and-the-allow_ld_defaultsbool-parameter) -- Whether to define lots as though it is a 'standard' township (when lots have not been explicitly defined otherwise).
 
