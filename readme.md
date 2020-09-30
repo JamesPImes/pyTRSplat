@@ -86,7 +86,27 @@ plats_2 = pyTRSplat.text_to_plats(
 
 
 
-## Bird's-eye view of module classes and functions
+## Overview of primary module classes and functions
+
+[`pyTRSplat.launch_app()`](https://github.com/JamesPImes/pyTRSplat#included-gui-application) -- Launch the GUI application discussed above. (Or run `pyTRSplat_window.pyw` directly.)
+
+[`pyTRSplat.text_to_plats()`](https://github.com/JamesPImes/pyTRSplat#quickly-generate-plats-from-raw-land-descriptions-with-text_to_plats) -- A function to generate plat images directly from raw PLSS land descriptions
+
+[`pyTRSplat.Plat` and `pyTRSplat.MultiPlat` objects](https://github.com/JamesPImes/pyTRSplat#get-more-control-with-plat-and-multiplat-objects) -- Generate plat images, optionally incorporating multiple data sources, custom header, etc. (Generate plats directly from raw text with the `MultiPlat.from_unparsed_text()` method.)
+
+[`pyTRSplat.PlatQueue` and `pyTRSplat.MultiPlatQueue` objects](https://github.com/JamesPImes/pyTRSplat#easily-handle-multiple-data-sources-with-platqueue-and-multiplatqueue-objects) -- Streamline platting from multiple sources.
+
+[`pyTRSplat.Settings` objects](https://github.com/JamesPImes/pyTRSplat#configure-the-output-with-settings-objects-including-presets-and-custom-settings) -- Configure the output styling and behavior of `Plat` and `MultiPlat` objects, including the `pyTRSplat.text_to_plats()` function.
+
+[`pyTRSplat.LotDefDB`, `pyTRSplat.TwpLotDefinitions`, and `pyTRSplat.LotDefinitions` objects](https://github.com/JamesPImes/pyTRSplat#objects-for-explicit-lot-defintions----lotdefinitions-twplotdefinitions-and-lotdefdb) -- Define how lots should be interpreted.
+*(See especially [loading lot definitions from .csv files](https://github.com/JamesPImes/pyTRSplat#loading-lot-definitions-data-from-csv-files-for-use-in-multiplat-and-plat-objects) for the easiest way to define lots.)*
+*(See also ["Why do we need lot definitions, anyway?"](https://github.com/JamesPImes/pyTRSplat#why-do-we-need-lot-definitions-anyway))*
+
+['Default lots' and the `allow_ld_defaults=<bool>` parameter](https://github.com/JamesPImes/pyTRSplat#default-lots-and-the-allow_ld_defaultsbool-parameter) -- Whether to define lots as though it is a 'standard' township (when lots have not been explicitly defined otherwise).
+
+[`SectionGrid` and `TownshipGrid` objects](https://github.com/JamesPImes/pyTRSplat#manual-platting-with-sectiongrid-and-townshipgrid-objects-and-other-methods) -- These primarily function as behind-the-scenes interpretors/translators for converting objects from the `pyTRS` module into data that is useful for this module, but could also be used for platting manually-selected lands.
+
+
 
 ### Quickly generate plats from raw land descriptions with `text_to_plats()`
 This convenience function is the simplest way to generate plats, other than the GUI application. It takes as input a raw PLSS land description (optionally using `pyTRS` config parameters for configuring how it should be parsed), and returns flattened PIL.Image objects of the generated plats, optionally saving them to filepath as .png or .pdf files.
@@ -379,7 +399,7 @@ In practice, non-standard townships are common even in flat parts of the United 
 
 
 
-##### (Some example `pyTRS.Tract` objects)
+##### (Create a few `pyTRS.Tract` objects to use in examples)
 ```
 import pyTRS
 
