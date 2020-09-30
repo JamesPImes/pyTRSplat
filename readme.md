@@ -35,9 +35,56 @@ Lands can be added either by entering their PLSS description as raw text, or by 
 
 ## Quick demonstration of pyTRSplat as a module
 
-The sample code block below is a demonstration of very basic functionality of converting text into a plat.
+The sample code block below is a demonstration of the basic functionality of converting text into a plat. See the next section of this readme for more fine-grained explanations.
 
-However, plats can be worked with more in-depth.
+```
+import pyTRSplat
+
+# The raw text of the PLSS description for the land we want to plat.
+
+land_description = '''Township 154 North, Range 97 West
+Section 1: Lots 1 - 3, S/2N/2
+Section 5: Lot 4, The South Half of the Northwest Quarter, and The Southwest Quarter
+Section 6: Lots 1 - 7, S/2NE/4, SE/4NW/4, E/2SW/4, SE/4
+Section 13: That portion of the E/2 lying north of the river and west of the private road right-of-way as more particularly described in Book 1234 / Page 567, recorded on January 1, 1964 in the records of Example County, as amended in that Right-of-Way Amendment Agreement dated December 10, 1987, recorded on December 11, 1987 as Document No. 1987-1234567 of the records of Example County.
+Section 14: NE/4'''
+
+
+# This .csv file is included in the pyTRSplat\_examples\ directory. It
+# defines what lot 1 means in Section 22, T154N-R97W (and other
+# lots/sections).
+lot_database_fp = r'pyTRSplat\_examples\SAMPLE_LDDB.csv'
+
+# Will output to a .png file (could also output to .pdf)
+output_fp = r'C:\land plats\sample_plat_01.png'
+
+# Using the 'letter' settings preset (i.e. letter-sized paper at 200ppi),
+# generate the plat, and save as .png to the specified filepath
+plats = pyTRSplat.text_to_plats(
+    land_description, settings='letter', lddb=lot_database_fp,
+    output_filepath=output_fp)
+
+# `plats` is a list of PIL.Image.Image objects
+print(type(plats[0]))  # prints "<class 'PIL.Image.Image'>"
+
+
+# Optionally customize the plat output by creating a Settings object
+set_obj = pyTRSplat.Settings(preset='letter')
+set_obj.write_header = False  # Disable writing of header
+set_obj.qq_side = 12  # 12px per side of each QQ square
+
+# ... Or use the GUI Settings customizer in `SettingsEditor.py` to create,
+# edit, and save presets
+
+# Will output to a .pdf file
+output_fp_2 = r'C:\land plats\sample_plat_01.png'
+
+plats_2 = pyTRSplat.text_to_plats(
+    land_description, settings=set_obj, lddb=lot_database_fp,
+    output_filepath=output_fp_2)
+```
+
+
 
 ## Bird's-eye view of module classes and functions
 
@@ -145,7 +192,7 @@ These objects can streamline generating `Plat` and `MultiPlat` objects with data
 
 * `pyTRSplat.MultiPlatQueue` -- A dict, keyed by Twp/Rge (e.g., `'154n97w'` or `'1s7e'`) of `PlatQueue` objects applicable to the respective Twp/Rge. This object can be sorted and automatically processed into the appropriate `Plat` object in a `MultiPlat` with the `MultiPlat.process_queue()` or `MultiPlat.from_queue()` methods.
 
-#### (some example data sources)
+#### (some example data sources to queue up)
 ```
 # First, create some example pyTRS.Tract and pyTRS.PLSSDesc objects
 
@@ -307,20 +354,169 @@ plat_2 = Plat(twp='154n', rge='97w', setting=custom_setting_1)
 
 
 
-### Getting into the weeds with lot definitions -- `LotDefinitions`, `TwpLotDefinitions`, and `LotDefDB` objects
+
+### Getting into the weeds with 'lot definitions' -- `LotDefinitions`, `TwpLotDefinitions`, and `LotDefDB` objects; and the `allow_ld_defaults=<bool>` parameter
 The most efficient way to define lots is to do so externally in a .csv file, and load them into a `pyTRSplat.LotDefDB` with init parameter `from_csv=<filepath>`. (See below.) __[#TODO: Link to that part of the readme]__
 
+Before talking about explicit lot definitions (i.e. `LotDefinitions`, `TwpLotDefinitions`, and `LotDefDB` objects), we'll talk about 'default' lot definitions, i.e. the 'expected' lots in a standard township.
 
 
 #### Why do we need lot definitions, anyway?
 
-Quarter-quarters (QQs) are not ambiguous (i.e. the NE/4NE/4 or `'NENE'` is always in the same place in any section\*\*). However, by design of the PLSS, lots can occur anywhere within a section (which is the point of using lots instead of QQs in the first place -- to handle variations in the land). Thus, we need some method for interpreting the lots in terms of QQs (e.g., in a 'typical' Section 1, Lot 1 is equivalent to the NE/4NE/4).
-
-
+Quarter-quarters (QQs) are not ambiguous (i.e. the NE/4NE/4 or `'NENE'` is always in the same place in any section\*\*). However, by design of the PLSS, lots can occur anywhere within a section (which is the point of using lots instead of QQs in the first place -- to account for variations in the land). So we need some method for interpreting the lots in terms of QQs (e.g., in a 'typical' Section 1, Lot 1 is equivalent to the NE/4NE/4).
 
 \*\* *Caveat: Non-standard sections with out-of-place QQs do exist but are relatively rare in most parts of the United States. In any case, such sections cannot be handled reliably by the current version of this module.*
 
-In this module, lots get defined in a hierarchical structure of specialized dicts, thus:
+
+
+#### 'Default Lots' and the `allow_ld_defaults=<bool>` parameter
+
+In a 'standard' township, where land features, bodies of water, mountains, etc. do not overly complicate the survey, lots are predictably situated along the northern and western boundaries -- i.e. in Sections 1 - 7, 18, 19, 30, and 31. That is what is meant by `'default lots'` in this module (depicted below):
+
+![default_lots](documentation/default_lots.png)
+
+In practice, non-standard townships are common even in flat parts of the United States, and so these default lot definitions cannot be blindly relied upon with too much confidence. However, defining lots for every plat could become onerous, and so they are included as a backup option (which is always disabled by default). Wherever the parameter `allow_ld_defaults=True` is passed in this module, these defaults will be used *__unless the user has explicitly defined lots for a given section__* (in which case the explicit lot defintions will control).
+
+
+
+##### (Some example `pyTRS.Tract` objects)
+```
+import pyTRS
+
+# Section 1, T154N-R97W has only standard lots -- i.e. Lots 1, 2, 3, and 4 correspond to
+# the NENE, NWNE, NENW, and NWNW respectively (by design of a 'standard' township)
+
+tract_1 = pyTRS.Tract(trs='154n97w01', desc='Lots 1 - 4, S/2N/2')
+tract_1.parse()
+
+
+# Section 25 of the same township has non-standard lots, due to a river that runs through it
+
+tract_2 = pyTRS.Tract(trs='154n97w25', desc='Lots 5, 8')
+tract_2.parse()
+```
+
+
+
+##### What happens when lots are undefined in a `Plat`:
+```
+# (An example plat with intentionally undefined lots, using the above example pyTRS.Tract objects)
+
+# parameter `allow_ld_defaults=False` isn't needed, since that's the default, but to be explicit
+# for this example:
+plat_1 = pyTRSplat.Plat(allow_ld_defaults=False)
+plat_1.plat_tract(tract_1)
+plat_1.plat_tract(tract_2)
+
+# `plat_1` now shows the S/2N/2 of Section 1 as filled, but none of the lots in either section,
+# because the module was not told how to interpret those lots. (The full tract text of both Tract
+# objects is written at the bottom, however.)
+
+# a Plat object's `.unhandled_lots_by_sec` attribute is a dict (keyed by section number) that shows
+# lots that the user attempted to plat but were undefined and therefore couldn't be placed
+print(plat_1.unhandled_lots_by_sec)  # prints "{1: ['L1', 'L2', 'L3', 'L4'], 25: ['L5', 'L8']}"
+```
+
+
+##### Allowing default lots with `allow_ld_defaults=True` when initializing `Plat` or `MultiPlat` objects
+```
+# (An example plat allowing default lots, but with other lots undefined. Again using the above
+# example pyTRS.Tract objects.)
+
+# This time passing parameter `allow_ld_defaults=True` when initializing our Plat.
+plat_2 = pyTRSplat.Plat(allow_ld_defaults=True)
+plat_2.plat_tract(tract_1)
+plat_2.plat_tract(tract_2)
+
+# `plat_2` now shows the entire N/2 of Section 1 as filled, because default lot definitions dictate
+# that Lots 1 - 4 of any Section 1 are equivalent to the N/2N/2. However, no lands in Section 25 are
+# filled, because no Section 25 ever has any default lots, and we haven't explicitly defined Lots 5
+# or 8.
+
+print(plat_2.unhandled_lots_by_sec)  # prints "{1: [], 25: ['L5', 'L8']}"
+```
+
+
+
+##### Allowing default lots with `allow_ld_defaults=True` *__AFTER__* initializing `Plat` or `MultiPlat` objects
+```
+# (Another example plat allowing default lots, but with other lots undefined. Again using the
+# above example pyTRS.Tract objects.)
+
+# Again being explicit with `allow_ld_defaults=False` for example purposes.
+plat_3 = pyTRSplat.Plat(allow_ld_defaults=False)
+
+# When platting individual objects or processing PlatQueue objects, we have the opportunity to again
+# specify whether to `allow_ld_defaults=<bool>` (and now it defaults to what is set in the Plat object)
+plat_3.plat_tract(tract_1, allow_ld_defaults=True)
+
+# We can specify `allow_ld_defaults=True` here, but it will have no effect, because no Section 25 ever
+# has default lots.
+plat_3.plat_tract(tract_2, allow_ld_defaults=True)
+
+print(plat_3.unhandled_lots_by_sec)  # prints "{1: [], 25: ['L5', 'L8']}"
+```
+
+To plat Lots 5 and 8 of Section 25, T154N-R97W, we have to explicitly define those lots -- most easily by loading from a .csv file of lot definition data. *[__#TODO__: Link to that part of the readme.]*
+
+
+
+##### IMPORTANT: Conflicts between default lot definitions and explicit lot definitions
+
+When parameter `allow_ld_defaults=True` is passed, but the user has also explicitly defined lots for a given section (via `pyTRSplat.LotDefDB` object or otherwise), the default lots will NOT be used -- even if those default lots were not included in the explicit definitions.
+
+For example, if we __do__ explicitly define Lots 5 - 8 in a hypothetical Section 1, but __do not__ also explicitly define Lots 1 - 4 of that section, then default lots 1 - 4 will not be picked up, even if we pass `allow_ld_defaults=True`.
+
+This example demonstrated:
+
+```
+# A hypothetical example plat, where `allow_ld_defaults=True` will have no effect due to
+# explicit lot definitions
+
+
+# Example pyTRS.Tract object
+import pyTRS
+tract_3 = pyTRS.Tract(trs='155n97w01', desc='Lots 1 - 8')
+tract_3.parse()
+
+
+import pyTRSplat
+
+# Create a LotDefDB object from a .csv file, where Lots 5 - 8 of Section 1, T155N-R97W
+# are defined as the SWNW, SENW, SWNE, SENE, respectively -- but no other lots are
+# defined for Section 1 (i.e. NOT the 'expected' Lots 1 - 4 in the N/2N/2).
+# (Lots 5 - 8 do not actually exist for that section and are only used as an example.)
+lddb_obj = pyTRSplat.LotDefDB(from_csv=r'C:\land\lddb data\some_hypothetical_file.csv')
+
+# Now create a Plat, passing our LotDefDB object to parameter `tld=` (which pulls the
+# appropriate lot definitions from the LDDB, since we've specified Twp/Rge).
+# We will also explicitly allow default lots.
+plat_4 = pyTRSplat.Plat(twp='155n', rge='97w', tld=lddb_obj, allow_ld_defaults=True)
+
+plat_4.plat_tract(tract_3)
+
+
+# Lots 5 - 8 have been platted (i.e. the S/2N/2), but Lots 1 - 4 are NOT filled, even
+# though they are default lots, because by design, the Plat won't accept default lots
+# in a section for which EXPLICIT lot definitions exist.
+print(plat_4.unhandled_lots_by_sec)  # prints "{1: ['L1', 'L2', 'L3', 'L4']}"
+
+# We would have to also explicitly define Lots 1 - 4 for this section in the .csv file.
+```
+
+This limitation is intentional: If a user explicitly defines lots for a section, then (a) it is most likely to be a non-standard section (where Lot 1 may not correspond with the *expected* QQ), and (b) it should be easy enough for the user to just define every lot in that section.
+
+
+
+##### Final thoughts on `allow_ld_defaults=` parameter
+
+The above examples are not the only places where the `allow_ld_defaults=` parameter appears. It's found in essentially all methods, functions, and objects where lot definitions may require definitions (either requiring them immediately or expecting to at some later time).
+
+
+
+#### Objects for explicit lot defintions -- `LotDefinitions`, `TwpLotDefinitions`, and `LotDefDB`
+
+In this module, lots get defined in a hierarchical structure of specialized `dict` objects:
 ```
 -- pyTRSplat.LotDefDB - dict, keyed by Twp/Rge (str), value-type:
 ---- pyTRSplat.TwpLotDefinitions - dict, keyed by sec number (int), value-type:
@@ -332,14 +528,35 @@ Thus, rudimentary access in a `LotDefDB` object called `lddb_obj` might be `lddb
 
 However, the end user probably doesn't have much cause to directly access the contents of a `LotDefDB`, `TwpLotDefinitions` or `LotDefinitions` object. I suspect most users will only need to pass such objects as parameters for methods in `Plat` or `MultiPlat` objects, or potentially `SectionGrid` / `TownshipGrid` objects.
 
-##### Loading `LotDefDB` data from .csv files (for use in `MultiPlat` and potentially `Plat` objects)
-
-
-Any user who defines lots in a .csv and loads them with `from_csv=<filepath>` at init, probably won't need to interact with the contents of a `LotDefDB`, `TwpLotDefinitions`, or `LotDefinitions` object or understand their respective methods very deeply. Instead, they can most likely just pass a `LotDefDB` object to the `lddb=` parameter when initializing a `MultiPlat` object (or a `TwpLotDefinitions` object to the `tld=` parameter when initializing a `Plat` object).
-
 *__[#TODO:__ Table for which objects / methods can take which lot definition types, and for which parameters.]*
 
 
+
+##### Loading lot definitions data from .csv files (for use in `MultiPlat` and `Plat` objects)
+
+It's easiest to define lots externally in a .csv file, and load them into the appropriate object for this module -- either with `LotDefDB(from_csv=<filepath>)` or `TwpLotDefinitions.from_csv(<filepath>, twp=<>, rge=<>)`.
+
+Below are the simplest options for loading lot definitions for this module. More complication options are available (discussed in the documentation), but understanding these should be sufficient for most use cases.
+
+
+###### Defining lots for a `MultiPlat` object by loading from .csv file:
+```
+import pyTRSplat
+
+# This .csv file is included in the 'pyTRSplat\_examples\' directory. (May need to provide
+# an absolute path, depending on where this code is being run.)
+lddb_filepath = r'_examples\SAMPLE_LDDB.csv'
+
+# Load the data from the .csv file into a LotDefDB object
+lddb_obj_1 = pyTRSplat.LotDefDB(from_csv=lddb_filepath)
+
+# pass the `lddb_obj_1` to the `lddb=` init parameter of a MultiPlat object
+multiplat_1 = pyTRSplat.MultiPlat(settings='letter', lddb=lddb_obj_1)
+
+
+```
+
+###### Defining lots for a `Plat` object by loading from .csv file:
 ```
 import pyTRSplat
 
@@ -348,80 +565,52 @@ import pyTRSplat
 lddb_filepath = r'_examples\SAMPLE_LDDB.csv'
 
 
+# There are three options for Plat objects:
 
 
-# Load the data from the .csv file into a LotDefDB object
-lddb_obj_1 = pyTRSplat.LotDefDB(from_csv=lddb_filepath)
-multiplat_1 = pyTRSplat.MultiPlat(settings='letter', lddb=lddb_obj_1)
-
-
-# Load the relevant data (for T154N-R97W) from the .csv file into a TwpLotDefinitions object
-# (twp/rge are mandatory here):
+# Option A -- TwpLotDefinitions.from_csv() method
+# 1) Load the data from the .csv file directly into a TwpLotDefinitions object
+# (specifying Twp/Rge is mandatory)
 tld_obj_1 = pyTRSplat.TwpLotDefinitions.from_csv(lddb_filepath, twp='154n', rge='97w)
 
-# and apply it to a Plat
-plat_1 = pyTRSplat.Plat(settings='letter', tld=tld_obj, twp='154n', rge='97w')
+# 2) Pass the `tld_obj_1` to the `tld=` init parameter of a Plat object
+# (specifying Twp/Rge is optional, but won't write the appropriate header without it)
+plat_1 = pyTRSplat.Plat(settings='letter', tld=tld_obj_1, twp='154n', rge='97w')
 
-# Alternatively, pull the TLD object out of `lddb_obj_1`, resulting in an equivalent
-# TLD object. See section on 'Why lot definitions?' for the structure of LDDB objects.
-tld_obj_2 = lddb_obj_1.get_tld('154n97w', allow_ld_defaults=False, force_)
 
+# Option B -- LotDefDB.get_tld() method
+# 1) Load the data from the .csv file into a LotDefDB object
+lddb_obj_2 = pyTRSplat.LotDefDB(from_csv=lddb_filepath)
+
+# 2) Use the `.get_tld()` method on the LotDefDB object, by specifying the `twprge`
+# (which is a dict key). It would return and store `None` if '154n97w' were not an
+# existing key in `lddb_obj_2`. (There are optional parameters for that possibility,
+# which are covered in the documentation.)
+tld_obj_2 = lddb_obj_1.get_tld('154n97w')
+
+# 3) Pass the `tld_obj_2` to the `tld=` init parameter of a Plat object
+# (specifying Twp/Rge is optional, but won't write the appropriate header without it)
+plat_2 = pyTRSplat.Plat(settings='letter', tld=tld_obj_2, twp='154n', rge='97w')
+
+
+# Option C -- Passing a LotDefDB to a Plat directly
+# 1) Load the data from the .csv file into a LotDefDB object
+lddb_obj_3 = pyTRSplat.LotDefDB(from_csv=lddb_filepath)
+
+# 2) pass the `lddb_obj_1` to the `tld=` init parameter of a Plat object;
+# IMPORTANT: to use this option, we MUST specify Twp/Rge, or it won't know which
+# `twprge` key to use on the LotDefDB object.
+plat_3 = pyTRSplat.Plat(settings='letter', tld=lddb_obj_3, twp='154n', rge='97w')
 ```
 
-
-When initializing a `pyTRSplat.LotDefDB` object, pass parameter `from_csv=<filepath>` to load data from a properly formatted\*\* .csv file.
-```
-# This example .csv file is included in the pyTRSplat/_examples/ dir. (May need to
-# specify as an absolute path, depending on where this code is being run.)
-lddb_filepath = r'pyTRSplat/_examples/SAMPLE_LDDB.csv'
-lddb_obj = pyTRSplat.LotDefDB(from_csv=lddb_filepath)
-
-# MultiPlat objects take LotDefDB objects natively in the `lddb=` init parameter:
-multiplat_1 = pyTRSplat.MultiPlat(settings='letter', lddb=lddb_obj)
-
-
-# Conversely, Plat objects are designed to take TwpLotDefinitions objects in the `tld=`
-# init parameter. (TwpLotDefinitions objects are one level down in the lot definitions
-# hierarchy -- i.e. the values stored in a LotDefDB object).
-
-# Here, we extract a TLD from the LDDB we just created from the .csv file.
-tld_obj_154n97w = lddb_obj.get_tld('154n97w')
-plat_1 = pyTRSplat.Plat(twp='154n', rge='97w', settings='letter', tld=tld_obj_154n97w)
-
-# However, if we have specified the Twp/Rge appropriately when initializing the Plat
-# object, we can also pass the LotDefDB itself object to `tld=` (without first pulling
-# the TLD), and the Plat itself will extract the appropriate TwpLotDefinitions object.
-plat_2 = pyTRSplat.Plat(twp='154n', rge='97w', settings='letter', tld=lddb_obj)
-
-
-# We can also load TLD objects from .csv file directly (Twp/Rge is mandatory):
-tld_obj_2 = pyTRSplat.TwpLotDefinitions.from_csv(lddb_filepath, twp='154n', rge='97w')
-```
-
-
-
-##### Loading `TwpLotDefinitions` data from .csv files (for use in `Plat` objects)
-```
-# This example .csv file is included in the pyTRSplat/_examples/ dir. (May need to
-# specify as an absolute path, depending on where this code is being run.)
-lddb_filepath = r'pyTRSplat/_examples/SAMPLE_LDDB.csv'
-
-# Load only the data relevant to T154N-R97W (since a TwpLotDefinitions object covers
-# only a single Twp/Rge):
-tld_obj_1 = pyTRSplat.TwpLotDefinitions.from_csv(lddb_filepath, twp='154n', rge='97w')
-
-# Equivalently, load the .csv data into a LotDefDB object, and pull the
-# TwpLotDefinitions object from that
-lddb_obj = pyTRSplat.LotDefDB(from_csv=lddb_filepath)
-tld_obj_2 = lddb_obj.get_tld('154n97w')
-```
 
 
 ###### Formatting a .csv file for lot definitions
-\*\* For proper .csv formatting, follow these guidelines (and see the example `SAMPLE_LDDB.csv` in the `'pyTRSplat\_examples\'` directory):
-1) These 5 headers MUST exist, all lowercase: `twp`, `rge`, `sec`, `lot`, `qq`
+
+Take a look at the example `SAMPLE_LDDB.csv` that is included in the `'pyTRSplat\_examples\'` directory. And follow these formatting guidelines for creating .csv files that are compatible with this module:
+1) These 5 headers MUST exist, all lowercase, no quotation marks: `twp`, `rge`, `sec`, `lot`, `qq`
 2) twp must be specified in the format '000x' (up to 3 digits, plus N/S specified as a single, lowercase character 'n' or 's').
-ex: `154n` for Township 154 North; `1s` for Township 7 South
+ex: `154n` for Township 154 North; `7s` for Township 7 South
 3) rge must be specified in the format '000x' (up to 3 digits, plus E/W specified as a single, lowercase character 'e' or 'w').
 ex: `97w` for Range 97 West; `6e` for Range 6 East
 4) `sec` and `lot` should specified as simple integers (non-numeric lots cannot currently be handled)
@@ -433,7 +622,8 @@ ex: `97w` for Range 97 West; `6e` for Range 6 East
         ex: Lot 4 that sprawls across the E/2NW/4 and SW/4NW/4 could be specified under the 'qq' column as `E2NW,SWNW`
 6) Any other columns (e.g., `COMMENTS`) should be acceptable but will be ignored.
 7) Duplicate lot entries will result in only the last-entered row being effective. If a lot comprises multiple QQ's, keep it on a single row, and refer to list item #5 above on how to handle it.
-8) Keep in mind that extra long .csv files might conceivably take a while to process and/or result in a LotDefDB that burdens the system's memory.
+8) Keep in mind that extremely long .csv files might conceivably take a while to process and/or result in a LotDefDB that burdens the system's memory.
+
 
 
 
@@ -451,6 +641,8 @@ Note that `TownshipGrid` and `SectionGrid` objects can be added to `PlatQueue` a
 Also, for the simplest option for manual platting, look into the `Plat.fill_qq()` method, which does not use much logic beyond using the designated color to fill in the square at the designated grid coordinate for the designated section.
 
 
+
+
 ### Misc. functions / utilities:
 
 These functions are also beyond the scope of a quick-start guide, and why they might be useful:
@@ -459,45 +651,4 @@ These functions are also beyond the scope of a quick-start guide, and why they m
 * `pyTRSplat.plssdesc_to_twp_grids()` -- Apply the parsed data in a `pyTRS.PLSSDesc` object into a dict of TownshipGrid objects (keyed by Twp/Rge)
 
 I expect few users would have cause to use these functions without an already deep understanding of the whole module (so probably nobody).
-
-###
-
-
-```
-import pyTRSplat
-
-# The PLSS description of the land we want to plat.
-land_description = 'T154N-R97W Sec 14: NE/4, Sec 15: W/2, Sec 22: Lot 1, S/2NE/4'
-
-# This .csv file is included in the pyTRSplat\_examples\ directory. It
-# defines what lot 1 means in Section 22, T154N-R97W (and other
-# lots/sections).
-lot_database_fp = r'_examples\SAMPLE_LDDB.csv'
-
-# Output to a .png file (could also output to .pdf)
-output_fp = r'C:\land plats\sample_plat_01.png'
-
-# Using the 'letter' settings preset (i.e. letter-sized paper at 200ppi),
-# generate the plat
-plats = pyTRSplat.text_to_plats(
-    land_description, settings='letter', lddb=lot_database_fp, 
-    output_filepath=output_fp)
-
-# Specifying `output_filepath=` saved the plat to the specified fp. The function
-# also returns a list of the Image objects of the plats (in this case only one 
-# Image in the list), and we've set the list to variable `plats`, in case we
-# want to use them for something else.
-
-# Optionally customize the plat output by creating a Settings object
-set_obj = pyTRSplat.Settings(preset='letter')
-set_obj.write_header = False  # Disable writing of header
-set_obj.qq_side = 12  # 12px per side of each QQ square
-
-# ... Or use the GUI Settings customizer in `SettingsEditor.py` to create,
-# edit, and save presets
-
-plats_2 = pyTRSplat.text_to_plats(
-    land_description, settings=set_obj, lddb=lot_database_fp, 
-    output_filepath=output_fp)
-```
 
