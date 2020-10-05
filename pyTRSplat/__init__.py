@@ -34,7 +34,6 @@ be found in their respective source packages:
     functions:  filter_tracts_by_twprge()
 """
 
-# TODO: Decide on license.
 
 import pyTRSplat._constants as _constants
 
@@ -42,6 +41,7 @@ __version__ = _constants.__version__
 __versionDate__ = _constants.__versionDate__
 __author__ = _constants.__author__
 __email__ = _constants.__email__
+__license__ = _constants.__license__
 
 def version():
     """Return the current version and version date as a string."""
