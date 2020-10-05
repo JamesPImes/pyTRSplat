@@ -655,12 +655,18 @@ class Plat:
         not specified, uses whatever is configured in Plat's `.settings`
         attribute.)
         """
-        secNum = int(sec_grid.sec)
+        sec_num = int(sec_grid.sec)
+        if sec_num not in self.sec_coords.keys():
+            # Direct section numbers that are not yet keys into 'section
+            # 0', i.e. the meainingless 'junk drawer' section. (This
+            # should only happen to section numbers > 36 or < 0.)
+            sec_num = 0
+
         for coord in sec_grid.filled_coords():
-            self.fill_qq(secNum, coord, qq_fill_RGBA=qq_fill_RGBA)
+            self.fill_qq(sec_num, coord, qq_fill_RGBA=qq_fill_RGBA)
         if self.settings.write_lot_numbers:
             self.write_lots(sec_grid)
-        self.unhandled_lots_by_sec[secNum] = sec_grid.unhandled_lots
+        self.unhandled_lots_by_sec[sec_num] = sec_grid.unhandled_lots
 
         # Write the Tract data to the bottom of the plat (or not, per settings).
         if self.settings.write_tracts and self.text_box is not None:
