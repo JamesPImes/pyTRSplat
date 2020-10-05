@@ -782,10 +782,12 @@ class Plat:
         """
         twp = tract.twp
         rge = tract.rge
-        sec = tract.sec
+
         only_sec = None
         if single_sec:
-            # TODO: May throw errors if 'secError' sections
+            sec = tract.sec
+            if sec == 'secError':
+                sec = 0
             only_sec = str(int(sec))
 
         platObj = Plat(
@@ -1111,6 +1113,12 @@ class MultiPlat:
                 attribute)
             `MultiPlat.from_queue()` -- to create a new MultiPlat object
                 from an existing MultiPlatQueue object
+        -- Raw text of a PLSS land description (i.e. a string):
+            `MultiPlat.from_unparsed_text()` -- to create a new
+                MultiPlat object from the raw text of a PLSS land
+                description (i.e. parse the text into a pyTRS.PLSSDesc
+                object behind-the-scenes, and generate a MultiPlat from
+                that)
 
         In addition to the above, MultiPlat objects can *indirectly*
         process any of the following object types, by first adding them
