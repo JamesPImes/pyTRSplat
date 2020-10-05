@@ -658,7 +658,7 @@ class Plat:
         sec_num = int(sec_grid.sec)
         if sec_num not in self.sec_coords.keys():
             # Direct section numbers that are not yet keys into 'section
-            # 0', i.e. the meaniningless 'junk drawer' section. (This
+            # 0', i.e. the meaningless 'junk drawer' section. (This
             # should only happen to section numbers > 36 or < 0.)
             sec_num = 0
 
