@@ -113,10 +113,10 @@ i += 1
 
 
 # Some miscellaneous objects that can be added to a PQ (or possibly MPQ):
-t1 = Tract('154n97w14', 'NE/4', initParseQQ=True)
-t2 = Tract('154n97w15', 'W/2', initParseQQ=True)
-t3 = Tract('154n97w01', 'Lots 1 - 3, S2NE', initParseQQ=True)
-t4 = Tract('154n97w25', 'Lots 4, 5, 7, NE4NE4', initParseQQ=True)
+t1 = Tract('NE/4', '154n97w14', initParseQQ=True)
+t2 = Tract('W/2', '154n97w15', initParseQQ=True)
+t3 = Tract('Lots 1 - 3, S2NE', '154n97w01', initParseQQ=True)
+t4 = Tract('Lots 4, 5, 7, NE4NE4', '154n97w25', initParseQQ=True)
 # PLSSDesc objects can only be added to MPQ objects -- not to PQ objects.
 d1 = PLSSDesc(
     'T154N-R97W Sec 3: Lots 1, 4, S2N2, T155N-R97W Sec 18: Lots 2 - 4, E2W2',
