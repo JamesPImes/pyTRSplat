@@ -1655,7 +1655,7 @@ class TractTextBox(TextBox):
             unwrit_lines = self.write_tract(
                 cursor=cursor, tract=tract, font_RGBA=font_RGBA,
                 reserve_last_line=reserve_last_line, justify=justify)
-            if len(unwrit_lines) > 0:
+            if unwrit_lines is not None:
                 # We couldn't write all of our lines, so let's bail.
                 pull_ejector = True
 
@@ -1664,7 +1664,7 @@ class TractTextBox(TextBox):
     def write_tract(
             self, tract: pyTRS.Tract, cursor='text_cursor', font_RGBA=None,
             override_legal_check=False, reserve_last_line=False,
-            justify=None) -> list:
+            justify=None):
         """
         Write the description of the parsed pyTRS.Tract object at the
         current coord of the specified `cursor`. First confirms that
@@ -1688,8 +1688,9 @@ class TractTextBox(TextBox):
         :param justify: Whether to justify the tract text, if it breaks
         onto multiple lines. (Defaults to whatever is set in
         `self.settings.justify_tract_text`)
-        :return: Returns a list of all of the lines that were not
-        written (i.e. an empty list, if all were written successfully).
+        :return: Returns None if the entire tract text was written, but
+        returns a piltextbox.UnwrittenLines object if at least one line
+        of text could not be written.
         """
 
         # Extract the text of the TRS+description from the Tract object.
@@ -1709,30 +1710,30 @@ class TractTextBox(TextBox):
             text=text, cursor=cursor, font_RGBA=font_RGBA, justify=justify,
             reserve_last_line=True, override_legal_check=override_legal_check)
 
-        if reserve_last_line or len(unwrit_lines) == 0:
+        if reserve_last_line or unwrit_lines is None:
             return unwrit_lines
 
         # If we had only one more line to write, write it; otherwise,
         # write an ellipses in red
-        if len(unwrit_lines) == 1:
-            final_line = unwrit_lines[0]
-            print(final_line)
-            single_unwrit = self.continue_paragraph(
-                continue_lines=[final_line], font_RGBA=font_RGBA,
-                justify=justify)
+        if unwrit_lines.remaining == 1:
+            final_line = unwrit_lines._stage_next_line()
+            single_unwrit = self.write_line(final_line, justify=justify)
         else:
             font_RGBA = self.settings.warningfont_RGBA
             single_unwrit = self.write_line(
                 text="[...]", indent=self.new_line_indent, font_RGBA=font_RGBA)
 
-        if len(single_unwrit) > 0:
-            # If that last line couldn't be written, return the full
-            # unwrit_lines list (which still includes that line)
+        if single_unwrit is not None:
+            # If that last line couldn't be written, unstage it, and
+            # return the full unwrit_lines
+            unwrit_lines._unstage()
             return unwrit_lines
         else:
             # Otherwise, if it was successfully written, pop it off, and
-            # return the remaining unwrit_lines
-            unwrit_lines.pop(0)
+            # return the remaining unwrit_lines (if any)
+            unwrit_lines._successful_write()
+            if unwrit_lines.remaining == 0:
+                return None
             return unwrit_lines
 
 
