@@ -231,4 +231,28 @@ mp4.process_queue()
 mp4.output_to_png(f"{TESTING_DIR}\\{str(i).rjust(3, '0')}_add_text_mpq.png")
 i += 1
 
+
+# Testing writing too many tracts than can fit in our plat.
+dx = PLSSDesc('T154N-R97W Sec 1 - 17: NE/4SW/4, NW/4SE/4', initParseQQ=True)
+pqx = PlatQueue()
+for tr in dx.parsedTracts:
+    pqx.queue_add(tr)
+tx = Tract(
+    (
+        'That portion of the NE/4 lying in the '
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do "
+        "eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim "
+        "ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut "
+        "aliquip ex ea commodo consequat. Duis aute irure dolor in "
+        "reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla "
+        "pariatur. Excepteur sint occaecat cupidatat non proident, sunt in "
+        "culpa qui officia deserunt mollit anim id est laborum."
+    ), trs='154n97w18', initParseQQ=True)
+pqx.queue_add(tx)
+sp3 = Plat.from_queue(pqx, twp='154n', rge='97w', settings='letter')
+
+sp3.output(f"{TESTING_DIR}\\{str(i).rjust(3, '0')}_tract_text_too_long.png")
+i += 1
+
+
 input(f"Success: {TESTING_DIR}")
