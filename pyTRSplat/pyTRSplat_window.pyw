@@ -2146,6 +2146,123 @@ class SingleLotDefiner(SectionFiller):
             self.master.canceled()
 
 
+class LotDefEditor(tk.Frame):
+    """
+    A frame for viewing, editing, and deleting LotDefinitions.
+    """
+    # TODO: Should be tk.Toplevel?
+    def __init__(self, master=None, target_lddb=None, lots=None):
+        """
+        :param target_lddb:
+        :param lots: A list of lots
+        """
+        tk.Frame.__init__(self, master)
+        self.master = master
+        self.target_lddb = target_lddb
+        self.lots = lots
+
+        # TODO: `lots` -> dict, keyed by trs, vals are list of lots.
+        # TODO: "Delete all LDDB data" button
+        # TODO: Table row for each lot, using the existing LDDB data
+        # TODO: Button to launch editor for each lot.
+
+
+class TableRow(tk.Frame):
+    """
+    A generic row in a table.
+    """
+
+    def __init__(
+            self, master=None, column_data=None, col_widths=None,
+            col_wraps=None, is_header=False):
+        """
+        :param column_data: A list of strings to write in the columns.
+        The number of elements in the list will dictate how many
+        columns are created.
+        :param col_widths: A list of integers, each representing the
+        width for that column. (List must have the same number of
+        elements as `column_data`.)
+        :param col_wraps: A list of integers, each representing the
+        textwrap for that column, in Tkinter 'text units'.
+        (List must have the same number of elements as `column_data`.)
+        :param is_header: Whether this row contains headers. (Defaults
+        to False.)
+        """
+        tk.Frame.__init__(self, master)
+        self.master = master
+        if column_data is None:
+            column_data = []
+        if col_widths is None:
+            col_widths = [None for _ in column_data]
+        if col_wraps is None:
+            col_wraps = [None for _ in column_data]
+
+        anchor = 'nw'
+        if is_header:
+            anchor = 'n'
+
+        for i in range(len(column_data)):
+            txt = column_data[i]
+            width = col_widths[i]
+            wrap = col_wraps[i]
+            frm = tk.Frame(
+                master=self, highlightbackground='black', highlightthickness=1)
+            frm.grid(row=0, column=i, sticky='ns')
+            lbl = tk.Label(
+                master=frm, text=txt, anchor=anchor, width=width,
+                wraplength=wrap, justify='left')
+            lbl.grid(sticky='nw')
+
+
+class LotDefTable(tk.Frame):
+    """
+    A frame containing a table of LotDefinitions and an editor button.
+    """
+
+    trs_col_width = 12
+    lot_name_col_width = 6
+    ld_col_width = 35
+    ld_wraplength = 240
+
+    def __init__(
+            self, master=None, lots=None, target_lddb=None, **kw):
+        tk.Frame.__init__(self, master, **kw)
+        self.master = master
+        self.btn = tk.Button(text='Edit')
+
+        col_width = [
+            LotDefTable.trs_col_width, LotDefTable.lot_name_col_width,
+            LotDefTable.ld_col_width
+        ]
+        col_wrap = [None, None, LotDefTable.ld_wraplength]
+
+        if lots is None:
+            lots = {}
+
+        if target_lddb is None:
+            target_lddb = LotDefDB()
+
+        rows = [['Twp/Rge/Sec', 'Lot', 'Definition']]
+        for trs_key, lot_list in lots.items():
+            ld = target_lddb.trs(trs_key)
+            for lot in lot_list:
+                definition = ld.get(lot, 'Undefined')
+                row = [trs_key, lot, definition]
+                rows.append(row)
+
+        start_row = 2
+        i = 0
+        for row in rows:
+            # Generate a TableRow for each
+
+            tr = TableRow(
+                master=self, column_data=row, col_widths=col_width,
+                col_wraps=col_wrap, is_header=i == 0)
+            tr.grid(row=start_row + i, column=2, sticky='ns')
+
+            i += 1
+
+
 ########################################################################
 # Manually Adding QQ's to Plat
 ########################################################################
