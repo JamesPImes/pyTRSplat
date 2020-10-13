@@ -2430,8 +2430,38 @@ class LotDefTable(tk.Frame):
         """
         Delete the lot definition for this lot from the LDDB.
         """
-        # TODO: Write this.
-        pass
+
+        trs = self.ld_dict[uid]['trs']
+        lot = self.ld_dict[uid]['lot']
+        cur_definition = self.ld_dict[uid]['definition']
+        ld = self.target_lddb.trs(trs)
+        if ld is None or cur_definition == 'Undefined':
+            return None
+
+        confirm = tk.messagebox.askokcancel(
+            'Are you sure?',
+            f"Delete lot definition for {trs}: {lot}?"
+        )
+        if not confirm:
+            return None
+
+        # Remove this key from the ld
+        ld.pop(lot, None)
+
+        # If there are no more lots for this section in the LotDefinitions,
+        # let's remove the LotDefinitions from the LDDB (which would optionally
+        # allow default lot definitions to take over).
+        if len(ld.keys()) == 0:
+            twprge = self.ld_dict[uid]['twprge']
+            sec = self.ld_dict[uid]['sec']
+            tld = self.target_lddb.get_tld(twprge)
+            # tld should never be None here, but just in case...
+            if tld is not None:
+                # Remove this section as key.
+                tld.pop(sec)
+
+        self.ld_dict[uid]['row_data'] = [trs, lot, 'Undefined']
+        self.update_table(uid)
 
     def update_table(self, uid):
         """
