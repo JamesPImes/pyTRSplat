@@ -174,17 +174,14 @@ class DescFrame(tk.Frame):
             command=self.lddb_btn_clicked)
         lddb_button.grid(row=5, column=1, pady=5, sticky='w')
 
-        # Button to manually define lots
-        manual_lddb_button = tk.Button(
-            desc_frame, text='Define Lots', height=2,
-            command=self.manual_lddb_clicked)
-        manual_lddb_button.grid(row=5, column=1, pady=5, sticky='e')
-
-        # Button to manually RE-define / edit lots
+        # Button to view / manually define lots
         ld_editor_btn = tk.Button(
-            desc_frame, text='Edit lot definitions', height=2,
-            command=self.ld_editor_btn_clicked)
-        ld_editor_btn.grid(row=6, column=1, pady=5, sticky='w')
+            desc_frame, text='View / define Lots', height=2,
+            command=self.manual_lddb_clicked)
+        ld_editor_btn.grid(row=5, column=1, pady=5, sticky='e')
+
+        # Our current LotDefEditor toplevel (if any)
+        self.lde = None
 
         self.lddp_fp_text = tk.StringVar('')
         self.lddp_fp_text.set(f"Current lot definitions: [None loaded]")
@@ -210,22 +207,44 @@ class DescFrame(tk.Frame):
 
     def manual_lddb_clicked(self):
         """
-        Check if any undefined lots currently exist. If so, launch the
-        definer.
+        Check if any lots currently exist in the parsed descriptions.
+        If so, launch the lot viewer / editor window.
         """
+        try:
+            self.lde.destroy()
+        except:
+            pass
+
+        def unpack_tract(tract, lots):
+            for lot in tract.lotList:
+                lots.setdefault(tract.trs, [])
+                if lot not in lots[tract.trs]:
+                    lots[tract.trs].append(lot)
+
         # Use tiny settings for speed. Only want the unhandled lots.
         mp = self.master.output_frame.gen_plat(use_tiny=True)
 
-        # Pass the MultiPlat through the unhandled lots checker in the
-        # OutputFrame, which will launch the definer, if any were found.
-        # (Returns None if the definer was launched.)
-        results = self.master.output_frame._check_for_unhandled_lots(
-            mp, warn=False)
-        if results is not None:
+        # Get a unhandled_lots dict, and set it to `lots` variable.
+        # (Here we don't care about the first-returned value, a bool.)
+        _, lots = self.master.output_frame._check_for_unhandled_lots(
+            mp, warn=False, do_not_launch=True)
+
+        for desc_obj in self.master.plssdesc_list:
+            for tract in desc_obj.parsedTracts:
+                unpack_tract(tract, lots)
+
+        if len(lots) == 0:
             messagebox.showinfo(
-                'No Undefined Lots',
-                'No currently undefined lots were identified.')
+                'No Lots',
+                'There are currently no lots in parsed descriptions. Try '
+                'adding one or more land descriptions above.'
+            )
             return
+
+        self.lde = LotDefEditor(
+            self, top_owner=self.master, target_lddb=self.master.lddb,
+            lots=lots)
+        self.lde.focus()
 
     def editor_btn_clicked(self):
         """Launch (or refocus-on) a DescriptionEditor popup window, for
@@ -765,7 +784,7 @@ class OutputFrame(tk.Frame):
             mpq=self.output_owner.mpq, settings=set_obj,
             lddb=self.output_owner.lddb, allow_ld_defaults=trust_default_lots)
 
-    def _check_for_unhandled_lots(self, mp, warn=None):
+    def _check_for_unhandled_lots(self, mp, warn=None, do_not_launch=False):
         """
         Check for any unhandled lots in any of the plats. Raise a
         warning if any are found. (Warning may be disabled in main
@@ -776,7 +795,11 @@ class OutputFrame(tk.Frame):
         defaults to what is configured in `.warn_unhandled_lots` in main
         app Tk window.) If set to `False`, will automatically launch the
         definer if any undefined lots were identified.
-        :return: If user declines to define lots now, returns a 2-tuple:
+        :param do_not_launch: A bool, whether to simply return what is
+        found, without prompting the user to launch the editor or
+        warning the user first. (Defaults to False.)
+        :return: If user declines to define lots now (or if
+        `do_not_launch` is passed as True), returns a 2-tuple:
             First element: bool (whether or not unhandled lots are found
                 -- i.e. `True` means there is at least 1 unhandled lot;
             Second element: A dict containing all the unhandled lots,
@@ -789,6 +812,10 @@ class OutputFrame(tk.Frame):
         confirm = True
         if warn is None:
             warn = self.output_owner.warn_unhandled_lots
+            confirm = False
+
+        if do_not_launch:
+            warn = False
             confirm = False
 
         uhl = mp.all_unhandled_lots
@@ -2218,8 +2245,8 @@ class LotDefEditor(tk.Toplevel):
         self.orig_lots = lots
         self.top_owner = top_owner
 
-        # Current editor (if any) for all undefined lots.
-        self.sle = None
+        # The current LotDefEditor (if any).
+        self.lde = None
 
         control_frm = tk.Frame(self)
         control_frm.grid(row=0, column=0, sticky='ns')
@@ -2297,6 +2324,8 @@ class LotDefEditor(tk.Toplevel):
 
         self.gen_new_table()
 
+        self.top_owner.trigger_update_preview()
+
     def close_btn_clicked(self):
         self.destroy()
 
@@ -2329,7 +2358,7 @@ class LotDefEditor(tk.Toplevel):
             )
 
         try:
-            self.sle.destroy()
+            self.lde.destroy()
         except:
             pass
 
@@ -2357,7 +2386,7 @@ class LotDefEditor(tk.Toplevel):
             no_lots()
             return
 
-        self.sle = LotDefEditor.TableSeriesDefiner(
+        self.lde = LotDefEditor.TableSeriesDefiner(
             self, top_owner=self.top_owner, target_lddb=self.target_lddb,
             lots_to_define=uhl)
 
@@ -2674,6 +2703,7 @@ class LotDefTable(tk.Frame):
 
         self.ld_dict[uid]['row_data'] = [trs, lot, 'Undefined']
         self.update_table(uid)
+        self.top_owner.trigger_update_preview()
 
     def update_table(self, uid):
         """
