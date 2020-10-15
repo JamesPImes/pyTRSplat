@@ -1666,8 +1666,6 @@ class SingleDescriptionEditor(tk.Frame):
             'Confirm Restore',
             'Discard all changes made to this description since opening '
             'this editor window?')
-        self.focus()
-        self.grab_set()
         if not confirm:
             return
 
@@ -2293,6 +2291,8 @@ class LotDefEditor(tk.Toplevel):
             "and then load that file here.\n\n"
             "Display all lots now?")
 
+        self.focus()
+
         if not confirm:
             return None
 
@@ -2313,6 +2313,8 @@ class LotDefEditor(tk.Toplevel):
         """
         confirm = tk.messagebox.askokcancel(
             'Are you sure?', "Delete ALL current lot definitions?")
+
+        self.focus()
 
         if not confirm:
             return None
@@ -2485,7 +2487,6 @@ class LDTableRow(TableRow):
             first_tk_col=2)
         self.uid = uid
 
-
         if not is_header:
             ed_btn = tk.Button(
                 self, text='Edit', width=5, command=self.edit_btn_clicked)
@@ -2570,30 +2571,6 @@ class LotDefTable(tk.Frame):
         self.ld_dict['headers']['definition'] = 'na_headers'
         uid_list = ['headers']
 
-        # for twprge_key, sec_dict in lots.items():
-        #     tld = target_lddb.get_tld(twprge_key, force_tld_return=False)
-        #     for sec_num, lot_list in sec_dict.items():
-        #
-        #         for lot in lot_list:
-        #             definition = 'Undefined'
-        #             if tld is not None:
-        #                 ld = tld.get_ld(sec_num, force_ld_return=True)
-        #                 definition = ld.get(lot, 'Undefined')
-        #             trs = f"{twprge_key}{str(sec_num).rjust(2, '0')}"
-        #             # 'unique ID' to serve as dict key -- i.e. '154n97w01_L1'
-        #             uid = f"{trs}_{lot}"
-        #             uid_list.append(uid)
-        #
-        #             self.ld_dict[uid] = {}
-        #             self.ld_dict[uid]['tld'] = tld
-        #             self.ld_dict[uid]['row_data'] = [trs, lot, definition]
-        #             self.ld_dict[uid]['row_num'] = i
-        #             self.ld_dict[uid]['twprge'] = twprge_key
-        #             self.ld_dict[uid]['sec'] = sec_num
-        #             self.ld_dict[uid]['trs'] = trs
-        #             self.ld_dict[uid]['lot'] = lot
-        #             self.ld_dict[uid]['definition'] = definition
-        #             i += 1
         i = 1
         for trs, lot_list in lots.items():
             ld = self.target_lddb.trs(trs)
@@ -2683,6 +2660,9 @@ class LotDefTable(tk.Frame):
             'Are you sure?',
             f"Delete lot definition for {trs}: {lot}?"
         )
+
+        self.focus()
+
         if not confirm:
             return None
 
@@ -2726,7 +2706,6 @@ class LotDefTable(tk.Frame):
         self.ld_dict[uid]['row_data'] = new_row_data
         self.ld_dict[uid]['definition'] = definition
         self.gen_tablerow(uid, row_data=new_row_data)
-
 
 
 ########################################################################
