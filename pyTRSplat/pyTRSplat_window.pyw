@@ -180,13 +180,19 @@ class DescFrame(tk.Frame):
             command=self.manual_lddb_clicked)
         manual_lddb_button.grid(row=5, column=1, pady=5, sticky='e')
 
+        # Button to manually RE-define / edit lots
+        ld_editor_btn = tk.Button(
+            desc_frame, text='Edit lot definitions', height=2,
+            command=self.ld_editor_btn_clicked)
+        ld_editor_btn.grid(row=6, column=1, pady=5, sticky='w')
+
         self.lddp_fp_text = tk.StringVar('')
         self.lddp_fp_text.set(f"Current lot definitions: [None loaded]")
         lddb_label = tk.Label(desc_frame, textvariable=self.lddp_fp_text)
-        lddb_label.grid(row=6, column=1, sticky='w')
+        lddb_label.grid(row=7, column=1, sticky='w')
 
         default_lots_frame = tk.Frame(desc_frame)
-        default_lots_frame.grid(row=7, column=1, sticky='w')
+        default_lots_frame.grid(row=8, column=1, sticky='w')
 
         self.trust_default_lots = tk.BooleanVar(
             desc_frame, value=True, name='trust_default_lots')
@@ -283,7 +289,6 @@ class DescFrame(tk.Frame):
             show_save=False, show_cancel=False, prompt_after_ok=after_prompt,
             exit_after_ok=True)
         pc.pack(padx=20, pady=10)
-
 
     def parse_btn_clicked(self):
         """
@@ -383,6 +388,13 @@ class DescFrame(tk.Frame):
                 messagebox.showerror(
                     '.csv Files Only', 'May only load \'.csv\' files containing '
                                        'lot definitions.')
+
+    def ld_editor_btn_clicked(self):
+        """
+        Launch a new window for editing lot defintions.
+        """
+        # TODO: Write this.
+        pass
 
     def lots_help_btn_clicked(self):
         """Display info about LotDefDB and default lots."""
@@ -2024,8 +2036,15 @@ class SeriesLotDefiner(tk.Toplevel):
     def __init__(
             self, master=None, top_owner=None, target_lddb=None,
             lots_to_define=None):
+        """
+        :param top_owner: The main application, which contains a
+        .trigger_update_preview() method.
+        :param target_lddb: A LotDefDB object that should be modified.
+        :param lots_to_define: A dict, specifying which lots need to be
+        defined, in this format:   <trs key> -> <list of lots>
+            ex: {'154n97w01': ['L1, 'L2'], '154n97w02': ['L1', 'L3']}
+        """
         tk.Toplevel.__init__(self, master)
-
         # The LotDefDB object that will be updated:
         self.target_lddb = target_lddb
 
@@ -2038,7 +2057,7 @@ class SeriesLotDefiner(tk.Toplevel):
         self.lots_to_define = lots_to_define
         self.cur_definer = None
         self.trs_keys = list(lots_to_define.keys())
-        self.cur_twprge = None
+        self.cur_trs = None
         self.cur_lots = []
 
         self.next_one()
@@ -2053,12 +2072,12 @@ class SeriesLotDefiner(tk.Toplevel):
             if len(self.trs_keys) == 0:
                 self.done()
                 return None
-            self.cur_twprge = self.trs_keys.pop(0)
-            self.cur_lots = self.lots_to_define[self.cur_twprge]
+            self.cur_trs = self.trs_keys.pop(0)
+            self.cur_lots = self.lots_to_define[self.cur_trs]
 
         lot = self.cur_lots.pop(0)
         self.cur_definer = SingleLotDefiner(
-            self, target_lddb=self.target_lddb, trs=self.cur_twprge, lot_num=lot)
+            self, target_lddb=self.target_lddb, trs=self.cur_trs, lot_num=lot)
         self.cur_definer.cancel_btn.grid(row=7, column=1)
         self.cur_definer.grid(row=0, column=0, padx=14, pady=14, sticky='nesw')
         self.cur_definer.focus()
@@ -2174,25 +2193,200 @@ class SingleLotDefiner(SectionFiller):
             self.master.canceled()
 
 
-class LotDefEditor(tk.Frame):
+class LotDefEditor(tk.Toplevel):
     """
     A frame for viewing, editing, and deleting LotDefinitions.
     """
-    # TODO: Should be tk.Toplevel?
-    def __init__(self, master=None, target_lddb=None, lots=None):
+    def __init__(
+            self, master=None, top_owner=None, target_lddb=None, lots=None):
         """
-        :param target_lddb:
-        :param lots: A list of lots
+        :param top_owner: The main application, which contains a
+        .trigger_update_preview() method.
+        :param target_lddb: A LotDefDB object that should be modified.
+        :param lots: A dict, keyed by TRS (e.g., '154n9701'), and whose
+        values are a list of lots that should be viewed. See example:
+            sample_lots = {
+                '154n97w25': ['L5', 'L8'],
+                '154n97w01': ['L1', 'L3'],
+                '155n97w04': ['L1', 'L2', 'L3', 'L4']
+            }
         """
-        tk.Frame.__init__(self, master)
+        tk.Toplevel.__init__(self, master)
         self.master = master
         self.target_lddb = target_lddb
-        self.lots = lots
+        self.lots = lots.copy()
+        self.orig_lots = lots
+        self.top_owner = top_owner
 
-        # TODO: `lots` -> dict, keyed by trs, vals are list of lots.
-        # TODO: "Delete all LDDB data" button
-        # TODO: DONE -- Table row for each lot, using the existing LDDB data
-        # TODO: DONE -- Button to launch editor for each lot.
+        # Current editor (if any) for all undefined lots.
+        self.sle = None
+
+        control_frm = tk.Frame(self)
+        control_frm.grid(row=0, column=0, sticky='ns')
+
+        del_btn = tk.Button(
+            control_frm, text='Delete All Lot Definitions',
+            command=self.del_btn_clicked)
+        del_btn.grid(row=0, column=1, padx=4, pady=4, sticky='ns')
+
+        close_btn = tk.Button(
+            control_frm, text='Close Editor', command=self.close_btn_clicked)
+        close_btn.grid(row=0, column=2, padx=4, pady=4, sticky='ns')
+
+        define_all_btn = tk.Button(
+            control_frm, text='Define All Remaining Lots',
+            command=self.define_all_lots)
+        define_all_btn.grid(row=0, column=3, padx=4, pady=4, sticky='ns')
+
+        display_entire_lddb_btn = tk.Button(
+            control_frm, text='Display All (SLOW)',
+            command=self.toggle_all_lddb)
+        display_entire_lddb_btn.grid(
+            row=0, column=4, padx=4, pady=4, sticky='ns')
+
+        # Our LotDefTable object, which will be populated shortly.
+        self.table = None
+
+        # Where to place the table in the grid
+        self.table_row = 1
+        self.table_column = 0
+
+        # Populate the table.
+        self.gen_new_table()
+
+    def toggle_all_lddb(self):
+        """
+        Include the entirety of the LotDefDB in the table.
+        """
+        confirm = tk.messagebox.askokcancel(
+            'WARNING',
+            "Viewing ALL lot definitions can be very slow, if there are "
+            "too many defined lots. To view and edit numerous lot definitions, "
+            "it will be more efficient to do so externally in a .csv file, "
+            "and then load that file here.\n\n"
+            "Display all lots now?")
+
+        if not confirm:
+            return None
+
+        for twprge, tld in self.target_lddb.items():
+            for sec, ld in tld.items():
+                trs = f"{twprge}{str(sec).rjust(2, '0')}"
+                self.lots.setdefault(trs, [])
+                lots = list(ld.keys())
+                for lot in lots:
+                    if lot not in self.lots[trs]:
+                        self.lots[trs].append(lot)
+        self.gen_new_table()
+
+    def del_btn_clicked(self):
+        """
+        Remove all items from the LotDefDB. (Does not actually destroy
+        the dict values; just pops their keys from the dict.)
+        """
+        confirm = tk.messagebox.askokcancel(
+            'Are you sure?', "Delete ALL current lot definitions?")
+
+        if not confirm:
+            return None
+
+        for i in range(len(self.target_lddb.keys())):
+            self.target_lddb.pop(list(self.target_lddb.keys())[0], None)
+
+        self.lots = self.orig_lots.copy()
+
+        self.gen_new_table()
+
+    def close_btn_clicked(self):
+        self.destroy()
+
+    def gen_new_table(self):
+        """
+        Generate a new LotDefTable for the lots.
+        """
+        try:
+            self.table.destroy()
+        except:
+            pass
+
+        self.table = LotDefTable(
+            self, top_owner=self.top_owner, lots=self.lots,
+            target_lddb=self.target_lddb)
+        self.table.grid(
+            row=self.table_row, column=self.table_column, sticky='nesw',
+            padx=5, pady=5)
+
+    def define_all_lots(self):
+        """
+        Define any lots that have not already been defined, one-by-one.
+        """
+
+        def no_lots():
+            messagebox.showinfo(
+                'No lots to define',
+                "All lots have been defined. Click the respective edit buttons "
+                "to re-define lots."
+            )
+
+        try:
+            self.sle.destroy()
+        except:
+            pass
+
+        if self.table is None:
+            no_lots()
+            return
+
+        ld_dict = self.table.ld_dict
+        if ld_dict is None:
+            no_lots()
+            return
+
+        # Extract unhandled lots from the ld_dict (generated in the
+        # LotDefTable object)
+        uhl = {}
+        for k, v in ld_dict.items():
+            if v['definition'] != 'Undefined':
+                continue
+            trs = v['trs']
+            lot = v['lot']
+            uhl.setdefault(trs, [])
+            uhl[trs].append(lot)
+
+        if len(uhl) == 0:
+            no_lots()
+            return
+
+        self.sle = LotDefEditor.TableSeriesDefiner(
+            self, top_owner=self.top_owner, target_lddb=self.target_lddb,
+            lots_to_define=uhl)
+
+    class TableSeriesDefiner(SeriesLotDefiner):
+        """
+        A SeriesLotDefiner with slightly modified behavior for cancel
+        and after completion.
+        """
+
+        def __init__(
+                self, master=None, top_owner=None, target_lddb=None,
+                lots_to_define=None):
+            SeriesLotDefiner.__init__(
+                self, master=master, top_owner=top_owner,
+                target_lddb=target_lddb, lots_to_define=lots_to_define)
+
+            # A bit hack-ish, but remove the "Leave Undefined" button.
+            self.cur_definer.leaveit_btn.grid_forget()
+
+            # These methods have the same functionality for this object.
+            self.canceled = self.done
+
+        def done(self):
+            self.master.gen_new_table()
+            try:
+                self.top_owner.trigger_update_preview()
+            except:
+                pass
+            self.destroy()
 
 
 class TableRow(tk.Frame):
@@ -2247,7 +2441,7 @@ class TableRow(tk.Frame):
 class LDTableRow(TableRow):
     """
     A TableRow object with added "Edit" and "Delete" buttons, specific
-    to the lot definition editor."
+    to the lot definition editor.
     """
 
     def __init__(
@@ -2278,15 +2472,6 @@ class LDTableRow(TableRow):
         self.master.del_btn_clicked(self.uid)
 
 
-class TestBlackHole:
-    # TODO: DELETE AFTER TESTING
-    def __init__(self):
-        pass
-
-    def trigger_update_preview(self):
-        pass
-
-
 class LotDefTable(tk.Frame):
     """
     A frame containing a table of LotDefinitions and edit/delete
@@ -2309,14 +2494,14 @@ class LotDefTable(tk.Frame):
             self, master=None, top_owner=None, lots=None, target_lddb=None,
             **kw):
         """
-        :param lots: A nested dict, whose first-level keys are `twprge`
-        (e.g., '154n97') and whose first-level values are another dict.
-        That second-level dict is keyed by section number (int), and its
-        values are a list of lots. See example:
+        :param lots: A dict, keyed by TRS (e.g., '154n9701'), and whose
+        values are a list of lots that should be viewed. See example:
             sample_lots = {
-                '154n97w': {25: ['L5', 'L8'], 1: ['L1', 'L3']},
-                '155n97w': {4: ['L1', 'L2', 'L3', 'L4']}
+                '154n97w25': ['L5', 'L8'],
+                '154n97w01': ['L1', 'L3'],
+                '155n97w04': ['L1', 'L2', 'L3', 'L4']
             }
+
         Note: This is the same structure as an 'unhandled lots' dict
         generated by the `MultiPlat.all_unhandled_lots` property.
         :param target_lddb: The LotDefDB object whose definitions should
@@ -2326,8 +2511,8 @@ class LotDefTable(tk.Frame):
         self.master = master
         self.btn = tk.Button(text='Edit')
 
-        if top_owner is None:  # DELETE -- TESTING PURPOSES
-            top_owner = TestBlackHole()  # DELETE -- TESTING PURPOSES
+        if top_owner is None:
+            top_owner = master
         self.top_owner = top_owner
 
         # A dict for keeping track of each TableRow, which lot definitions
@@ -2353,40 +2538,67 @@ class LotDefTable(tk.Frame):
         self.ld_dict['headers'] = {}
         self.ld_dict['headers']['row_data'] = header_data
         self.ld_dict['headers']['row_num'] = 0
+        self.ld_dict['headers']['definition'] = 'na_headers'
         uid_list = ['headers']
 
+        # for twprge_key, sec_dict in lots.items():
+        #     tld = target_lddb.get_tld(twprge_key, force_tld_return=False)
+        #     for sec_num, lot_list in sec_dict.items():
+        #
+        #         for lot in lot_list:
+        #             definition = 'Undefined'
+        #             if tld is not None:
+        #                 ld = tld.get_ld(sec_num, force_ld_return=True)
+        #                 definition = ld.get(lot, 'Undefined')
+        #             trs = f"{twprge_key}{str(sec_num).rjust(2, '0')}"
+        #             # 'unique ID' to serve as dict key -- i.e. '154n97w01_L1'
+        #             uid = f"{trs}_{lot}"
+        #             uid_list.append(uid)
+        #
+        #             self.ld_dict[uid] = {}
+        #             self.ld_dict[uid]['tld'] = tld
+        #             self.ld_dict[uid]['row_data'] = [trs, lot, definition]
+        #             self.ld_dict[uid]['row_num'] = i
+        #             self.ld_dict[uid]['twprge'] = twprge_key
+        #             self.ld_dict[uid]['sec'] = sec_num
+        #             self.ld_dict[uid]['trs'] = trs
+        #             self.ld_dict[uid]['lot'] = lot
+        #             self.ld_dict[uid]['definition'] = definition
+        #             i += 1
         i = 1
-        for twprge_key, sec_dict in lots.items():
-            tld = target_lddb.get_tld(twprge_key, force_tld_return=False)
-            for sec_num, lot_list in sec_dict.items():
+        for trs, lot_list in lots.items():
+            ld = self.target_lddb.trs(trs)
+            for lot in lot_list:
+                definition = 'Undefined'
+                if ld is not None:
+                    definition = ld.get(lot, 'Undefined')
+                # 'unique ID' to serve as dict key -- i.e. '154n97w01_L1'
+                uid = f"{trs}_{lot}"
+                uid_list.append(uid)
 
-                for lot in lot_list:
-                    definition = 'Undefined'
-                    if tld is not None:
-                        ld = tld.get_ld(sec_num, force_ld_return=True)
-                        definition = ld.get(lot, 'Undefined')
-                    trs = f"{twprge_key}{str(sec_num).rjust(2, '0')}"
-                    # 'unique ID' to serve as dict key -- i.e. '154n97w01_L1'
-                    uid = f"{trs}_{lot}"
-                    uid_list.append(uid)
+                twp, rge, sec = pyTRS.break_trs(trs)
+                try:
+                    sec = int(sec)
+                except ValueError:
+                    sec = 0
 
-                    self.ld_dict[uid] = {}
-                    self.ld_dict[uid]['tld'] = tld
-                    self.ld_dict[uid]['row_data'] = [trs, lot, definition]
-                    self.ld_dict[uid]['row_num'] = i
-                    self.ld_dict[uid]['twprge'] = twprge_key
-                    self.ld_dict[uid]['sec'] = sec_num
-                    self.ld_dict[uid]['trs'] = trs
-                    self.ld_dict[uid]['lot'] = lot
-                    self.ld_dict[uid]['definition'] = definition
-                    i += 1
+                self.ld_dict[uid] = {}
+                self.ld_dict[uid]['ld'] = ld
+                self.ld_dict[uid]['row_data'] = [trs, lot, definition]
+                self.ld_dict[uid]['row_num'] = i
+                self.ld_dict[uid]['twprge'] = twp + rge
+                self.ld_dict[uid]['sec'] = sec
+                self.ld_dict[uid]['trs'] = trs
+                self.ld_dict[uid]['lot'] = lot
+                self.ld_dict[uid]['definition'] = definition
+                i += 1
 
         start_row = 2
         for uid in uid_list:
             # Generate a LDTableRow for each
             table_row_num = self.ld_dict[uid]['row_num']
             self.ld_dict[uid]['grid_row'] = table_row_num + start_row
-            self.ld_dict[uid]['grid_col'] = LotDefTable.tbrow_col
+            self.ld_dict[uid]['grid_col'] = self.tbrow_col
             self.gen_tablerow(uid)
 
     def gen_tablerow(self, uid, row_data=None):
@@ -2405,8 +2617,8 @@ class LotDefTable(tk.Frame):
         col = self.ld_dict[uid]['grid_col']
         self.ld_dict[uid]['tablerow'] = LDTableRow(
             master=self, column_data=row_data,
-            col_widths=LotDefTable.col_width,
-            col_wraps=LotDefTable.col_wrap, is_header=is_header, uid=uid)
+            col_widths=self.col_width,
+            col_wraps=self.col_wrap, is_header=is_header, uid=uid)
         self.ld_dict[uid]['tablerow'].grid(row=row, column=col, sticky='ns')
 
     def edit_btn_clicked(self, uid):
@@ -2458,7 +2670,7 @@ class LotDefTable(tk.Frame):
             # tld should never be None here, but just in case...
             if tld is not None:
                 # Remove this section as key.
-                tld.pop(sec)
+                tld.pop(sec, None)
 
         self.ld_dict[uid]['row_data'] = [trs, lot, 'Undefined']
         self.update_table(uid)
