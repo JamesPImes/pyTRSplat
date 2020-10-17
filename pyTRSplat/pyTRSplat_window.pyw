@@ -112,6 +112,7 @@ class MainWindow(tk.Tk):
         """Update the preview in `.preview_frame`."""
         self.preview_frame.gen_preview()
 
+
 ########################################################################
 # Getting / Parsing / Managing Land Descriptions and loading LotDefDB
 ########################################################################
@@ -407,13 +408,6 @@ class DescFrame(tk.Frame):
                 messagebox.showerror(
                     '.csv Files Only', 'May only load \'.csv\' files containing '
                                        'lot definitions.')
-
-    def ld_editor_btn_clicked(self):
-        """
-        Launch a new window for editing lot defintions.
-        """
-        # TODO: Write this.
-        pass
 
     def lots_help_btn_clicked(self):
         """Display info about LotDefDB and default lots."""
@@ -2191,8 +2185,12 @@ class SingleLotDefiner(SectionFiller):
 
         filled = self.sec_grid.filled_qqs()
         if len(filled) == 0:
-            # TODO: Prompt confirm
-            print("PLACEHOLDER: Leave undefined?")
+            confirm = tk.messagebox.askokcancel(
+                'Are you sure?', "Leave this lot undefined?")
+
+            if not confirm:
+                return None
+
         definition = ','.join(filled)
 
         tld = self.target_lddb.get_tld(self.twprge, force_tld_return=True)
@@ -2249,25 +2247,25 @@ class LotDefEditor(tk.Toplevel):
         control_frm = tk.Frame(self)
         control_frm.grid(row=0, column=0, sticky='ns')
 
-        del_btn = tk.Button(
-            control_frm, text='Delete All Lot Definitions',
-            command=self.del_btn_clicked)
-        del_btn.grid(row=0, column=1, padx=4, pady=4, sticky='ns')
-
-        close_btn = tk.Button(
-            control_frm, text='Close Editor', command=self.close_btn_clicked)
-        close_btn.grid(row=0, column=2, padx=4, pady=4, sticky='ns')
-
         define_all_btn = tk.Button(
             control_frm, text='Define All Remaining Lots',
             command=self.define_all_lots)
-        define_all_btn.grid(row=0, column=3, padx=4, pady=4, sticky='ns')
+        define_all_btn.grid(row=0, column=1, padx=4, pady=4, sticky='ns')
 
         display_entire_lddb_btn = tk.Button(
             control_frm, text='Display All (SLOW)',
             command=self.toggle_all_lddb)
         display_entire_lddb_btn.grid(
-            row=0, column=4, padx=4, pady=4, sticky='ns')
+            row=0, column=2, padx=4, pady=4, sticky='ns')
+
+        del_btn = tk.Button(
+            control_frm, text='Delete All Lot Definitions',
+            command=self.del_btn_clicked)
+        del_btn.grid(row=0, column=3, padx=4, pady=4, sticky='ns')
+
+        close_btn = tk.Button(
+            control_frm, text='Close Editor', command=self.close_btn_clicked)
+        close_btn.grid(row=0, column=4, padx=4, pady=4, sticky='ns')
 
         # Our LotDefTable object, which will be populated shortly.
         self.table = None
@@ -2285,10 +2283,10 @@ class LotDefEditor(tk.Toplevel):
         """
         confirm = tk.messagebox.askokcancel(
             'WARNING',
-            "Viewing ALL lot definitions can be very slow, if there are "
-            "too many defined lots. To view and edit numerous lot definitions, "
-            "it will be more efficient to do so externally in a .csv file, "
-            "and then load that file here.\n\n"
+            "Viewing ALL lot definitions can be very slow if there are "
+            "too many defined lots. It may be more efficient to view and edit "
+            "numerous lot definitions externally in a .csv file, and then load "
+            "that file here.\n\n"
             "Display all lots now?")
 
         self.focus()
@@ -2476,16 +2474,20 @@ class LDTableRow(TableRow):
     """
 
     def __init__(
-            self, master=None, column_data=None, col_widths=None,
-            col_wraps=None, is_header=False, uid=None):
+            self, master=None, control_owner=None, column_data=None,
+            col_widths=None, col_wraps=None, is_header=False, uid=None):
         """
         All parameters are the same as for TableRow, except:
         :param uid: The unique identifier for a lot (ex: '154n97w01_L1')
+        :param control_owner: The tkinter object that controls this obj,
+        and which has `.edit_btn_clicked()` and `.del_btn_clicked()`
+        methods.
         """
         TableRow.__init__(
             self, master, column_data, col_widths, col_wraps, is_header,
             first_tk_col=2)
         self.uid = uid
+        self.control_owner = control_owner
 
         if not is_header:
             ed_btn = tk.Button(
@@ -2496,10 +2498,10 @@ class LDTableRow(TableRow):
             del_btn.grid(row=0, column=5, padx=4, sticky='ns')
 
     def edit_btn_clicked(self):
-        self.master.edit_btn_clicked(self.uid)
+        self.control_owner.edit_btn_clicked(self.uid)
 
     def del_btn_clicked(self):
-        self.master.del_btn_clicked(self.uid)
+        self.control_owner.del_btn_clicked(self.uid)
 
 
 class LotDefTable(tk.Frame):
@@ -2508,14 +2510,13 @@ class LotDefTable(tk.Frame):
     buttons.
     """
 
-    # TODO: Scrollbar
-
     trs_col_width = 12
     lot_name_col_width = 6
     ld_col_width = 35
     ld_wraplength = 240
     col_width = [trs_col_width, lot_name_col_width, ld_col_width]
     col_wrap = [None, None, ld_wraplength]
+    max_rows_per_page = 15
 
     # The tk grid column in the LotDefTable frame holding TableRow objs
     tbrow_col = 2
@@ -2545,6 +2546,48 @@ class LotDefTable(tk.Frame):
             top_owner = master
         self.top_owner = top_owner
 
+        ###################3
+        # Scroll frame
+
+        control_frame = tk.Frame(self)
+        control_frame.grid(row=0, column=1)
+
+        # Subframe for left/right scrol
+        scroll_frame = tk.Frame(control_frame)
+        scroll_frame.grid(row=1, column=1)
+
+        self.header_lbl = tk.Label(control_frame, text='')
+        self.header_lbl.grid(row=0, column=1)
+
+        # Button to scroll preview right
+        scroll_right_button = tk.Button(
+            scroll_frame, text='>', height=1, width=8,
+            command=self.scroll_page)
+        scroll_right_button.grid(
+            row=1, column=2, padx=8, pady=2, sticky='n')
+
+        # Button to scroll preview left
+        scroll_left_button = tk.Button(
+            scroll_frame, text='<', height=1, width=8,
+            command=lambda: self.scroll_page(-1))
+        scroll_left_button.grid(
+            row=1, column=1, padx=8, pady=2, sticky='n')
+
+        ##################
+        # Gen pages
+        ##################
+
+        # A dict of pages (i.e. Frames), one of which is displayed at a time;
+        # keyed by incremented ints, starting at 0
+        self.pages = {}
+        # The index of the currently displayed page.
+        self.page_index = None
+        # The current page (Frame) itself.
+        self.current_page = None
+
+        self.display_frame = tk.Frame(self)
+        self.display_frame.grid(row=2, column=1, sticky='nesw')
+
         # A dict for keeping track of each TableRow, which lot definitions
         # it corresponds to, where to find it in the tk grid, etc. Keyed
         # by unique ID in the format of TRS_lotnumber (ex: '154n97w01_L1')
@@ -2563,15 +2606,23 @@ class LotDefTable(tk.Frame):
 
         self.target_lddb = target_lddb
 
-        # Headers in the first row.
-        header_data = ['Twp/Rge/Sec', 'Lot', 'Definition']
-        self.ld_dict['headers'] = {}
-        self.ld_dict['headers']['row_data'] = header_data
-        self.ld_dict['headers']['row_num'] = 0
-        self.ld_dict['headers']['definition'] = 'na_headers'
-        uid_list = ['headers']
+        uid_list = []
 
-        i = 1
+        def gen_header(page_num: int):
+            """
+            Generate a header for a new page.
+            """
+
+            uid = f"headers_{page_num}"
+            header_data = ['Twp/Rge/Sec', 'Lot', 'Definition']
+            self.ld_dict[uid] = {}
+            self.ld_dict[uid]['row_data'] = header_data
+            self.ld_dict[uid]['row_num'] = 0
+            self.ld_dict[uid]['definition'] = 'na_headers'
+            self.ld_dict[uid]['page'] = page_num
+            uid_list.append(uid)
+
+        i = 0
         for trs, lot_list in lots.items():
             ld = self.target_lddb.trs(trs)
             for lot in lot_list:
@@ -2591,13 +2642,22 @@ class LotDefTable(tk.Frame):
                 self.ld_dict[uid] = {}
                 self.ld_dict[uid]['ld'] = ld
                 self.ld_dict[uid]['row_data'] = [trs, lot, definition]
-                self.ld_dict[uid]['row_num'] = i
+                self.ld_dict[uid]['row_num'] = i % LotDefTable.max_rows_per_page + 1
+                self.ld_dict[uid]['page'] = i // LotDefTable.max_rows_per_page
                 self.ld_dict[uid]['twprge'] = twp + rge
                 self.ld_dict[uid]['sec'] = sec
                 self.ld_dict[uid]['trs'] = trs
                 self.ld_dict[uid]['lot'] = lot
                 self.ld_dict[uid]['definition'] = definition
                 i += 1
+
+        # Subtract the last one for an accurate total.
+        i -= 1
+
+        for page_num in range(i//LotDefTable.max_rows_per_page + 1):
+            gen_header(page_num)
+            new_frame = tk.Frame(self.display_frame)
+            self.pages[page_num] = new_frame
 
         start_row = 2
         for uid in uid_list:
@@ -2607,7 +2667,50 @@ class LotDefTable(tk.Frame):
             self.ld_dict[uid]['grid_col'] = self.tbrow_col
             self.gen_tablerow(uid)
 
-    def gen_tablerow(self, uid, row_data=None):
+        if len(self.pages) > 0:
+            self.page_index = 0
+            self.update_displayed_page()
+
+    def scroll_page(self, direction=1):
+        """Scroll the SDE left or right. (1 -> right;  -1 -> left).
+        Defaults to scrolling right."""
+        if self.page_index is not None:
+            self.page_index += direction
+
+        # Wrap the index around, if it goes above or below the length
+        # of our previews list.
+        if len(self.pages) not in [None, 0]:
+            self.page_index %= len(self.pages)
+        self.update_displayed_page()
+
+    def update_displayed_page(self, page_index=None):
+        """Display the SingleDescriptionEditor stored at the specified
+        `index`."""
+        if page_index is None:
+            page_index = self.page_index
+
+        if page_index is None:
+            # If still None, don't do anything else.
+            return
+
+        if self.current_page is not None:
+            # If we've already displayed an sde, remove it from the grid now
+            self.current_page.grid_remove()
+
+        # Set the new page, and place it on the grid.
+        self.current_page = self.pages[page_index]
+        self.current_page.grid( row=0, column=0, sticky='nwse')
+        self.update_header()
+
+    def update_header(self):
+        """Update the label showing which index we're currently on."""
+        if self.page_index is not None:
+            header_txt = f"{self.page_index + 1} / {len(self.pages)}"
+        else:
+            header_txt = "[No lots to display.]"
+        self.header_lbl.config(text=header_txt)
+
+    def gen_tablerow(self, uid, page=None, row_data=None):
         """
         Generate a row in the table for the lot definition represented
         by the unique ID `uid`.
@@ -2618,11 +2721,13 @@ class LotDefTable(tk.Frame):
         """
         if row_data is None:
             row_data = self.ld_dict[uid]['row_data']
+        if page is None:
+            page = self.ld_dict[uid]['page']
         is_header = self.ld_dict[uid]['row_num'] == 0
-        row = self.ld_dict[uid]['grid_row']
+        row = self.ld_dict[uid]['row_num']
         col = self.ld_dict[uid]['grid_col']
         self.ld_dict[uid]['tablerow'] = LDTableRow(
-            master=self, column_data=row_data,
+            master=self.pages[page], control_owner=self, column_data=row_data,
             col_widths=self.col_width,
             col_wraps=self.col_wrap, is_header=is_header, uid=uid)
         self.ld_dict[uid]['tablerow'].grid(row=row, column=col, sticky='ns')
