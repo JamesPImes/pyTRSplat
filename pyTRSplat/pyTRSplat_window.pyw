@@ -1057,17 +1057,72 @@ class FullPreviewWindow(tk.Toplevel):
 
 
 ########################################################################
+# Generic table rows (used for a couple different subclasses)
+########################################################################
+
+class TableRow(tk.Frame):
+    """
+    A generic row in a table.
+    """
+
+    def __init__(
+            self, master=None, column_data=None, col_widths=None,
+            col_wraps=None, is_header=False, first_tk_col=0):
+        """
+        :param column_data: A list of strings to write in the columns.
+        The number of elements in the list will dictate how many
+        columns are created.
+        :param col_widths: A list of integers, each representing the
+        width for that column. (List must have the same number of
+        elements as `column_data`.)
+        :param col_wraps: A list of integers, each representing the
+        textwrap for that column, in Tkinter 'text units'.
+        (List must have the same number of elements as `column_data`.)
+        :param is_header: Whether this row contains headers. (Defaults
+        to False.)
+        :param first_tk_col: The first tkinter grid column in which to
+        place the table (probably only used for TableRow subclasses).
+        """
+        tk.Frame.__init__(self, master)
+        self.master = master
+        if column_data is None:
+            column_data = []
+        if col_widths is None:
+            col_widths = [None for _ in column_data]
+        if col_wraps is None:
+            col_wraps = [None for _ in column_data]
+
+        anchor = 'nw'
+        if is_header:
+            anchor = 'n'
+
+        for i in range(len(column_data)):
+            txt = column_data[i]
+            width = col_widths[i]
+            wrap = col_wraps[i]
+            frm = tk.Frame(
+                master=self, highlightbackground='black', highlightthickness=1)
+            frm.grid(row=0, column=first_tk_col + i, sticky='ns')
+            lbl = tk.Label(
+                master=frm, text=txt, anchor=anchor, width=width,
+                wraplength=wrap, justify='left')
+            lbl.grid(sticky='nw')
+
+
+########################################################################
 # Description Editor Window / Subframes
 ########################################################################
 
 class DescriptionEditor(tk.Toplevel):
-    """A widget for viewing, editing, reconfiguring, and reparsing PLSSDesc
+    """
+    A widget for viewing, editing, reconfiguring, and reparsing PLSSDesc
     objects that are currently in the MultiPlatQueue.
 
     NOTE: At init, specify `plssdesc_list_owner=<object>` (e.g., a root
     Tk() object), if that's where the list of updated/saved PLSSDesc
     objects should be stored to (defaults to same as `master`, but may
-    need to be a higher-level master)."""
+    need to be a higher-level master).
+    """
 
     SDE_ROW = 1
     SDE_COL = 1
@@ -1596,8 +1651,7 @@ class SingleDescriptionEditor(tk.Frame):
             self.tract_table.destroy()
         self.tract_table = TractTable(
             self.pytrs_display_frame,
-            tract_list=source_plssdesc.parsedTracts,
-            text_color=text_color, more_info=self.more_info)
+            tract_list=source_plssdesc.parsedTracts, more_info=self.more_info)
         self.tract_table.grid(
             row=self.tract_table_row_col[0],
             column=self.tract_table_row_col[1],
@@ -1776,8 +1830,10 @@ class DescTextEditWindow(tk.Toplevel):
 
 
 class TractTable(tk.Frame):
-    """A frame containing a table of parsed data from a list of
-    pyTRS.Tract objects."""
+    """
+    A frame containing a table of parsed data from a list of
+    pyTRS.Tract objects.
+    """
 
     trs_col_width = 10
     trs_wraplength = 240
@@ -1789,73 +1845,46 @@ class TractTable(tk.Frame):
     lotqq_wraplength = 200
 
     def __init__(
-            self, master=None, tract_list=None, text_color='black',
-            more_info=False, **kw):
+            self, master=None, tract_list=None, more_info=False, **kw):
         tk.Frame.__init__(self, master, **kw)
         self.master = master
-
         if tract_list is None:
             tract_list = []
         self.tract_list = tract_list
 
-        # Use a copy of this list (because we'll be inserting, and we
-        # want the original list to remain intact).
-        tract_list = tract_list.copy()
+        self.col_widths = [self.trs_col_width, self.desc_col_width]
+        self.col_wraps = [self.trs_wraplength, self.desc_wraplength]
 
-        # Insert None at the start of the list, because we'll write
-        # headers on our first pass
-        tract_list.insert(0, None)
+        if more_info:
+            self.col_widths.append(self.lotqq_col_width)
+            self.col_wraps.append(self.lotqq_wraplength)
+
         i = 0
+
+        headers = ['TRS', 'Description']
+
+        if more_info:
+            headers = ['TRS', 'Description', 'Identified Lots / QQs']
+
+        tr = TableRow(
+            self, column_data=headers, col_widths=self.col_widths,
+            col_wraps=self.col_wraps, is_header=True)
+        tr.grid(row=i, column=0, sticky='ew')
+        i += 1
+
+        rows = []
+
         for tract_obj in tract_list:
-            # Generate a row for each tract (and also for header)
-
-            # ...for TRS
-            trs_frm = tk.Frame(
-                master=self, highlightbackground='black', highlightthickness=1)
-            trs_frm.grid(row=i, column=1, sticky='ns')
-            if tract_obj is None:
-                trs_txt = 'TRS'
-                anchor = 'n'
-            else:
-                trs_txt = tract_obj.trs
-                anchor = 'nw'
-            trs_lbl = tk.Label(
-                master=trs_frm, text=trs_txt, fg=text_color,
-                width=TractTable.trs_col_width,
-                wraplength=TractTable.trs_wraplength, justify='left')
-            trs_lbl.grid(sticky='nws')
-
-            # ...for tract descrip.
-            desc_frm = tk.Frame(
-                master=self, highlightbackground='black', highlightthickness=1)
-            desc_frm.grid(row=i, column=2, sticky='ns')
-            if tract_obj is None:
-                desc_txt = 'Description'
-            else:
-                desc_txt = tract_obj.desc
-            desc_lbl = tk.Label(
-                master=desc_frm, text=desc_txt, fg=text_color, anchor=anchor,
-                width=TractTable.desc_col_width,
-                wraplength=TractTable.desc_wraplength, justify='left')
-            desc_lbl.grid(sticky='nws')
-
-            # ...for more info
+            new_row = [tract_obj.trs, tract_obj.desc]
             if more_info:
-                # If more info requested, also display Parsed Lots / QQ's
-                frm = tk.Frame(
-                    master=self, highlightbackground='black',
-                    highlightthickness=1)
-                frm.grid(row=i, column=3, sticky='nws')
-                if tract_obj is None:
-                    lotqq_txt = 'Identified Lots / QQs'
-                else:
-                    lotqq_txt = f"{', '.join(tract_obj.lotQQList)}"
-                lotqq_lbl = tk.Label(
-                    master=frm, text=lotqq_txt, fg=text_color, anchor=anchor,
-                    width=TractTable.lotqq_col_width,
-                    wraplength=TractTable.lotqq_wraplength, justify='left')
-                lotqq_lbl.grid(row=i, column=2, sticky='ns')
+                new_row.append(', '.join(tract_obj.lotQQList))
+            rows.append(new_row)
 
+        for row in rows:
+            tr = TableRow(
+                self, column_data=row, col_widths=self.col_widths,
+                col_wraps=self.col_wraps)
+            tr.grid(row=i, column=0, sticky='ew')
             i += 1
 
 
@@ -2416,55 +2445,6 @@ class LotDefEditor(tk.Toplevel):
             except:
                 pass
             self.destroy()
-
-
-class TableRow(tk.Frame):
-    """
-    A generic row in a table.
-    """
-
-    def __init__(
-            self, master=None, column_data=None, col_widths=None,
-            col_wraps=None, is_header=False, first_tk_col=0):
-        """
-        :param column_data: A list of strings to write in the columns.
-        The number of elements in the list will dictate how many
-        columns are created.
-        :param col_widths: A list of integers, each representing the
-        width for that column. (List must have the same number of
-        elements as `column_data`.)
-        :param col_wraps: A list of integers, each representing the
-        textwrap for that column, in Tkinter 'text units'.
-        (List must have the same number of elements as `column_data`.)
-        :param is_header: Whether this row contains headers. (Defaults
-        to False.)
-        :param first_tk_col: The first tkinter grid column in which to
-        place the table (probably only used for TableRow subclasses).
-        """
-        tk.Frame.__init__(self, master)
-        self.master = master
-        if column_data is None:
-            column_data = []
-        if col_widths is None:
-            col_widths = [None for _ in column_data]
-        if col_wraps is None:
-            col_wraps = [None for _ in column_data]
-
-        anchor = 'nw'
-        if is_header:
-            anchor = 'n'
-
-        for i in range(len(column_data)):
-            txt = column_data[i]
-            width = col_widths[i]
-            wrap = col_wraps[i]
-            frm = tk.Frame(
-                master=self, highlightbackground='black', highlightthickness=1)
-            frm.grid(row=0, column=first_tk_col + i, sticky='ns')
-            lbl = tk.Label(
-                master=frm, text=txt, anchor=anchor, width=width,
-                wraplength=wrap, justify='left')
-            lbl.grid(sticky='nw')
 
 
 class LDTableRow(TableRow):
