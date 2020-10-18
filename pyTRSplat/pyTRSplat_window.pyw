@@ -187,7 +187,7 @@ class DescFrame(tk.Frame):
         self.lddp_fp_text = tk.StringVar('')
         self.lddp_fp_text.set(f"Current lot definitions: [None loaded]")
         lddb_label = tk.Label(desc_frame, textvariable=self.lddp_fp_text)
-        lddb_label.grid(row=7, column=1, sticky='w')
+        # lddb_label.grid(row=7, column=1, sticky='w')
 
         default_lots_frame = tk.Frame(desc_frame)
         default_lots_frame.grid(row=8, column=1, sticky='w')
@@ -465,24 +465,31 @@ class PlatPreview(tk.Frame):
     # Generate a Settings object for the mini-preview, with no
     # margins. (Hard-coded here, rather than creating it as a preset,
     # so that it will never be changed to unexpected settings.)
-    setObj = Settings(preset=None)
-    setObj.qq_side = 8
-    setObj.centerbox_wh = 12
-    setObj.sec_line_stroke = 1
-    setObj.qql_stroke = 1
-    setObj.ql_stroke = 1
-    setObj.sec_line_RGBA = (0, 0, 0, 255)
-    setObj.ql_RGBA = (128, 128, 128, 255)
-    setObj.qql_RGBA = (230, 230, 230, 255)
-    setObj.dim = (
-        setObj.qq_side * 4 * 6 + setObj.sec_line_stroke,
-        setObj.qq_side * 4 * 6 + setObj.sec_line_stroke)
-    setObj.y_top_marg = 0
-    setObj.set_font('sec', size=11)
-    setObj.write_header = False
-    setObj.write_tracts = False
-    setObj.write_lot_numbers = False
-    PREVIEW_SETTINGS = setObj
+    PREVIEW_SETTINGS = Settings(preset=None)
+    PREVIEW_SETTINGS_NONE = Settings(preset=None)
+    for set_obj in [PREVIEW_SETTINGS, PREVIEW_SETTINGS_NONE]:
+        set_obj.qq_side = 8
+        set_obj.centerbox_wh = 12
+        set_obj.sec_line_stroke = 1
+        set_obj.qql_stroke = 1
+        set_obj.ql_stroke = 1
+        set_obj.sec_line_RGBA = (0, 0, 0, 255)
+        set_obj.ql_RGBA = (128, 128, 128, 255)
+        set_obj.qql_RGBA = (230, 230, 230, 255)
+        set_obj.dim = (
+            set_obj.qq_side * 4 * 6 + set_obj.sec_line_stroke,
+            set_obj.qq_side * 4 * 6 + set_obj.sec_line_stroke)
+        set_obj.y_top_marg = 0
+        set_obj.set_font('sec', size=11)
+        set_obj.write_header = False
+        set_obj.write_tracts = False
+        set_obj.write_lot_numbers = False
+
+    # When there is nothing to preview, will show a grayed-out dummy plat.
+    PREVIEW_SETTINGS_NONE.sec_line_RGBA = (148, 148, 148, 255)
+    PREVIEW_SETTINGS_NONE.secfont_RGBA = (168, 168, 168, 255)
+    PREVIEW_SETTINGS_NONE.ql_RGBA = (196, 196, 196, 255)
+    PREVIEW_SETTINGS_NONE.centerbox_wh = 14
 
     def __init__(self, master=None, preview_owner=None):
         tk.Frame.__init__(self, master)
@@ -571,7 +578,7 @@ class PlatPreview(tk.Frame):
         # If there's nothing yet in the MPQ, manually create a 'dummy' plat
         # and append it, so that there's something to show (an empty plat)
         if len(mpq.keys()) == 0:
-            dummy = Plat(settings=self.PREVIEW_SETTINGS)
+            dummy = Plat(settings=self.PREVIEW_SETTINGS_NONE)
             new_preview_mp.plats.append(dummy)
             self.dummy_set = True
 
