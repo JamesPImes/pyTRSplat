@@ -1612,8 +1612,7 @@ class SingleDescriptionEditor(tk.Frame):
             self.flag_table.destroy()
         self.flag_table = FlagTable(
             self.pytrs_display_frame, wflag_list=source_plssdesc.wFlagList,
-            eflag_list=source_plssdesc.eFlagList, more_info=self.more_info,
-            text_color=text_color)
+            eflag_list=source_plssdesc.eFlagList, more_info=self.more_info)
         if self.more_info:
             # Only if `.more_info==True` do we place this on the grid.
             self.flag_table.grid(
@@ -1846,6 +1845,12 @@ class TractTable(tk.Frame):
 
     def __init__(
             self, master=None, tract_list=None, more_info=False, **kw):
+        """
+        :param tract_list: A list of pyTRS.Tract objects to display.
+        :param more_info: Whether the user wants to display 'more info'.
+        In this case, the `.lotQQList` attribute of each pyTRS.Tract
+        object is considered 'more info'.
+        """
         tk.Frame.__init__(self, master, **kw)
         self.master = master
         if tract_list is None:
@@ -1862,10 +1867,8 @@ class TractTable(tk.Frame):
         i = 0
 
         headers = ['TRS', 'Description']
-
         if more_info:
             headers = ['TRS', 'Description', 'Identified Lots / QQs']
-
         tr = TableRow(
             self, column_data=headers, col_widths=self.col_widths,
             col_wraps=self.col_wraps, is_header=True)
@@ -1895,63 +1898,49 @@ class FlagTable(tk.Frame):
     flag_col_width = 35
     flag_wraplength = 240
 
+    col_widths = [flag_col_width, flag_col_width]
+    col_wraps = [flag_wraplength, flag_wraplength]
+
     def __init__(
             self, master=None, wflag_list=None, eflag_list=None,
-            text_color='black', more_info=False, **kw):
+            more_info=False, **kw):
+        """
+        :param more_info: Whether the user wants to display 'more info'.
+        In this case, all flag data is considered 'more info'.
+        :param wflag_list: The `.wFlagList` attribute from a
+        pyTRS.PLSSDesc object to display.
+        :param eflag_list: The `.eFlagList` attribute from a
+        pyTRS.PLSSDesc object to display.
+        """
         tk.Frame.__init__(self, master, **kw)
         self.master = master
 
+        if not more_info:
+            return
+
         if wflag_list is None:
-            wflag_list = []
-        self.wflag_list = wflag_list
+            wflag_list = ['None']
+        elif len(wflag_list) == 0:
+            wflag_list = ['None']
 
         if eflag_list is None:
-            eflag_list = []
-        self.eflag_list = eflag_list
+            eflag_list = ['None']
+        elif len(eflag_list) == 0:
+            eflag_list = ['None']
 
-        if len(wflag_list) == 0:
-            wflag_list.append('None')
-
-        if len(eflag_list) == 0:
-            eflag_list.append('None')
+        headers = ['Warning Flags', 'Error Flags']
+        row_data = [', '.join(wflag_list), ', '.join(eflag_list)]
 
         i = 0
-        while i < 2 and more_info:
-            # Generate a row for each tract (and also for header)
-
-            # ...for Warning Flags
-            wflag_frm = tk.Frame(
-                master=self, highlightbackground='black', highlightthickness=1)
-            wflag_frm.grid(row=i, column=1, sticky='ns')
-            if i == 0:
-                # Write a header for the first row
-                wflag_txt = 'Warning Flags'
-                anchor = 'n'
-            else:
-                wflag_txt = ', '.join(wflag_list)
-                anchor = 'nw'
-            wflag_lbl = tk.Label(
-                master=wflag_frm, text=wflag_txt, fg=text_color, anchor=anchor,
-                width=FlagTable.flag_col_width, justify='left',
-                wraplength=FlagTable.flag_wraplength)
-            wflag_lbl.grid(sticky='nw')
-
-            # ...For Error Flags
-            eflag_frm = tk.Frame(
-                master=self, highlightbackground='black', highlightthickness=1)
-            eflag_frm.grid(row=i, column=2, sticky='ns')
-            if i == 0:
-                # Write a header for the first row
-                eflag_txt = 'Error Flags'
-            else:
-                eflag_txt = ', '.join(eflag_list)
-            eflag_lbl = tk.Label(
-                master=eflag_frm, text=eflag_txt, fg=text_color, anchor=anchor,
-                width=FlagTable.flag_col_width, justify='left',
-                wraplength=FlagTable.flag_wraplength)
-            eflag_lbl.grid(sticky='nw')
-
-            i += 1
+        tr = TableRow(
+            self, column_data=headers, col_widths=self.col_widths,
+            col_wraps=self.col_wraps, is_header=True)
+        tr.grid(row=i, column=0, sticky='ew')
+        i += 1
+        tr = TableRow(
+            self, column_data=row_data, col_widths=self.col_widths,
+            col_wraps=self.col_wraps, is_header=True)
+        tr.grid(row=i, column=0, sticky='ew')
 
 
 ########################################################################
