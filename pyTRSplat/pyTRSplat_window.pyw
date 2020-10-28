@@ -538,6 +538,8 @@ class PlatPreview(tk.Frame):
             textvariable=self.preview_footer_text)
         preview_disp_footer.grid(row=3, column=1, sticky='n')
 
+        self.preview_disp_label = None
+
         # Update the `self.previews` list (starts as an empty list).
         self.gen_preview()
 
@@ -606,7 +608,7 @@ class PlatPreview(tk.Frame):
             index = 0
             self.preview_index = 0
         img = self.previews[index]
-        preview = ImageTk.PhotoImage(img)
+        preview = ImageTk.PhotoImage(img, master=self)
 
         # Display the preview in this label.
         self.preview_disp_label = Label(
