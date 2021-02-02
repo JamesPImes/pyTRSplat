@@ -1,14 +1,14 @@
 # Copyright (c) 2020, James P. Imes. All rights reserved.
 
 """
-pyTRSplat -- A module to generate configurable land plat images from
+pyTRSplat -- A module to generate customizable land plat images from
 PLSS land descriptions ('legal descriptions'), using the pyTRS parsing
 module; and/or from manually-selected lands. Import as a module, or use
-the GUI application ('pyTRSplat/pyTRSplat_window.pyw').
+the GUI application ('pyTRSplat/pyTRSplat_app_windowed.pyw').
 
 Quick Guide to Module Structure / Packages:
 `pyTRSplat.launch_app()` -- Launch the GUI application
-        (or run 'pyTRSplat/pyTRSplat_window.pyw' directly)
+        (or run 'pyTRSplat/pyTRSplat_app_windowed.pyw' directly)
 
 These functions and classes from the various packages are all imported
 as main-level objects and functions. But additional documentation can
@@ -43,6 +43,7 @@ __author__ = _constants.__author__
 __email__ = _constants.__email__
 __license__ = _constants.__license__
 
+
 def version():
     """Return the current version and version date as a string."""
     return f'v{__version__} - {__versionDate__}'
@@ -58,9 +59,10 @@ from pyTRSplat.settingseditor import launch_settings_editor
 from pyTRSplat.platqueue import PlatQueue, MultiPlatQueue
 from pyTRSplat.utils import filter_tracts_by_twprge
 
+
 def launch_app():
     """
     Launch the GUI application.
     """
-    from pyTRSplat.pyTRSplat_window import launch_app
+    from .pyTRSplat_app import launch_app
     launch_app()

@@ -85,7 +85,7 @@ class ScrollResizeDisplay(tk.Frame):
         self.canvas_h_min = 600
 
         self.img = img
-        self.shown_img = ImageTk.PhotoImage(img)
+        self.shown_img = ImageTk.PhotoImage(img, master=self)
 
         ###################
         # A subframe for holding the canvas and its scrollbars
@@ -149,7 +149,7 @@ class ScrollResizeDisplay(tk.Frame):
         if h < self.canvas_h_min:
             h = self.canvas_h_min
 
-        self.shown_img = ImageTk.PhotoImage(new_img)
+        self.shown_img = ImageTk.PhotoImage(new_img, master=self)
         self.cvs.itemconfig('displayed_preview', image=self.shown_img)
         self.cvs.config(width=w, height=h)
         self.cvs.config(scrollregion=self.cvs.bbox('all'))

@@ -8,7 +8,7 @@ interpreters for converting parsed pyTRS.PLSSDesc and pyTRS.Tract data
 into SectionGrid and TownshipGrid objects.
 """
 
-from pyTRS import pyTRS
+from pyTRS import parser as pyTRS
 from pyTRSplat.utils import _smooth_QQs, _lot_without_div
 
 class SectionGrid:
