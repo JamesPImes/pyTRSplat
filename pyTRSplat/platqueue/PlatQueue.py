@@ -153,7 +153,7 @@ class MultiPlatQueue(dict):
             definition, and because they can have multiple Twp/Rge.
     """
 
-    # These types can be platted on a (single) Plat:
+    # These types can be platted onto a MultiPlat:
     MULTI_PLATTABLES = (
         SectionGrid, TownshipGrid, pyTRS.Tract, pyTRS.PLSSDesc, PlatQueue)
 
