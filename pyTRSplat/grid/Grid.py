@@ -958,7 +958,7 @@ class TwpLotDefinitions(dict):
         .csv file at filepath `fp`. Specify `twp=<str>` and `rge=<str>`
         for which rows should match.
             ex: tld_obj = TwpLotDefinitions.from_csv(
-                    r'assets\examples\SAMPLE_LDDB.csv',
+                    r'assets/examples/SAMPLE_LDDB.csv',
                     twp='154n', rge='97w')
 
         **See the docstring for LotDefDB for proper .csv formatting.
