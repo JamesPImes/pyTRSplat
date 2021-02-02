@@ -1,0 +1,1141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.9.2" />
+<title>pyTRSplat.platqueue.PlatQueue API documentation</title>
+<meta name="description" content="Streamlined queues of &#39;plattable&#39; objects." />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>pyTRSplat.platqueue.PlatQueue</code></h1>
+</header>
+<section id="section-intro">
+<p>Streamlined queues of 'plattable' objects.</p>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python"># Copyright (c) 2020, James P. Imes. All rights reserved.
+
+&#34;&#34;&#34;
+Streamlined queues of &#39;plattable&#39; objects.
+&#34;&#34;&#34;
+
+from pyTRSplat.grid import SectionGrid, TownshipGrid
+from pyTRSplat.utils import filter_tracts_by_twprge
+import pyTRS
+
+class PlatQueue(list):
+    &#34;&#34;&#34;
+    A list of objects that can be incorporated into / projected onto a
+    Plat object (i.e. &#39;plattable&#39;). The PlatQueue object also contains
+    an attribute `.tracts`, which is a SEPARATE list of the pyTRS.Tract
+    objects associated with the queued plattable objects (i.e. it is a
+    list of Tract objects whose text will eventually be written at the
+    bottom of the Plat, if the Plat is configured to do so).
+
+    These object types are plattable (i.e. can be added to a PlatQueue):
+        -- pyTRSplat.SectionGrid
+        -- pyTRSplat.TownshipGrid
+        -- pyTRS.Tract
+    Add objects with the `.queue_add()` method.
+
+    Or absorb another PlatQueue object with `.absorb()`.
+    &#34;&#34;&#34;
+
+    # These types can be platted on a (single) Plat:
+    SINGLE_PLATTABLES = (SectionGrid, TownshipGrid, pyTRS.Tract)
+
+    def __init__(self):
+        &#34;&#34;&#34;
+        Do not pass any arguments at init. Use the `.queue_add()`
+        and/or `.absorb()` methods after init.
+        &#34;&#34;&#34;
+        super().__init__()
+        self.tracts = []
+
+    def queue_add(self, plattable, tracts=None):
+        &#34;&#34;&#34;
+        Queue up an object for platting -- i.e. add the object to this
+        queue, and optionally add any corresponding tracts to the
+        `.tracts` list as well.
+
+        NOTE: A PlatQueue can contain any number of plattable objects,
+        but only one may be added via this method at a time. However,
+        the list passed as `tracts=` (if any) can contain any number of
+        pyTRS.Tract objects (which get appended to the `.tracts`
+        attribute of this PlatQueue).
+
+        IMPORTANT: Passing an object in `tracts` does NOT add it to the
+        queue to be platted -- only to the tracts whose text will be
+        written at the bottom of the plat(s), if so configured.
+
+        :param plattable: The object to be added to the queue. (Must be
+        a type acceptable to PlatQueue -- see docs for those objects.)
+        :param tracts: A list of pyTRS.Tract objects whose text should
+        eventually be written at the bottom of the Plat (assuming the
+        Plat is configured in settings to write Tract text).
+        NOTE: Objects added to `tracts` do NOT get drawn on the plat --
+        only written at the bottom. But pyTRS.Tract objects passed here
+        as arg `plattable` are automatically added to `tracts`.
+        &#34;&#34;&#34;
+
+        # Make sure that `tracts` is a list.
+        if tracts is None:
+            tracts = []
+        elif isinstance(tracts, pyTRS.Tract):
+            # If tracts was fed as a single Tract object, put it in a list.
+            tracts = [tracts]
+
+        # If attempting to add another PlatQueue object, we&#39;ll absorb
+        # it instead.
+        if isinstance(plattable, PlatQueue):
+            self.absorb(plattable, tracts=tracts)
+            return
+
+        # We&#39;ll disallow PLSSDesc objects before ruling out others,
+        # because they ARE allowed in MultiPlatQueue objects, so we
+        # point the user in that direction.
+        if isinstance(plattable, pyTRS.PLSSDesc):
+            raise TypeError(
+                &#39;Attempted to add unplattable object to queue; pyTRS.PLSSDesc &#39;
+                &#39;objects may be queued in MultiPlatQueue objects, but &#39;
+                &#39;not PlatQueue objects.&#39;)
+
+        # We&#39;ll disallow object types that are not in PLATTABLES.
+        if not isinstance(plattable, PlatQueue.SINGLE_PLATTABLES):
+            raise TypeError(f&#39;Attempted to add unplattable object to queue; &#39;
+                            f&#39;type: {type(plattable)}&#39;)
+
+        # We&#39;ll also make sure that `tracts` contains only Tract objects.
+        for item in tracts:
+            if not isinstance(item, pyTRS.Tract):
+                raise TypeError(
+                    f&#39;Attempted to add object other than  pyTRS.Tract to &#39;
+                    f&#39;`tracts` list; type: {type(item)}&#39;)
+
+        # A Tract object is both plattable, and its description gets
+        # (optionally) written at the bottom of the page, so if a Tract
+        # was added to this queue, we check to see if it was ALSO added
+        # in the `tracts` list. If it was not, we add it now.
+        if isinstance(plattable, pyTRS.Tract):
+            if not plattable in tracts:
+                tracts.append(plattable)
+
+        # The plattable itself gets added to the PlatQueue (a list)...
+        self.append(plattable)
+
+        # ...And the corresponding tracts get added to a dict, keyed by
+        # the tract object.
+        self.tracts.extend(tracts)
+
+    def absorb(self, pqObj, tracts=None):
+        &#34;&#34;&#34;
+        Absorb a PlatQueue object into this one. The parameter `tracts=`
+        should not be used directly -- it will only be used when this is
+        called via `.queue_add()`.
+        NOTE: Does not destroy the absorbed PlatQueue.
+        &#34;&#34;&#34;
+        if tracts is None:
+            tracts = []
+        self.extend(pqObj)
+        self.tracts.extend(pqObj.tracts)
+        self.tracts.extend(tracts)
+
+
+class MultiPlatQueue(dict):
+    &#34;&#34;&#34;
+    A dict keyed by T&amp;R (in the format of &#39;000x000y&#39; or fewer digits)
+    of objects to use to generate a MultiPlat object. Each value in the
+    MultiPlatQueue is a PlatQueue object, which in turn is a list of
+    objects that can be incorporated into / projected onto a Plat object
+    (i.e. &#39;plattable&#39;).
+
+    These object types can be added to a MultiPlatQueue:
+        -- pyTRSplat.SectionGrid [*]
+        -- pyTRSplat.TownshipGrid [*]
+        -- pyTRSplat.PlatQueue [*]
+        -- pyTRS.Tract [**]
+        -- pyTRS.PLSSDesc [***]
+        [*] Single asterisk denotes object types for which twprge must
+            be specified when adding to the queue (i.e. which Twp/Rge do
+            these objects belong to).
+        [**] Double asterisk denotes object types for which twprge may
+            optionally be specified when adding to the queue (if not
+            specified, will be pulled from the object itself, as long as
+            that object has appropriate `.twp` and `.rge` attributes).
+        [***] Specifying twprge for pyTRS.PLSSDesc objects has no effect
+            (it can be specified but will be disregarded), because
+            PLSSDesc objects automatically contain Twp/Rge data by
+            definition, and because they can have multiple Twp/Rge.
+    &#34;&#34;&#34;
+
+    # These types can be platted on a (single) Plat:
+    MULTI_PLATTABLES = (
+        SectionGrid, TownshipGrid, pyTRS.Tract, pyTRS.PLSSDesc, PlatQueue)
+
+    def __init__(self):
+        &#34;&#34;&#34;
+        Do not pass any arguments at init. Use the `.queue_add()`,
+        `.queue_add_text()`, and/or `.absorb()` methods after init.
+        &#34;&#34;&#34;
+        super().__init__()
+
+    def queue_add(self, plattable, twprge=&#39;&#39;, tracts=None):
+        &#34;&#34;&#34;
+        Queue up an object for platting -- i.e. add that object to the
+        PlatQueue object for the specified `twprge` (in the format
+        &#39;000z000y&#39;, or fewer digits). If no PlatQueue yet exists for
+        that twprge (i.e. if that twprge is not yet a key in this
+        MultiPlatQueue object), a PQ object will be created.
+
+        NOTE: If a pyTRS.PLSSDesc object is passed as the `plattable`,
+        then `twprge` and `tracts` are ignored, but rather are deduced
+        automatically (because there can be more than one T&amp;R from a
+        single PLSSDesc object).
+
+        NOTE ALSO: If a pyTRS.Tract object is passed as the `plattable`,
+        then `twprge` is optional (as long as the Tract object has a
+        specified `.twp` and `.rge`), and `tracts` is always optional.
+        However, the Tract object&#39;s `.twp` and `.rge` will NOT overrule
+        a kwarg-specified `twprge=` (if any).
+
+        :param plattable: The object to be added to the queue. (Must be
+        a type acceptable to MultiPlatQueue -- see docs for those
+        objects.)
+        :param twprge: A string of the Twp/Rge (e.g., &#39;154n97w&#39; or
+        &#39;1s8e&#39;) to which the plattable object belongs.
+            ex: If queuing up a pyTRS.SectionGrid object for Section 1,
+                T154N-R97W, then `twprge` should be &#39;154n97w&#39;.
+        NOTE: `twprge` is ignored when a pyTRS.PLSSDesc object is passed
+            as `plattable`.
+        NOTE ALSO: `twprge` is optional when a pyTRS.Tract object is
+            passed as `plattable`, as long as the Tract object has
+            appropriate `.twp` and `.rge` attributes. If `twprge=` is
+            specified in this method, that will control over whatever is
+            in the Tract object&#39;s `.twp` and `.rge` attributes.
+        :param tracts: A list of pyTRS.Tract objects whose text should
+        eventually be written at the bottom of the appropriate Plat
+        (assuming the MultiPlat is configured in settings to write Tract
+        text).
+        NOTE: Objects added to `tracts` do NOT get drawn on the plats --
+        only written at the bottom. But pyTRS.Tract objects passed here
+        as arg `plattable` are automatically added to `tracts`.
+        &#34;&#34;&#34;
+
+        def breakout_plssdesc(descObj):
+            &#34;&#34;&#34;
+            pyTRS.PLSSDesc objects MUST be handled specially, because
+            they can generate multiple T&amp;R&#39;s (i.e. multiple dict keys).
+            &#34;&#34;&#34;
+            twp_to_tract = filter_tracts_by_twprge(descObj)
+            for twprge, tract_list in twp_to_tract.items():
+                self.setdefault(twprge, PlatQueue())
+                for tract in tract_list:
+                    self[twprge].queue_add(tract)
+            return
+
+        def handle_tract(tractObj, twprge=None, tracts=None):
+            &#34;&#34;&#34;
+            pyTRS.Tract object can be handled specially too, because it
+            can also have T&amp;R specified internally. Return the original
+            plattable -- but also the twprge and tracts, if they were
+            not specified.
+            &#34;&#34;&#34;
+
+            # If twprge was not specified for this object, pull it from
+            # the Tract object itself.
+            if twprge in [&#39;&#39;, None]:
+                twp, rge = tractObj.twp.lower(), tractObj.rge.lower()
+                twprge = twp+rge
+                if twprge == &#39;&#39;:
+                    # i.e. tract.twp and tract.rge were both also &#39;&#39;
+                    twprge = &#39;undef&#39;
+            else:
+                twprge = twprge.lower()
+
+            # Smooth out any variations of &#39;TRerrTRerr&#39;, &#39;TRerr_&#39;, etc.
+            if &#39;trerr&#39; in twprge.lower():
+                twprge = &#39;TRerr&#39;
+
+            # Ensure this Tract object has been added to the tract list.
+            confirmed_tracts = []
+            if tracts is not None:
+                confirmed_tracts.extend(tracts)
+            if tractObj not in confirmed_tracts:
+                confirmed_tracts.append(tractObj)
+
+            return tractObj, twprge, confirmed_tracts
+
+
+        def handle_platqueue(pq, twprge=None, tracts=None):
+            &#34;&#34;&#34;
+            PlatQueue object can be handled specially too, because it
+            should be absorbed, if a PQ already exists for that T&amp;R,
+            rather than added.
+            &#34;&#34;&#34;
+            if twprge is None:
+                raise ValueError(
+                    &#39;`twprge` must be specified when adding a PlatQueue &#39;
+                    &#39;to a MultiPlatQueue.&#39;)
+            if tracts is not None:
+                pq.tracts.extend(tracts)
+            self.setdefault(twprge, PlatQueue())
+            self[twprge].absorb(pq)
+            return
+
+        if not isinstance(plattable, MultiPlatQueue.MULTI_PLATTABLES):
+            raise TypeError(f&#34;Cannot add type to MultiPlatQueue: &#34;
+                            f&#34;{type(plattable)}&#34;)
+
+        # Handle PLSSDesc object, if it is one.
+        if isinstance(plattable, pyTRS.PLSSDesc):
+            breakout_plssdesc(plattable)
+            return
+
+        # Handle PlatQueue object, if it is one.
+        if isinstance(plattable, PlatQueue):
+            handle_platqueue(plattable, twprge, tracts)
+            return
+
+        # Handle Tract object, if it is one.
+        if isinstance(plattable, pyTRS.Tract):
+            plattable, twprge, tracts = handle_tract(plattable, twprge, tracts)
+
+        if len(twprge) == 0:
+            raise ValueError(
+                &#34;To add objects other than pyTRS.PLSSDesc or pyTRS.Tract to &#34;
+                &#34;queue, &#39;twprge&#39; must be specified as a non-empty string, to &#34;
+                &#34;serve as dict key.&#34;)
+
+        twprge = twprge.lower()
+        # If the twprge does not already exist as a key, create a
+        # PlatQueue object for that T&amp;R, and add it to the dict now.
+        self.setdefault(twprge, PlatQueue())
+        self[twprge].queue_add(plattable, tracts)
+
+    def absorb(self, mpq):
+        &#34;&#34;&#34;
+        Absorb a MultiPlatQueue object into this one.
+        &#34;&#34;&#34;
+        for twprge, pq in mpq.items():
+            # If a PQ for this T&amp;R does not yet exist, we&#39;ll create one now.
+            self.setdefault(twprge, PlatQueue())
+
+            # And instruct our new PQ to absorb the PQ from our subordinate MPQ
+            self[twprge].absorb(pq)
+
+    def queue_add_text(self, text, config=None):
+        &#34;&#34;&#34;
+        Parse the raw text of a PLSS land description (optionally using
+        `config=` parameters -- see pyTRS docs), and add the resulting
+        PLSSDesc object to this MultiPlatQueue.
+        &#34;&#34;&#34;
+        descObj = pyTRS.PLSSDesc(text, config=config, initParseQQ=True)
+        self.queue_add(descObj)</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="pyTRSplat.platqueue.PlatQueue.MultiPlatQueue"><code class="flex name class">
+<span>class <span class="ident">MultiPlatQueue</span></span>
+</code></dt>
+<dd>
+<div class="desc"><p>A dict keyed by T&amp;R (in the format of '000x000y' or fewer digits)
+of objects to use to generate a MultiPlat object. Each value in the
+MultiPlatQueue is a PlatQueue object, which in turn is a list of
+objects that can be incorporated into / projected onto a Plat object
+(i.e. 'plattable').</p>
+<p>These object types can be added to a MultiPlatQueue:
+&ndash; pyTRSplat.SectionGrid [<em>]
+&ndash; pyTRSplat.TownshipGrid [</em>]
+&ndash; pyTRSplat.PlatQueue [<em>]
+&ndash; pyTRS.Tract [</em><em>]
+&ndash; pyTRS.PLSSDesc [</em><strong>]
+[<em>] Single asterisk denotes object types for which twprge must
+be specified when adding to the queue (i.e. which Twp/Rge do
+these objects belong to).
+[**] Double asterisk denotes object types for which twprge may
+optionally be specified when adding to the queue (if not
+specified, will be pulled from the object itself, as long as
+that object has appropriate <code>.twp</code> and <code>.rge</code> attributes).
+[</em></strong>] Specifying twprge for pyTRS.PLSSDesc objects has no effect
+(it can be specified but will be disregarded), because
+PLSSDesc objects automatically contain Twp/Rge data by
+definition, and because they can have multiple Twp/Rge.</p>
+<p>Do not pass any arguments at init. Use the <code>.queue_add()</code>,
+<code>.queue_add_text()</code>, and/or <code>.absorb()</code> methods after init.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class MultiPlatQueue(dict):
+    &#34;&#34;&#34;
+    A dict keyed by T&amp;R (in the format of &#39;000x000y&#39; or fewer digits)
+    of objects to use to generate a MultiPlat object. Each value in the
+    MultiPlatQueue is a PlatQueue object, which in turn is a list of
+    objects that can be incorporated into / projected onto a Plat object
+    (i.e. &#39;plattable&#39;).
+
+    These object types can be added to a MultiPlatQueue:
+        -- pyTRSplat.SectionGrid [*]
+        -- pyTRSplat.TownshipGrid [*]
+        -- pyTRSplat.PlatQueue [*]
+        -- pyTRS.Tract [**]
+        -- pyTRS.PLSSDesc [***]
+        [*] Single asterisk denotes object types for which twprge must
+            be specified when adding to the queue (i.e. which Twp/Rge do
+            these objects belong to).
+        [**] Double asterisk denotes object types for which twprge may
+            optionally be specified when adding to the queue (if not
+            specified, will be pulled from the object itself, as long as
+            that object has appropriate `.twp` and `.rge` attributes).
+        [***] Specifying twprge for pyTRS.PLSSDesc objects has no effect
+            (it can be specified but will be disregarded), because
+            PLSSDesc objects automatically contain Twp/Rge data by
+            definition, and because they can have multiple Twp/Rge.
+    &#34;&#34;&#34;
+
+    # These types can be platted on a (single) Plat:
+    MULTI_PLATTABLES = (
+        SectionGrid, TownshipGrid, pyTRS.Tract, pyTRS.PLSSDesc, PlatQueue)
+
+    def __init__(self):
+        &#34;&#34;&#34;
+        Do not pass any arguments at init. Use the `.queue_add()`,
+        `.queue_add_text()`, and/or `.absorb()` methods after init.
+        &#34;&#34;&#34;
+        super().__init__()
+
+    def queue_add(self, plattable, twprge=&#39;&#39;, tracts=None):
+        &#34;&#34;&#34;
+        Queue up an object for platting -- i.e. add that object to the
+        PlatQueue object for the specified `twprge` (in the format
+        &#39;000z000y&#39;, or fewer digits). If no PlatQueue yet exists for
+        that twprge (i.e. if that twprge is not yet a key in this
+        MultiPlatQueue object), a PQ object will be created.
+
+        NOTE: If a pyTRS.PLSSDesc object is passed as the `plattable`,
+        then `twprge` and `tracts` are ignored, but rather are deduced
+        automatically (because there can be more than one T&amp;R from a
+        single PLSSDesc object).
+
+        NOTE ALSO: If a pyTRS.Tract object is passed as the `plattable`,
+        then `twprge` is optional (as long as the Tract object has a
+        specified `.twp` and `.rge`), and `tracts` is always optional.
+        However, the Tract object&#39;s `.twp` and `.rge` will NOT overrule
+        a kwarg-specified `twprge=` (if any).
+
+        :param plattable: The object to be added to the queue. (Must be
+        a type acceptable to MultiPlatQueue -- see docs for those
+        objects.)
+        :param twprge: A string of the Twp/Rge (e.g., &#39;154n97w&#39; or
+        &#39;1s8e&#39;) to which the plattable object belongs.
+            ex: If queuing up a pyTRS.SectionGrid object for Section 1,
+                T154N-R97W, then `twprge` should be &#39;154n97w&#39;.
+        NOTE: `twprge` is ignored when a pyTRS.PLSSDesc object is passed
+            as `plattable`.
+        NOTE ALSO: `twprge` is optional when a pyTRS.Tract object is
+            passed as `plattable`, as long as the Tract object has
+            appropriate `.twp` and `.rge` attributes. If `twprge=` is
+            specified in this method, that will control over whatever is
+            in the Tract object&#39;s `.twp` and `.rge` attributes.
+        :param tracts: A list of pyTRS.Tract objects whose text should
+        eventually be written at the bottom of the appropriate Plat
+        (assuming the MultiPlat is configured in settings to write Tract
+        text).
+        NOTE: Objects added to `tracts` do NOT get drawn on the plats --
+        only written at the bottom. But pyTRS.Tract objects passed here
+        as arg `plattable` are automatically added to `tracts`.
+        &#34;&#34;&#34;
+
+        def breakout_plssdesc(descObj):
+            &#34;&#34;&#34;
+            pyTRS.PLSSDesc objects MUST be handled specially, because
+            they can generate multiple T&amp;R&#39;s (i.e. multiple dict keys).
+            &#34;&#34;&#34;
+            twp_to_tract = filter_tracts_by_twprge(descObj)
+            for twprge, tract_list in twp_to_tract.items():
+                self.setdefault(twprge, PlatQueue())
+                for tract in tract_list:
+                    self[twprge].queue_add(tract)
+            return
+
+        def handle_tract(tractObj, twprge=None, tracts=None):
+            &#34;&#34;&#34;
+            pyTRS.Tract object can be handled specially too, because it
+            can also have T&amp;R specified internally. Return the original
+            plattable -- but also the twprge and tracts, if they were
+            not specified.
+            &#34;&#34;&#34;
+
+            # If twprge was not specified for this object, pull it from
+            # the Tract object itself.
+            if twprge in [&#39;&#39;, None]:
+                twp, rge = tractObj.twp.lower(), tractObj.rge.lower()
+                twprge = twp+rge
+                if twprge == &#39;&#39;:
+                    # i.e. tract.twp and tract.rge were both also &#39;&#39;
+                    twprge = &#39;undef&#39;
+            else:
+                twprge = twprge.lower()
+
+            # Smooth out any variations of &#39;TRerrTRerr&#39;, &#39;TRerr_&#39;, etc.
+            if &#39;trerr&#39; in twprge.lower():
+                twprge = &#39;TRerr&#39;
+
+            # Ensure this Tract object has been added to the tract list.
+            confirmed_tracts = []
+            if tracts is not None:
+                confirmed_tracts.extend(tracts)
+            if tractObj not in confirmed_tracts:
+                confirmed_tracts.append(tractObj)
+
+            return tractObj, twprge, confirmed_tracts
+
+
+        def handle_platqueue(pq, twprge=None, tracts=None):
+            &#34;&#34;&#34;
+            PlatQueue object can be handled specially too, because it
+            should be absorbed, if a PQ already exists for that T&amp;R,
+            rather than added.
+            &#34;&#34;&#34;
+            if twprge is None:
+                raise ValueError(
+                    &#39;`twprge` must be specified when adding a PlatQueue &#39;
+                    &#39;to a MultiPlatQueue.&#39;)
+            if tracts is not None:
+                pq.tracts.extend(tracts)
+            self.setdefault(twprge, PlatQueue())
+            self[twprge].absorb(pq)
+            return
+
+        if not isinstance(plattable, MultiPlatQueue.MULTI_PLATTABLES):
+            raise TypeError(f&#34;Cannot add type to MultiPlatQueue: &#34;
+                            f&#34;{type(plattable)}&#34;)
+
+        # Handle PLSSDesc object, if it is one.
+        if isinstance(plattable, pyTRS.PLSSDesc):
+            breakout_plssdesc(plattable)
+            return
+
+        # Handle PlatQueue object, if it is one.
+        if isinstance(plattable, PlatQueue):
+            handle_platqueue(plattable, twprge, tracts)
+            return
+
+        # Handle Tract object, if it is one.
+        if isinstance(plattable, pyTRS.Tract):
+            plattable, twprge, tracts = handle_tract(plattable, twprge, tracts)
+
+        if len(twprge) == 0:
+            raise ValueError(
+                &#34;To add objects other than pyTRS.PLSSDesc or pyTRS.Tract to &#34;
+                &#34;queue, &#39;twprge&#39; must be specified as a non-empty string, to &#34;
+                &#34;serve as dict key.&#34;)
+
+        twprge = twprge.lower()
+        # If the twprge does not already exist as a key, create a
+        # PlatQueue object for that T&amp;R, and add it to the dict now.
+        self.setdefault(twprge, PlatQueue())
+        self[twprge].queue_add(plattable, tracts)
+
+    def absorb(self, mpq):
+        &#34;&#34;&#34;
+        Absorb a MultiPlatQueue object into this one.
+        &#34;&#34;&#34;
+        for twprge, pq in mpq.items():
+            # If a PQ for this T&amp;R does not yet exist, we&#39;ll create one now.
+            self.setdefault(twprge, PlatQueue())
+
+            # And instruct our new PQ to absorb the PQ from our subordinate MPQ
+            self[twprge].absorb(pq)
+
+    def queue_add_text(self, text, config=None):
+        &#34;&#34;&#34;
+        Parse the raw text of a PLSS land description (optionally using
+        `config=` parameters -- see pyTRS docs), and add the resulting
+        PLSSDesc object to this MultiPlatQueue.
+        &#34;&#34;&#34;
+        descObj = pyTRS.PLSSDesc(text, config=config, initParseQQ=True)
+        self.queue_add(descObj)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.dict</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="pyTRSplat.platqueue.PlatQueue.MultiPlatQueue.MULTI_PLATTABLES"><code class="name">var <span class="ident">MULTI_PLATTABLES</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="pyTRSplat.platqueue.PlatQueue.MultiPlatQueue.absorb"><code class="name flex">
+<span>def <span class="ident">absorb</span></span>(<span>self, mpq)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Absorb a MultiPlatQueue object into this one.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def absorb(self, mpq):
+    &#34;&#34;&#34;
+    Absorb a MultiPlatQueue object into this one.
+    &#34;&#34;&#34;
+    for twprge, pq in mpq.items():
+        # If a PQ for this T&amp;R does not yet exist, we&#39;ll create one now.
+        self.setdefault(twprge, PlatQueue())
+
+        # And instruct our new PQ to absorb the PQ from our subordinate MPQ
+        self[twprge].absorb(pq)</code></pre>
+</details>
+</dd>
+<dt id="pyTRSplat.platqueue.PlatQueue.MultiPlatQueue.queue_add"><code class="name flex">
+<span>def <span class="ident">queue_add</span></span>(<span>self, plattable, twprge='', tracts=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Queue up an object for platting &ndash; i.e. add that object to the
+PlatQueue object for the specified <code>twprge</code> (in the format
+'000z000y', or fewer digits). If no PlatQueue yet exists for
+that twprge (i.e. if that twprge is not yet a key in this
+MultiPlatQueue object), a PQ object will be created.</p>
+<p>NOTE: If a pyTRS.PLSSDesc object is passed as the <code>plattable</code>,
+then <code>twprge</code> and <code>tracts</code> are ignored, but rather are deduced
+automatically (because there can be more than one T&amp;R from a
+single PLSSDesc object).</p>
+<p>NOTE ALSO: If a pyTRS.Tract object is passed as the <code>plattable</code>,
+then <code>twprge</code> is optional (as long as the Tract object has a
+specified <code>.twp</code> and <code>.rge</code>), and <code>tracts</code> is always optional.
+However, the Tract object's <code>.twp</code> and <code>.rge</code> will NOT overrule
+a kwarg-specified <code>twprge=</code> (if any).</p>
+<p>:param plattable: The object to be added to the queue. (Must be
+a type acceptable to MultiPlatQueue &ndash; see docs for those
+objects.)
+:param twprge: A string of the Twp/Rge (e.g., '154n97w' or
+'1s8e') to which the plattable object belongs.
+ex: If queuing up a pyTRS.SectionGrid object for Section 1,
+T154N-R97W, then <code>twprge</code> should be '154n97w'.
+NOTE: <code>twprge</code> is ignored when a pyTRS.PLSSDesc object is passed
+as <code>plattable</code>.
+NOTE ALSO: <code>twprge</code> is optional when a pyTRS.Tract object is
+passed as <code>plattable</code>, as long as the Tract object has
+appropriate <code>.twp</code> and <code>.rge</code> attributes. If <code>twprge=</code> is
+specified in this method, that will control over whatever is
+in the Tract object's <code>.twp</code> and <code>.rge</code> attributes.
+:param tracts: A list of pyTRS.Tract objects whose text should
+eventually be written at the bottom of the appropriate Plat
+(assuming the MultiPlat is configured in settings to write Tract
+text).
+NOTE: Objects added to <code>tracts</code> do NOT get drawn on the plats &ndash;
+only written at the bottom. But pyTRS.Tract objects passed here
+as arg <code>plattable</code> are automatically added to <code>tracts</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def queue_add(self, plattable, twprge=&#39;&#39;, tracts=None):
+    &#34;&#34;&#34;
+    Queue up an object for platting -- i.e. add that object to the
+    PlatQueue object for the specified `twprge` (in the format
+    &#39;000z000y&#39;, or fewer digits). If no PlatQueue yet exists for
+    that twprge (i.e. if that twprge is not yet a key in this
+    MultiPlatQueue object), a PQ object will be created.
+
+    NOTE: If a pyTRS.PLSSDesc object is passed as the `plattable`,
+    then `twprge` and `tracts` are ignored, but rather are deduced
+    automatically (because there can be more than one T&amp;R from a
+    single PLSSDesc object).
+
+    NOTE ALSO: If a pyTRS.Tract object is passed as the `plattable`,
+    then `twprge` is optional (as long as the Tract object has a
+    specified `.twp` and `.rge`), and `tracts` is always optional.
+    However, the Tract object&#39;s `.twp` and `.rge` will NOT overrule
+    a kwarg-specified `twprge=` (if any).
+
+    :param plattable: The object to be added to the queue. (Must be
+    a type acceptable to MultiPlatQueue -- see docs for those
+    objects.)
+    :param twprge: A string of the Twp/Rge (e.g., &#39;154n97w&#39; or
+    &#39;1s8e&#39;) to which the plattable object belongs.
+        ex: If queuing up a pyTRS.SectionGrid object for Section 1,
+            T154N-R97W, then `twprge` should be &#39;154n97w&#39;.
+    NOTE: `twprge` is ignored when a pyTRS.PLSSDesc object is passed
+        as `plattable`.
+    NOTE ALSO: `twprge` is optional when a pyTRS.Tract object is
+        passed as `plattable`, as long as the Tract object has
+        appropriate `.twp` and `.rge` attributes. If `twprge=` is
+        specified in this method, that will control over whatever is
+        in the Tract object&#39;s `.twp` and `.rge` attributes.
+    :param tracts: A list of pyTRS.Tract objects whose text should
+    eventually be written at the bottom of the appropriate Plat
+    (assuming the MultiPlat is configured in settings to write Tract
+    text).
+    NOTE: Objects added to `tracts` do NOT get drawn on the plats --
+    only written at the bottom. But pyTRS.Tract objects passed here
+    as arg `plattable` are automatically added to `tracts`.
+    &#34;&#34;&#34;
+
+    def breakout_plssdesc(descObj):
+        &#34;&#34;&#34;
+        pyTRS.PLSSDesc objects MUST be handled specially, because
+        they can generate multiple T&amp;R&#39;s (i.e. multiple dict keys).
+        &#34;&#34;&#34;
+        twp_to_tract = filter_tracts_by_twprge(descObj)
+        for twprge, tract_list in twp_to_tract.items():
+            self.setdefault(twprge, PlatQueue())
+            for tract in tract_list:
+                self[twprge].queue_add(tract)
+        return
+
+    def handle_tract(tractObj, twprge=None, tracts=None):
+        &#34;&#34;&#34;
+        pyTRS.Tract object can be handled specially too, because it
+        can also have T&amp;R specified internally. Return the original
+        plattable -- but also the twprge and tracts, if they were
+        not specified.
+        &#34;&#34;&#34;
+
+        # If twprge was not specified for this object, pull it from
+        # the Tract object itself.
+        if twprge in [&#39;&#39;, None]:
+            twp, rge = tractObj.twp.lower(), tractObj.rge.lower()
+            twprge = twp+rge
+            if twprge == &#39;&#39;:
+                # i.e. tract.twp and tract.rge were both also &#39;&#39;
+                twprge = &#39;undef&#39;
+        else:
+            twprge = twprge.lower()
+
+        # Smooth out any variations of &#39;TRerrTRerr&#39;, &#39;TRerr_&#39;, etc.
+        if &#39;trerr&#39; in twprge.lower():
+            twprge = &#39;TRerr&#39;
+
+        # Ensure this Tract object has been added to the tract list.
+        confirmed_tracts = []
+        if tracts is not None:
+            confirmed_tracts.extend(tracts)
+        if tractObj not in confirmed_tracts:
+            confirmed_tracts.append(tractObj)
+
+        return tractObj, twprge, confirmed_tracts
+
+
+    def handle_platqueue(pq, twprge=None, tracts=None):
+        &#34;&#34;&#34;
+        PlatQueue object can be handled specially too, because it
+        should be absorbed, if a PQ already exists for that T&amp;R,
+        rather than added.
+        &#34;&#34;&#34;
+        if twprge is None:
+            raise ValueError(
+                &#39;`twprge` must be specified when adding a PlatQueue &#39;
+                &#39;to a MultiPlatQueue.&#39;)
+        if tracts is not None:
+            pq.tracts.extend(tracts)
+        self.setdefault(twprge, PlatQueue())
+        self[twprge].absorb(pq)
+        return
+
+    if not isinstance(plattable, MultiPlatQueue.MULTI_PLATTABLES):
+        raise TypeError(f&#34;Cannot add type to MultiPlatQueue: &#34;
+                        f&#34;{type(plattable)}&#34;)
+
+    # Handle PLSSDesc object, if it is one.
+    if isinstance(plattable, pyTRS.PLSSDesc):
+        breakout_plssdesc(plattable)
+        return
+
+    # Handle PlatQueue object, if it is one.
+    if isinstance(plattable, PlatQueue):
+        handle_platqueue(plattable, twprge, tracts)
+        return
+
+    # Handle Tract object, if it is one.
+    if isinstance(plattable, pyTRS.Tract):
+        plattable, twprge, tracts = handle_tract(plattable, twprge, tracts)
+
+    if len(twprge) == 0:
+        raise ValueError(
+            &#34;To add objects other than pyTRS.PLSSDesc or pyTRS.Tract to &#34;
+            &#34;queue, &#39;twprge&#39; must be specified as a non-empty string, to &#34;
+            &#34;serve as dict key.&#34;)
+
+    twprge = twprge.lower()
+    # If the twprge does not already exist as a key, create a
+    # PlatQueue object for that T&amp;R, and add it to the dict now.
+    self.setdefault(twprge, PlatQueue())
+    self[twprge].queue_add(plattable, tracts)</code></pre>
+</details>
+</dd>
+<dt id="pyTRSplat.platqueue.PlatQueue.MultiPlatQueue.queue_add_text"><code class="name flex">
+<span>def <span class="ident">queue_add_text</span></span>(<span>self, text, config=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Parse the raw text of a PLSS land description (optionally using
+<code>config=</code> parameters &ndash; see pyTRS docs), and add the resulting
+PLSSDesc object to this MultiPlatQueue.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def queue_add_text(self, text, config=None):
+    &#34;&#34;&#34;
+    Parse the raw text of a PLSS land description (optionally using
+    `config=` parameters -- see pyTRS docs), and add the resulting
+    PLSSDesc object to this MultiPlatQueue.
+    &#34;&#34;&#34;
+    descObj = pyTRS.PLSSDesc(text, config=config, initParseQQ=True)
+    self.queue_add(descObj)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="pyTRSplat.platqueue.PlatQueue.PlatQueue"><code class="flex name class">
+<span>class <span class="ident">PlatQueue</span></span>
+</code></dt>
+<dd>
+<div class="desc"><p>A list of objects that can be incorporated into / projected onto a
+Plat object (i.e. 'plattable'). The PlatQueue object also contains
+an attribute <code>.tracts</code>, which is a SEPARATE list of the pyTRS.Tract
+objects associated with the queued plattable objects (i.e. it is a
+list of Tract objects whose text will eventually be written at the
+bottom of the Plat, if the Plat is configured to do so).</p>
+<p>These object types are plattable (i.e. can be added to a PlatQueue):
+&ndash; pyTRSplat.SectionGrid
+&ndash; pyTRSplat.TownshipGrid
+&ndash; pyTRS.Tract
+Add objects with the <code>.queue_add()</code> method.</p>
+<p>Or absorb another PlatQueue object with <code>.absorb()</code>.</p>
+<p>Do not pass any arguments at init. Use the <code>.queue_add()</code>
+and/or <code>.absorb()</code> methods after init.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class PlatQueue(list):
+    &#34;&#34;&#34;
+    A list of objects that can be incorporated into / projected onto a
+    Plat object (i.e. &#39;plattable&#39;). The PlatQueue object also contains
+    an attribute `.tracts`, which is a SEPARATE list of the pyTRS.Tract
+    objects associated with the queued plattable objects (i.e. it is a
+    list of Tract objects whose text will eventually be written at the
+    bottom of the Plat, if the Plat is configured to do so).
+
+    These object types are plattable (i.e. can be added to a PlatQueue):
+        -- pyTRSplat.SectionGrid
+        -- pyTRSplat.TownshipGrid
+        -- pyTRS.Tract
+    Add objects with the `.queue_add()` method.
+
+    Or absorb another PlatQueue object with `.absorb()`.
+    &#34;&#34;&#34;
+
+    # These types can be platted on a (single) Plat:
+    SINGLE_PLATTABLES = (SectionGrid, TownshipGrid, pyTRS.Tract)
+
+    def __init__(self):
+        &#34;&#34;&#34;
+        Do not pass any arguments at init. Use the `.queue_add()`
+        and/or `.absorb()` methods after init.
+        &#34;&#34;&#34;
+        super().__init__()
+        self.tracts = []
+
+    def queue_add(self, plattable, tracts=None):
+        &#34;&#34;&#34;
+        Queue up an object for platting -- i.e. add the object to this
+        queue, and optionally add any corresponding tracts to the
+        `.tracts` list as well.
+
+        NOTE: A PlatQueue can contain any number of plattable objects,
+        but only one may be added via this method at a time. However,
+        the list passed as `tracts=` (if any) can contain any number of
+        pyTRS.Tract objects (which get appended to the `.tracts`
+        attribute of this PlatQueue).
+
+        IMPORTANT: Passing an object in `tracts` does NOT add it to the
+        queue to be platted -- only to the tracts whose text will be
+        written at the bottom of the plat(s), if so configured.
+
+        :param plattable: The object to be added to the queue. (Must be
+        a type acceptable to PlatQueue -- see docs for those objects.)
+        :param tracts: A list of pyTRS.Tract objects whose text should
+        eventually be written at the bottom of the Plat (assuming the
+        Plat is configured in settings to write Tract text).
+        NOTE: Objects added to `tracts` do NOT get drawn on the plat --
+        only written at the bottom. But pyTRS.Tract objects passed here
+        as arg `plattable` are automatically added to `tracts`.
+        &#34;&#34;&#34;
+
+        # Make sure that `tracts` is a list.
+        if tracts is None:
+            tracts = []
+        elif isinstance(tracts, pyTRS.Tract):
+            # If tracts was fed as a single Tract object, put it in a list.
+            tracts = [tracts]
+
+        # If attempting to add another PlatQueue object, we&#39;ll absorb
+        # it instead.
+        if isinstance(plattable, PlatQueue):
+            self.absorb(plattable, tracts=tracts)
+            return
+
+        # We&#39;ll disallow PLSSDesc objects before ruling out others,
+        # because they ARE allowed in MultiPlatQueue objects, so we
+        # point the user in that direction.
+        if isinstance(plattable, pyTRS.PLSSDesc):
+            raise TypeError(
+                &#39;Attempted to add unplattable object to queue; pyTRS.PLSSDesc &#39;
+                &#39;objects may be queued in MultiPlatQueue objects, but &#39;
+                &#39;not PlatQueue objects.&#39;)
+
+        # We&#39;ll disallow object types that are not in PLATTABLES.
+        if not isinstance(plattable, PlatQueue.SINGLE_PLATTABLES):
+            raise TypeError(f&#39;Attempted to add unplattable object to queue; &#39;
+                            f&#39;type: {type(plattable)}&#39;)
+
+        # We&#39;ll also make sure that `tracts` contains only Tract objects.
+        for item in tracts:
+            if not isinstance(item, pyTRS.Tract):
+                raise TypeError(
+                    f&#39;Attempted to add object other than  pyTRS.Tract to &#39;
+                    f&#39;`tracts` list; type: {type(item)}&#39;)
+
+        # A Tract object is both plattable, and its description gets
+        # (optionally) written at the bottom of the page, so if a Tract
+        # was added to this queue, we check to see if it was ALSO added
+        # in the `tracts` list. If it was not, we add it now.
+        if isinstance(plattable, pyTRS.Tract):
+            if not plattable in tracts:
+                tracts.append(plattable)
+
+        # The plattable itself gets added to the PlatQueue (a list)...
+        self.append(plattable)
+
+        # ...And the corresponding tracts get added to a dict, keyed by
+        # the tract object.
+        self.tracts.extend(tracts)
+
+    def absorb(self, pqObj, tracts=None):
+        &#34;&#34;&#34;
+        Absorb a PlatQueue object into this one. The parameter `tracts=`
+        should not be used directly -- it will only be used when this is
+        called via `.queue_add()`.
+        NOTE: Does not destroy the absorbed PlatQueue.
+        &#34;&#34;&#34;
+        if tracts is None:
+            tracts = []
+        self.extend(pqObj)
+        self.tracts.extend(pqObj.tracts)
+        self.tracts.extend(tracts)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.list</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="pyTRSplat.platqueue.PlatQueue.PlatQueue.SINGLE_PLATTABLES"><code class="name">var <span class="ident">SINGLE_PLATTABLES</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="pyTRSplat.platqueue.PlatQueue.PlatQueue.absorb"><code class="name flex">
+<span>def <span class="ident">absorb</span></span>(<span>self, pqObj, tracts=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Absorb a PlatQueue object into this one. The parameter <code>tracts=</code>
+should not be used directly &ndash; it will only be used when this is
+called via <code>.queue_add()</code>.
+NOTE: Does not destroy the absorbed PlatQueue.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def absorb(self, pqObj, tracts=None):
+    &#34;&#34;&#34;
+    Absorb a PlatQueue object into this one. The parameter `tracts=`
+    should not be used directly -- it will only be used when this is
+    called via `.queue_add()`.
+    NOTE: Does not destroy the absorbed PlatQueue.
+    &#34;&#34;&#34;
+    if tracts is None:
+        tracts = []
+    self.extend(pqObj)
+    self.tracts.extend(pqObj.tracts)
+    self.tracts.extend(tracts)</code></pre>
+</details>
+</dd>
+<dt id="pyTRSplat.platqueue.PlatQueue.PlatQueue.queue_add"><code class="name flex">
+<span>def <span class="ident">queue_add</span></span>(<span>self, plattable, tracts=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Queue up an object for platting &ndash; i.e. add the object to this
+queue, and optionally add any corresponding tracts to the
+<code>.tracts</code> list as well.</p>
+<p>NOTE: A PlatQueue can contain any number of plattable objects,
+but only one may be added via this method at a time. However,
+the list passed as <code>tracts=</code> (if any) can contain any number of
+pyTRS.Tract objects (which get appended to the <code>.tracts</code>
+attribute of this PlatQueue).</p>
+<p>IMPORTANT: Passing an object in <code>tracts</code> does NOT add it to the
+queue to be platted &ndash; only to the tracts whose text will be
+written at the bottom of the plat(s), if so configured.</p>
+<p>:param plattable: The object to be added to the queue. (Must be
+a type acceptable to PlatQueue &ndash; see docs for those objects.)
+:param tracts: A list of pyTRS.Tract objects whose text should
+eventually be written at the bottom of the Plat (assuming the
+Plat is configured in settings to write Tract text).
+NOTE: Objects added to <code>tracts</code> do NOT get drawn on the plat &ndash;
+only written at the bottom. But pyTRS.Tract objects passed here
+as arg <code>plattable</code> are automatically added to <code>tracts</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def queue_add(self, plattable, tracts=None):
+    &#34;&#34;&#34;
+    Queue up an object for platting -- i.e. add the object to this
+    queue, and optionally add any corresponding tracts to the
+    `.tracts` list as well.
+
+    NOTE: A PlatQueue can contain any number of plattable objects,
+    but only one may be added via this method at a time. However,
+    the list passed as `tracts=` (if any) can contain any number of
+    pyTRS.Tract objects (which get appended to the `.tracts`
+    attribute of this PlatQueue).
+
+    IMPORTANT: Passing an object in `tracts` does NOT add it to the
+    queue to be platted -- only to the tracts whose text will be
+    written at the bottom of the plat(s), if so configured.
+
+    :param plattable: The object to be added to the queue. (Must be
+    a type acceptable to PlatQueue -- see docs for those objects.)
+    :param tracts: A list of pyTRS.Tract objects whose text should
+    eventually be written at the bottom of the Plat (assuming the
+    Plat is configured in settings to write Tract text).
+    NOTE: Objects added to `tracts` do NOT get drawn on the plat --
+    only written at the bottom. But pyTRS.Tract objects passed here
+    as arg `plattable` are automatically added to `tracts`.
+    &#34;&#34;&#34;
+
+    # Make sure that `tracts` is a list.
+    if tracts is None:
+        tracts = []
+    elif isinstance(tracts, pyTRS.Tract):
+        # If tracts was fed as a single Tract object, put it in a list.
+        tracts = [tracts]
+
+    # If attempting to add another PlatQueue object, we&#39;ll absorb
+    # it instead.
+    if isinstance(plattable, PlatQueue):
+        self.absorb(plattable, tracts=tracts)
+        return
+
+    # We&#39;ll disallow PLSSDesc objects before ruling out others,
+    # because they ARE allowed in MultiPlatQueue objects, so we
+    # point the user in that direction.
+    if isinstance(plattable, pyTRS.PLSSDesc):
+        raise TypeError(
+            &#39;Attempted to add unplattable object to queue; pyTRS.PLSSDesc &#39;
+            &#39;objects may be queued in MultiPlatQueue objects, but &#39;
+            &#39;not PlatQueue objects.&#39;)
+
+    # We&#39;ll disallow object types that are not in PLATTABLES.
+    if not isinstance(plattable, PlatQueue.SINGLE_PLATTABLES):
+        raise TypeError(f&#39;Attempted to add unplattable object to queue; &#39;
+                        f&#39;type: {type(plattable)}&#39;)
+
+    # We&#39;ll also make sure that `tracts` contains only Tract objects.
+    for item in tracts:
+        if not isinstance(item, pyTRS.Tract):
+            raise TypeError(
+                f&#39;Attempted to add object other than  pyTRS.Tract to &#39;
+                f&#39;`tracts` list; type: {type(item)}&#39;)
+
+    # A Tract object is both plattable, and its description gets
+    # (optionally) written at the bottom of the page, so if a Tract
+    # was added to this queue, we check to see if it was ALSO added
+    # in the `tracts` list. If it was not, we add it now.
+    if isinstance(plattable, pyTRS.Tract):
+        if not plattable in tracts:
+            tracts.append(plattable)
+
+    # The plattable itself gets added to the PlatQueue (a list)...
+    self.append(plattable)
+
+    # ...And the corresponding tracts get added to a dict, keyed by
+    # the tract object.
+    self.tracts.extend(tracts)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="pyTRSplat.platqueue" href="index.html">pyTRSplat.platqueue</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="pyTRSplat.platqueue.PlatQueue.MultiPlatQueue" href="#pyTRSplat.platqueue.PlatQueue.MultiPlatQueue">MultiPlatQueue</a></code></h4>
+<ul class="">
+<li><code><a title="pyTRSplat.platqueue.PlatQueue.MultiPlatQueue.MULTI_PLATTABLES" href="#pyTRSplat.platqueue.PlatQueue.MultiPlatQueue.MULTI_PLATTABLES">MULTI_PLATTABLES</a></code></li>
+<li><code><a title="pyTRSplat.platqueue.PlatQueue.MultiPlatQueue.absorb" href="#pyTRSplat.platqueue.PlatQueue.MultiPlatQueue.absorb">absorb</a></code></li>
+<li><code><a title="pyTRSplat.platqueue.PlatQueue.MultiPlatQueue.queue_add" href="#pyTRSplat.platqueue.PlatQueue.MultiPlatQueue.queue_add">queue_add</a></code></li>
+<li><code><a title="pyTRSplat.platqueue.PlatQueue.MultiPlatQueue.queue_add_text" href="#pyTRSplat.platqueue.PlatQueue.MultiPlatQueue.queue_add_text">queue_add_text</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="pyTRSplat.platqueue.PlatQueue.PlatQueue" href="#pyTRSplat.platqueue.PlatQueue.PlatQueue">PlatQueue</a></code></h4>
+<ul class="">
+<li><code><a title="pyTRSplat.platqueue.PlatQueue.PlatQueue.SINGLE_PLATTABLES" href="#pyTRSplat.platqueue.PlatQueue.PlatQueue.SINGLE_PLATTABLES">SINGLE_PLATTABLES</a></code></li>
+<li><code><a title="pyTRSplat.platqueue.PlatQueue.PlatQueue.absorb" href="#pyTRSplat.platqueue.PlatQueue.PlatQueue.absorb">absorb</a></code></li>
+<li><code><a title="pyTRSplat.platqueue.PlatQueue.PlatQueue.queue_add" href="#pyTRSplat.platqueue.PlatQueue.PlatQueue.queue_add">queue_add</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.9.2</a>.</p>
+</footer>
+</body>
+</html>
