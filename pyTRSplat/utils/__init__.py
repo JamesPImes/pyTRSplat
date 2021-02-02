@@ -58,12 +58,12 @@ def _smooth_QQs(aliquot_text) -> list:
         ex: 'S2NENE' -> ['NENE']
     NOTE: Does NOT convert lots to QQ.
     """
-    import pyTRS.pyTRS
+    from pyTRS.parser.parser import scrub_aliquots, unpack_aliquots
 
     qq_l = []
     for aliq in aliquot_text.replace(' ', '').split(','):
-        scrubbed = pyTRS.pyTRS.pyTRS.scrub_aliquots(aliq, cleanQQ=True)
-        scrubbed = pyTRS.pyTRS.pyTRS.unpack_aliquots(scrubbed)
+        scrubbed = scrub_aliquots(aliq, cleanQQ=True)
+        scrubbed = unpack_aliquots(scrubbed)
         for qq in scrubbed:
             # Append only the last 4 chars (ie. the true QQ: 'S2NENE' -> 'NENE')
             qq_l.append(qq[-4:])
