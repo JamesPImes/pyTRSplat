@@ -10,23 +10,21 @@ class Settings:
     size, colors, fonts, whether to write headers/tracts/etc.). Default
     and presets are available and customizable.
 
-    When a string is passed (as `preset=`) at init, it is assumed to be
-    one of two things:
-        -- the filepath to a saved .txt file of data that can be read
-            into a Settings object, with the `._import_file()` method.
-        -- the name of a saved preset (with no file extension), which
-            will be loaded with the `._load_preset()` method.
-    If neither of those is successful, a default Settings object will be
-    initialized instead.
+    When a string is passed (as `preset=`) at init, it must be the name
+    of a saved preset (with no file extension), which will be loaded
+    with the `._load_preset()` method. If unsuccessful, a default
+    Settings object will be initialized instead.
 
     A Settings object can be saved as a preset with the `.save_preset()`
     method (which will save as a .txt file in the directory stored as
     class variable `Settings.PRESET_DIRECTORY`).
     NOTE: File extension is NOT specified when saving/loading preset
         (the program handles that internally).
-    NOTE ALSO: To establish custom presets for a specific project, we
-        can change the class variable of Settings.PRESET_DIRECTORY for
-        that project in the code before loading any presets.
+    NOTE ALSO: To establish a separate directory for custom presets for
+        a specific project, we can change the class variable of
+        `Settings.PRESET_DIRECTORY` for that project in the code before
+        loading any presets. Or presets can be loaded individually from
+        any directory or filepath with `Settings.from_file()`.
 
     A list of currently saved presets can be accessed by calling
     `Settings.list_presets()`.
