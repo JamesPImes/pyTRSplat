@@ -2,6 +2,17 @@
 
 A python module and application for generating customizable plat images of PLSS descriptions (or 'legal descriptions') of land. Uses the [pyTRS library](https://github.com/JamesPImes/pyTRS) for parsing raw land descriptions into their component parts and the [Pillow (PIL) library](https://python-pillow.org/) for drawing the plats. (And also a small role for the [piltextbox module](https://github.com/JamesPImes/piltextbox), which was spun off from this project.)
 
+## To install
+
+...from the GitHub repo.
+```
+$ pip install -r https://raw.githubusercontent.com/JamesPImes/pyTRSplat/master/requirements.txt
+
+$ pip install git+https://github.com/JamesPImes/pyTRSplat@master
+```
+
+(Cleaner install options coming soon.)
+
 
 ## Sample Outputs
 
