@@ -38,7 +38,7 @@ Section 14: NE/4
 
 ## Included GUI Application
 
-A full-featured GUI application is included as `pyTRSplat_window.pyw`. The interface is a little rough-around-the-edges (especially the custom settings editor), but it has nearly all of the features of the module.
+A full-featured GUI application is included as `pyTRSplat_app_windowed.pyw`. The interface is a little rough-around-the-edges (especially the custom settings editor), but it has nearly all of the features of the module.
 
 Lands can be added either by entering their PLSS description as raw text, or by manually selecting which QQ's to fill -- or both methods. It currently will save to PNG or PDF.
 
@@ -99,7 +99,7 @@ plats_2 = pyTRSplat.text_to_plats(
 
 ## Overview of primary module classes and functions
 
-[`pyTRSplat.launch_app()`](https://github.com/JamesPImes/pyTRSplat#included-gui-application) -- Launch the GUI application discussed above. (Or run `pyTRSplat_window.pyw` directly.)
+[`pyTRSplat.launch_app()`](https://github.com/JamesPImes/pyTRSplat#included-gui-application) -- Launch the GUI application discussed above. (Or run `pyTRSplat_app_windowed.pyw` directly.)
 
 [`pyTRSplat.text_to_plats()`](https://github.com/JamesPImes/pyTRSplat#quickly-generate-plats-from-raw-land-descriptions-with-text_to_plats) -- A function to generate plat images directly from raw PLSS land descriptions
 
