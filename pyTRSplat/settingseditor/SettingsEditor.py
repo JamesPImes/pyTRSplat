@@ -141,7 +141,7 @@ class SettingsEditor(tk.Frame):
         if set_obj is False:
             return False
 
-        from pyTRS import PLSSDesc
+        from pytrs import PLSSDesc
 
         # Create a dummy PLSSDesc object, and generate a MultiPlat
         t = (
@@ -160,7 +160,7 @@ class SettingsEditor(tk.Frame):
             'of the records of Example County.\n'
             'Sec 14: NE/4\n'
         )
-        d = PLSSDesc(t, initParseQQ=True)
+        d = PLSSDesc(t, init_parse_qq=True)
         mp = MultiPlat.from_plssdesc(
             d, settings=set_obj, allow_ld_defaults=True)
         im = mp.output()[0]

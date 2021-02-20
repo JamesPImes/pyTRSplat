@@ -2,7 +2,7 @@
 
 """
 pyTRSplat -- A module to generate customizable land plat images from
-PLSS land descriptions ('legal descriptions'), using the pyTRS parsing
+PLSS land descriptions ('legal descriptions'), using the pytrs parsing
 module; and/or from manually-selected lands. Import as a module, or use
 the GUI application ('pyTRSplat/pyTRSplat_app_windowed.pyw').
 
@@ -16,7 +16,7 @@ be found in their respective source packages:
 `pyTRSplat.plat` -- Generate plat images
     classes:    Plat, MultiPlat
     functions:  text_to_plats()
-`pyTRSplat.grid` -- Interpret pyTRS.PLSSDesc and pyTRS.Tract objects,
+`pyTRSplat.grid` -- Interpret pytrs.PLSSDesc and pytrs.Tract objects,
         define how specific lots should be interpreted, manually.
     classes:    SectionGrid, TownshipGrid, LotDefinitions,
         TwpLotDefinitions, LotDefDB

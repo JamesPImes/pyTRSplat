@@ -3,7 +3,7 @@
 """
 pyTRSplat -- A module to generate land plat images of full townships
 (6x6 grid) or single sections from PLSS land descriptions ('legal
-descriptions'), using the pyTRS parsing module.
+descriptions'), using the pytrs parsing module.
 """
 
 # TODO: Give the option to depict `.unhandled_lots` on plats somewhere.
@@ -25,14 +25,14 @@ from pyTRSplat.platqueue import PlatQueue, MultiPlatQueue
 from PIL import Image, ImageDraw, ImageFont
 
 # piltextbox.TextBox gets customized into TractTextBox class here, for
-# optionally writing pyTRS.Tract info at the bottom of each Plat.
+# optionally writing pytrs.Tract info at the bottom of each Plat.
 # More info at <https://github.com/JamesPImes/piltextbox>
 from piltextbox import TextBox
 
 # For parsing text of PLSS land descriptions into its component parts.
 # More info at <https://github.com/JamesPImes/pyTRS>
-import pyTRS
-from pyTRS import version as pyTRS_version
+import pytrs
+from pytrs import version as pytrs_version
 
 
 ########################################################################
@@ -65,11 +65,11 @@ class Plat:
     configure a Settings object prior to initializing a Plat object.
 
     Plat objects can incorporate and/or be created from these objects:
-        -- pyTRS.Tract (created externally via the pyTRS module)
-            `.plat_tract()` -- to project a pyTRS.Tract object onto an
+        -- pytrs.Tract (created externally via the pytrs module)
+            `.plat_tract()` -- to project a pytrs.Tract object onto an
                 existing Plat object
             `Plat.from_tract()` -- to create a new Plat object from an
-                an existing pyTRS.Tract object
+                an existing pytrs.Tract object
         -- pyTRSplat.SectionGrid
             `.plat_section_grid()` -- to project a SectionGrid onto an
                 existing Plat.
@@ -270,7 +270,7 @@ class Plat:
 
         All other parameters have the same effect as vanilla __init__().
         """
-        twp, rge, _ = pyTRS.break_trs(twprge)
+        twp, rge, _ = pytrs.break_trs(twprge)
 
         return Plat(
             twp=twp, rge=rge, only_section=only_section, settings=settings,
@@ -304,7 +304,7 @@ class Plat:
         NOTE: A PlatQueue can contain any number of plattable objects,
         but only one may be added via this method at a time. However,
         the list passed as `tracts=` (if any) can contain any number of
-        pyTRS.Tract objects.
+        pytrs.Tract objects.
 
         IMPORTANT: Passing an object in `tracts` does NOT add it to the
         queue to be platted -- only to the tracts whose text will be
@@ -312,11 +312,11 @@ class Plat:
 
         :param plattable: The object to be added to the queue. (Must be
         a type acceptable to PlatQueue -- see docs for those objects.)
-        :param tracts: A list of pyTRS.Tract objects whose text should
+        :param tracts: A list of pytrs.Tract objects whose text should
         eventually be written at the bottom of the Plat (assuming the
         Plat is configured in settings to write Tract text).
         NOTE: Objects added to `tracts` do NOT get drawn on the plat --
-        only written at the bottom. But pyTRS.Tract objects passed here
+        only written at the bottom. But pytrs.Tract objects passed here
         as arg `plattable` are automatically added to `tracts`.
         :return: None
         """
@@ -338,9 +338,9 @@ class Plat:
             queue = self.pq
 
         for itm in queue:
-            if isinstance(itm, pyTRS.PLSSDesc):
+            if isinstance(itm, pytrs.PLSSDesc):
                 raise TypeError(
-                    f"Cannot process pyTRS.PLSSDesc objects in a PlatQueue "
+                    f"Cannot process pytrs.PLSSDesc objects in a PlatQueue "
                     f"object into a Plat object. "
                     f"Use MultiPlatQueue and MultiPlat objects instead.")
             elif not isinstance(itm, PlatQueue.SINGLE_PLATTABLES):
@@ -350,9 +350,9 @@ class Plat:
                 self.plat_section_grid(itm)
             elif isinstance(itm, TownshipGrid):
                 self.plat_township_grid(itm)
-            elif isinstance(itm, pyTRS.Tract):
-                self.plat_tract(itm, write_tract=False,
-                                allow_ld_defaults=allow_ld_defaults)
+            elif isinstance(itm, pytrs.Tract):
+                self.plat_tract(
+                    itm, write_tract=False, allow_ld_defaults=allow_ld_defaults)
 
         if self.settings.write_tracts and self.text_box is not None:
             self.text_box.write_all_tracts(queue.tracts)
@@ -375,7 +375,7 @@ class Plat:
         # If no direction was specified, then also check if (only) digits were
         # specified for twp and rge. If that's the case, arbitrarily assign 'n'
         # and 'w' as their directions (only for purposes of
-        # `pyTRS.decompile_twprge()` -- will be cut off before the header
+        # `pytrs.decompile_twprge()` -- will be cut off before the header
         # itself is compiled).
         if not twp.lower().endswith(('n', 's')):
 
@@ -394,7 +394,7 @@ class Plat:
                 except ValueError:
                     pass
 
-        twpNum, try_NS, rgeNum, try_EW = pyTRS.decompile_twprge(twp + rge)
+        twpNum, try_NS, rgeNum, try_EW = pytrs.decompile_twprge(twp + rge)
 
         if try_NS == 'n':
             NS = 'North'
@@ -522,9 +522,9 @@ class Plat:
 
     def write_all_tracts(self, tracts):
         """
-        Pass the list of pyTRS.Tract objects onto the TractTextBox (if
+        Pass the list of pytrs.Tract objects onto the TractTextBox (if
         it exists), where they will be written.
-        :param tracts: A list of pyTRS.Tract objects that should be
+        :param tracts: A list of pytrs.Tract objects that should be
         written to the TractTextBox (i.e. at the bottom of the Plat).
         :return: None
         """
@@ -533,9 +533,9 @@ class Plat:
 
     def write_tract(self, tract):
         """
-        Pass the pyTRS.Tract object onto the TractTextBox (if it
+        Pass the pytrs.Tract object onto the TractTextBox (if it
         exists), where they will be written.
-        :param tract: A pyTRS.Tract object that should be written to the
+        :param tract: A pytrs.Tract object that should be written to the
         TractTextBox (i.e. at the bottom of the Plat)
         :return: None
         """
@@ -642,13 +642,13 @@ class Plat:
             self, sec_grid: SectionGrid, tracts=None, qq_fill_RGBA=None):
         """
         Project a pyTRSplat.SectionGrid object onto an existing Plat
-        object (i.e. fill any QQ hits per the `SectionGrid.QQgrid`
+        object (i.e. fill any QQ hits per the `SectionGrid.qq_grid`
         values). Add any lot names in the `.unhandled_lots` list of the
         SectionGrid object to the Plat's `.unhandled_lots_by_sec` dict.
 
-        :param sec_grid: The SectionGrid object whose `.QQgrid` values
+        :param sec_grid: The SectionGrid object whose `.qq_grid` values
         should be projected onto the Plat.
-        :param tracts: A list of pyTRS.Tract objects whose text should
+        :param tracts: A list of pytrs.Tract objects whose text should
         be written at the bottom of the Plat (if the Plat settings are
         configured to write Tract text).
         :param qq_fill_RGBA: The color with which to fill the QQs. (If
@@ -690,7 +690,7 @@ class Plat:
         `single_sec=True` to plat a single section (with the section
         number pulled from the `.sec` attribute of the SectionGrid obj),
         or `False` (the default) to plat the full 6x6 grid of sections.
-        :param tracts: A list of pyTRS.Tract objects whose text should
+        :param tracts: A list of pytrs.Tract objects whose text should
         be written at the bottom of the Plat (if the Plat settings are
         configured to write Tract text).
         """
@@ -720,7 +720,7 @@ class Plat:
         :arg twp_grid: pyTRSplat.TownshipGrid object to project at init.
         NOTE: `twp` and `rge` are pulled from the TownshipGrid object,
         rather than specified as parameter.
-        :param tracts: A list of pyTRS.Tract objects whose text should
+        :param tracts: A list of pytrs.Tract objects whose text should
         be written at the bottom of the Plat (if the Plat settings are
         configured to write Tract text).
         """
@@ -735,15 +735,15 @@ class Plat:
     def plat_township_grid(self, twp_grid, tracts=None, qq_fill_RGBA=None):
         """
         Project a pyTRSplat.TownshipGrid object onto an existing Plat
-        object (i.e. fill any QQ hits per all `SectionGrid.QQgrid`
+        object (i.e. fill any QQ hits per all `SectionGrid.qq_grid`
         values in the TownshipGrid). Add any lot names in the
         `.unhandled_lots` list of each SectionGrid to the Plat's
         `.unhandled_lots_by_sec` dict.
 
         :param twp_grid: The TownshipGrid object whose subordinate
         SectionGrid objects should be projected onto the Plat (i.e.
-        their `.QQgrid` attributes).
-        :param tracts: A list of pyTRS.Tract objects whose text should
+        their `.qq_grid` attributes).
+        :param tracts: A list of pytrs.Tract objects whose text should
         be written at the bottom of the Plat (if the Plat settings are
         configured to write Tract text).
         :param qq_fill_RGBA: The color with which to fill the QQs. (If
@@ -755,7 +755,7 @@ class Plat:
         # We use `include_pinged=True` to also include any sections
         # that were 'pinged' by a setter method, but may not have had
         # any values actually set (e.g., perhaps for a Tract object that
-        # failed to generate any lots/QQ's when parsed by pyTRS).
+        # failed to generate any lots/QQ's when parsed by pytrs).
         sec_grid_list = twp_grid.filled_section_grids(include_pinged=True)
 
         # Plat each SectionGrid's filled QQ's onto our new overlay.
@@ -771,13 +771,13 @@ class Plat:
 
     @staticmethod
     def from_tract(
-            tract: pyTRS.Tract, settings=None, single_sec=False, ld=None,
+            tract: pytrs.Tract, settings=None, single_sec=False, ld=None,
             allow_ld_defaults=False):
         """
-        Generate and return a new Plat object from a parsed pyTRS.Tract
+        Generate and return a new Plat object from a parsed pytrs.Tract
         object.
 
-        :arg tract: pyTRS.Tract object to project at init.
+        :arg tract: pytrs.Tract object to project at init.
         NOTE: `twp` and `rge` are pulled from the Tract object, rather
         than specified as parameter.
         :param single_sec: Replaces `only_section=<int>` from __init__()
@@ -803,12 +803,12 @@ class Plat:
         return platObj
 
     def plat_tract(
-            self, tract: pyTRS.Tract, write_tract=None, ld=None,
+            self, tract: pytrs.Tract, write_tract=None, ld=None,
             allow_ld_defaults=None):
         """
-        Project a parsed pyTRS.Tract object onto an existing Plat.
+        Project a parsed pytrs.Tract object onto an existing Plat.
 
-        :arg tract: pyTRS.Tract object to project.
+        :arg tract: pytrs.Tract object to project.
         :parameter write_tract: Whether to write the Tract text at the
         bottom of the Plat. If not specified, defaults to whatever the
         Plat settings are (in `.settings.write_tracts` attribute).
@@ -944,7 +944,7 @@ class Plat:
         NOTE: When 0 is passed as `sec_num`, this method returns
         immediately without filling any QQ's and without raising any
         errors. This is to handle flawed parses where the section number
-        could not be identified in the original text (by the pyTRS
+        could not be identified in the original text (by the pytrs
         module), which typically sets the section number to 'secError'.
         Where this method gets called by other methods/functions in this
         module, 'secError' should first get converted to int 0 prior to
@@ -1082,7 +1082,7 @@ class MultiPlat:
     An object to create, process, hold, and output one or multiple Plat
     objects, all using identical settings and general parameters. For
     example, generating one or more Plat objects from a parsed
-    pyTRS.PLSSDesc object (which can cover one or multiple townships).
+    pytrs.PLSSDesc object (which can cover one or multiple townships).
 
     MultiPlat objects can be configured (size, font, colors, margins,
     etc.) at init, thus:
@@ -1095,11 +1095,11 @@ class MultiPlat:
 
     MultiPlat objects can incorporate and/or be created from these
     objects directly:
-        -- pyTRS.PLSSDesc (created externally via the pyTRS module)
-            `.plat_plssdesc()` -- to process a pyTRS.PLSSDesc object
+        -- pytrs.PLSSDesc (created externally via the pytrs module)
+            `.plat_plssdesc()` -- to process a pytrs.PLSSDesc object
                 into an existing MultiPlat object
             `MultiPlat.from_plssdesc()` -- to create a new MultiPlat
-                object from an an existing pyTRS.PLSSDesc object
+                object from an an existing pytrs.PLSSDesc object
             NOTE: To process more than one PLSSDesc object, use the
                 MultiPlatQueue options, which filter the data in
                 PLSSDesc objects into respective Twp/Rge before platting
@@ -1122,7 +1122,7 @@ class MultiPlat:
         -- Raw text of a PLSS land description (i.e. a string):
             `MultiPlat.from_unparsed_text()` -- to create a new
                 MultiPlat object from the raw text of a PLSS land
-                description (i.e. parse the text into a pyTRS.PLSSDesc
+                description (i.e. parse the text into a pytrs.PLSSDesc
                 object behind-the-scenes, and generate a MultiPlat from
                 that)
 
@@ -1130,8 +1130,8 @@ class MultiPlat:
         process any of the following object types, by first adding them
         to a MultiPlatQueue object and then using any of the above
         options for processing MultiPlatQueue objects:
-                -- pyTRS.PLSSDesc
-                -- pyTRS.Tract
+                -- pytrs.PLSSDesc
+                -- pytrs.Tract
                 -- pyTRSplat.SectionGrid
                 -- pyTRSplat.TownshipGrid
                 -- pyTRSplat.PlatQueue
@@ -1276,12 +1276,12 @@ class MultiPlat:
         arguments to the `.queue_add()` method in the MultiPlat's
         MultiPlatQueue object (its `.mpq` attribute).
 
-        NOTE: If a pyTRS.PLSSDesc object is passed as the `plattable`,
+        NOTE: If a pytrs.PLSSDesc object is passed as the `plattable`,
         then `twprge` and `tracts` are ignored, but rather are deduced
         automatically (because there can be more than one T&R from a
         single PLSSDesc object).
 
-        NOTE ALSO: If a pyTRS.Tract object is passed as the `plattable`,
+        NOTE ALSO: If a pytrs.Tract object is passed as the `plattable`,
         then `twprge` is optional (as long as the Tract object has a
         specified `.twp` and `.rge`), and `tracts` is always optional.
         However, the Tract object's `.twp` and `.rge` will NOT overrule
@@ -1292,21 +1292,21 @@ class MultiPlat:
         objects.)
         :param twprge: A string of the Twp/Rge (e.g., '154n97w' or
         '1s8e') to which the plattable object belongs.
-            ex: If queuing up a pyTRS.SectionGrid object for Section 1,
+            ex: If queuing up a pytrs.SectionGrid object for Section 1,
                 T154N-R97W, then `twprge` should be '154n97w'.
-        NOTE: `twprge` is ignored when a pyTRS.PLSSDesc object is passed
+        NOTE: `twprge` is ignored when a pytrs.PLSSDesc object is passed
             as `plattable`.
-        NOTE ALSO: `twprge` is optional when a pyTRS.Tract object is
+        NOTE ALSO: `twprge` is optional when a pytrs.Tract object is
             passed as `plattable`, as long as the Tract object has
             appropriate `.twp` and `.rge` attributes. If `twprge=` is
             specified in this method, that will control over whatever is
             in the Tract object's `.twp` and `.rge` attributes.
-        :param tracts: A list of pyTRS.Tract objects whose text should
+        :param tracts: A list of pytrs.Tract objects whose text should
         eventually be written at the bottom of the appropriate Plat
         (assuming the MultiPlat is configured in settings to write Tract
         text).
         NOTE: Objects added to `tracts` do NOT get drawn on the plat --
-        only written at the bottom. But pyTRS.Tract objects passed here
+        only written at the bottom. But pytrs.Tract objects passed here
         as arg `plattable` are automatically added to `tracts`.
         """
         self.mpq.queue_add(plattable=plattable, twprge=twprge, tracts=tracts)
@@ -1314,8 +1314,8 @@ class MultiPlat:
     def queue_add_text(self, text, config=None):
         """
         Parse the raw text of a PLSS land description (optionally using
-        `config=` parameters -- see pyTRS docs), and add the resulting
-        pyTRS.PLSSDesc object to this MultiPlat's queue (`.mpq`) -- by
+        `config=` parameters -- see pytrs docs), and add the resulting
+        pytrs.PLSSDesc object to this MultiPlat's queue (`.mpq`) -- by
         passing through the arguments to the `.queue_add_text()` method
         in the Plat's MultiPlatQueue object.
         """
@@ -1344,13 +1344,13 @@ class MultiPlat:
 
     @staticmethod
     def from_plssdesc(
-            plssdesc_obj: pyTRS.PLSSDesc, settings=None, lddb=None,
+            plssdesc_obj: pytrs.PLSSDesc, settings=None, lddb=None,
             allow_ld_defaults=False):
         """
-        Generate a MultiPlat from a parsed pyTRS.PLSSDesc object.
-        (lots/QQs must be parsed within the pyTRS.Tract objects in the
+        Generate a MultiPlat from a parsed pytrs.PLSSDesc object.
+        (lots/QQs must be parsed within the pytrs.Tract objects in the
         PLSSDesc object's `.parsedDesc` attribute for any QQ's to be
-        filled on the resulting plats -- see pyTRS docs for more info.)
+        filled on the resulting plats -- see pytrs docs for more info.)
         """
 
         mp_obj = MultiPlat(
@@ -1362,14 +1362,14 @@ class MultiPlat:
         return mp_obj
 
     def plat_plssdesc(
-            self, plssdesc_obj: pyTRS.PLSSDesc, lddb=None,
+            self, plssdesc_obj: pytrs.PLSSDesc, lddb=None,
             allow_ld_defaults=False):
         """
-        Process a parsed pyTRS.PLSSDesc object into an existing
+        Process a parsed pytrs.PLSSDesc object into an existing
         MultiPlat.
 
-        :arg plssdesc_obj: a pyTRS.PLSSDesc object (whose subordinate
-        pyTRS.Tract objects have also been parsed into lots/QQs) to
+        :arg plssdesc_obj: a pytrs.PLSSDesc object (whose subordinate
+        pytrs.Tract objects have also been parsed into lots/QQs) to
         process into this MultiPlat.
         :param lddb: A pyTRSplat.LotDefDB object, for defining how
         each lot should be interpreted in terms of QQ's (i.e. 'L1'
@@ -1385,7 +1385,7 @@ class MultiPlat:
 
         # Get a dict linking the this PLSSDesc's parsed Tracts to their
         # respective T&R's (keyed by T&R -- same as twp_grids dict)
-        twp_to_tract = filter_tracts_by_twprge(plssdesc_obj.parsedTracts)
+        twp_to_tract = filter_tracts_by_twprge(plssdesc_obj.parsed_tracts)
 
         # Generate Plat object of each township, and append it to `self.plats`
         for k, v in twp_grids.items():
@@ -1397,10 +1397,10 @@ class MultiPlat:
     def from_unparsed_text(
             text, config=None, settings=None, lddb=None, allow_ld_defaults=False):
         """Parse the text of a PLSS land description (optionally using
-        `config=` parameters -- see pyTRS docs), and generate Plat(s)
+        `config=` parameters -- see pytrs docs), and generate Plat(s)
         for the lands described. Returns a MultiPlat object."""
 
-        descObj = pyTRS.PLSSDesc(text, config=config, initParseQQ=True)
+        descObj = pytrs.PLSSDesc(text, config=config, init_parse_qq=True)
         return MultiPlat.from_plssdesc(
             descObj, settings=settings, lddb=lddb,
             allow_ld_defaults=allow_ld_defaults)
@@ -1503,7 +1503,7 @@ class TractTextBox(TextBox):
     """
     INTERNAL USE:
     A piltextbox.TextBox object, with additional methods for writing
-    pyTRS.Tract data at the bottom of the Plat.
+    pytrs.Tract data at the bottom of the Plat.
 
     IMPORTANT: After init, any changes to font in the Settings object
     will have NO EFFECT on the TractTextBox.
@@ -1579,11 +1579,11 @@ class TractTextBox(TextBox):
     def write_all_tracts(self, tracts=None, cursor='text_cursor',
             justify=None):
         """
-        Write the descriptions of each parsed pyTRS.Tract object at the
+        Write the descriptions of each parsed pytrs.Tract object at the
         current coord of the specified `cursor`. Updates the coord of
         the `cursor` used.
 
-        :param tracts: A list of pyTRS.Tract objects, whose descriptions
+        :param tracts: A list of pytrs.Tract objects, whose descriptions
         should be written.
         :param cursor: The name of an existing cursor, at whose coord
         the text should be written. (Defaults to 'text_cursor')
@@ -1643,7 +1643,7 @@ class TractTextBox(TextBox):
             reserve_last_line = len(ctracts) != 0
 
             font_RGBA = self.font_RGBA
-            if len(tract.lotQQList) == 0 or tract.sec == 'secError':
+            if len(tract.lots_qqs) == 0 or tract.sec == 'secError':
                 # If no lots/QQs were identified, or if this tract has a
                 # 'secError' (i.e. it was a flawed parse where the section
                 # number could not be successfully deduced -- in which case it
@@ -1662,16 +1662,16 @@ class TractTextBox(TextBox):
             tracts_written += 1
 
     def write_tract(
-            self, tract: pyTRS.Tract, cursor='text_cursor', font_RGBA=None,
+            self, tract: pytrs.Tract, cursor='text_cursor', font_RGBA=None,
             override_legal_check=False, reserve_last_line=False,
             justify=None):
         """
-        Write the description of the parsed pyTRS.Tract object at the
+        Write the description of the parsed pytrs.Tract object at the
         current coord of the specified `cursor`. First confirms that
         writing the text would not go past margins; and if so, will not
         write it. Updates the coord of the `cursor` used.
 
-        :param tract: a pyTRS.Tract object, whose description should be
+        :param tract: a pytrs.Tract object, whose description should be
         written.
         :param cursor: The name of an existing cursor, at whose coord
         the text should be written. (Defaults to 'text_cursor')
@@ -1747,7 +1747,7 @@ def text_to_plats(
     """
     (A convenience function, for simplified interaction with MultiPlat
     objects.) Parse the raw text of a PLSS land description (optionally
-    using `config=` parameters -- see pyTRS.Config docs), and generate
+    using `config=` parameters -- see pytrs.Config docs), and generate
     plat(s) for the lands described (i.e. PIL.Image.Image objects.
     Configure the plats with `settings=` parameter (see
     pyTRSplat.Settings docs). Optionally output to .png or .pdf with
@@ -1758,8 +1758,8 @@ def text_to_plats(
     except:
     :param text: The raw text of a PLSS land description to be platted.
     :param config: Optional configurable parameters for how the raw
-    description should be parsed (see pyTRS docs, especially
-    pyTRS.Config).
+    description should be parsed (see pytrs docs, especially
+    pytrs.Config).
     :param output_filepath: If specified, the generated images will be
     saved to file(s). Defaults to None.
     NOTE: Must end in either '.pdf' or '.png'.
