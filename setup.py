@@ -11,7 +11,7 @@ long_description = (
     "pyTRSplat is a Python library and GUI application for generating "
     "customizable plats directly from Public Land Survey System (PLSS) "
     "land descriptions (or 'legal descriptions'), built on the "
-    "[pyTRS library](https://github.com/JamesPImes/pyTRSplat)."
+    "[pyTRS library](https://github.com/JamesPImes/pyTRS)."
     "\n\n"
     "Can be imported as a module, or the GUI application provides "
     "essentially all of the functionality as well."
