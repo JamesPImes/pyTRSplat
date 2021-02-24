@@ -115,12 +115,12 @@ plats_2 = pyTRSplat.text_to_plats(
 
 ['Default lots' and the `allow_ld_defaults=<bool>` parameter](https://github.com/JamesPImes/pyTRSplat#default-lots-and-the-allow_ld_defaultsbool-parameter) -- Whether to define lots as though it is a 'standard' township (when lots have not been explicitly defined otherwise).
 
-[`SectionGrid` and `TownshipGrid` objects](https://github.com/JamesPImes/pyTRSplat#manual-platting-with-sectiongrid-and-townshipgrid-objects-and-other-methods) -- These primarily function as behind-the-scenes interpretors/translators for converting objects from the `pyTRS` module into data that is useful for this module, but could also be used for platting manually-selected lands.
+[`SectionGrid` and `TownshipGrid` objects](https://github.com/JamesPImes/pyTRSplat#manual-platting-with-sectiongrid-and-townshipgrid-objects-and-other-methods) -- These primarily function as behind-the-scenes interpretors/translators for converting objects from the `pytrs` module into data that is useful for this module, but could also be used for platting manually-selected lands.
 
 
 
 ### Quickly generate plats from raw land descriptions with `text_to_plats()`
-This convenience function is the simplest way to generate plats, other than the GUI application. It takes as input a raw PLSS land description (optionally using `pyTRS` config parameters for configuring how it should be parsed), and returns flattened PIL.Image objects of the generated plats, optionally saving them to filepath as .png or .pdf files.
+This convenience function is the simplest way to generate plats, other than the GUI application. It takes as input a raw PLSS land description (optionally using `pytrs` config parameters for configuring how it should be parsed), and returns flattened PIL.Image objects of the generated plats, optionally saving them to filepath as .png or .pdf files.
 Example:
 ```
 import pyTRSplat
@@ -143,7 +143,7 @@ print(type(plats[0]))  # prints '<class 'PIL.Image.Image'>'
 For generating more nuanced or complicated plats, or incorporating data from multiple sources, these are the objects to use.
 `pyTRSplat.Plat` -- A single plat, comprising a single PLSS township of land. (Can also plat a single section. See `pyTRSplat.Plat` documentation on `only_section=<int>` parameter.)
 
-`pyTRSplat.MultiPlat` -- A collection of any number of plats (i.e. `pyTRSplat.Plat` objects, stored as a list in the `.plats` attribute), all sharing identical settings and general parameters, and each comprising a single PLSS township of land. These can also handle `pyTRS.PLSSDesc` objects, whereas `Plat` objects cannot (because `PLSSDesc` objects can span multiple Twp/Rge).
+`pyTRSplat.MultiPlat` -- A collection of any number of plats (i.e. `pyTRSplat.Plat` objects, stored as a list in the `.plats` attribute), all sharing identical settings and general parameters, and each comprising a single PLSS township of land. These can also handle `pytrs.PLSSDesc` objects, whereas `Plat` objects cannot (because `PLSSDesc` objects can span multiple Twp/Rge).
 
 
 
@@ -156,11 +156,11 @@ import pyTRSplat
 # but with no specific lands projected onto it yet.
 plat_1 = pyTRSplat.Plat(twp='154n', rge='97w', settings='legal')
 
-# We'll import pyTRS, a module for parsing land descriptions (which this module builds on)
-import pyTRS
+# We'll import pytrs, a module for parsing land descriptions (which this module builds on)
+import pytrs
 
 # Creating a tract, being the NE/4 of Section 14, T154N-R97W
-tract_1 = pyTRS.Tract(trs='154n97w14', desc='NE/4')
+tract_1 = pytrs.Tract(desc='NE/4', trs='154n97w14')
 
 # Parsing it into lots/QQs; not bothering with any optional `config=` parameters here.
 tract_1.parse()
@@ -184,17 +184,17 @@ import pyTRSplat
 # 'legal' preset.
 multiplat_1 = pyTRSplat.MultiPlat(settings='legal')
 
-# We'll import pyTRS, a module for parsing land descriptions (which this module builds on)
-import pyTRS
+# We'll import pytrs, a module for parsing land descriptions (which this module builds on)
+import pytrs
 
 # Creating a PLSSDesc object, spanning lands in T154N-R97W and T155N-R97W
 sample_text = 'T154N-R97W Sec 14: SE/4, Sec 15: W/2, T155N-R97W Sec 22: S/2'
-plssdesc_1 = pyTRS.PLSSDesc(sample_text)
+plssdesc_1 = pytrs.PLSSDesc(sample_text)
 
-# Parse `plssdesc_1` it into pyTRS.Tract objects, which get parsed into lots/QQs by virtue
-# of the parameter initParseQQ=True (see pyTRS docs for more info); also not bothering with
+# Parse `plssdesc_1` it into pytrs.Tract objects, which get parsed into lots/QQs by virtue
+# of the parameter init_parse_qq=True (see pyTRS docs for more info); also not bothering with
 # any optional `config=` parameters here.
-plssdesc_1.parse(initParseQQ=True)
+plssdesc_1.parse(init_parse_qq=True)
 
 # `plssdesc_1` now has 3 Tracts in `.parsedTracts` attribute, being in 154n97w14, 154n97w15,
 # and 155n97w22 (i.e. there are two unique Twp/Rges: 154n97w and 154n98w).
@@ -225,26 +225,26 @@ These objects can streamline generating `Plat` and `MultiPlat` objects with data
 
 #### (some example data sources to queue up)
 ```
-# First, create some example pyTRS.Tract and pyTRS.PLSSDesc objects
+# First, create some example pytrs.Tract and pytrs.PLSSDesc objects
 
-import pyTRS
+import pytrs
 
 # Creating a couple tracts, and parsing them into lots/QQs with the pyTRS module
-tract_1 = pyTRS.Tract(trs='154n97w14', desc='NE/4')
+tract_1 = pytrs.Tract(desc='NE/4', trs='154n97w14')
 tract_1.parse()
-tract_2 = pyTRS.Tract(trs='154n97w13', desc='W/2NW/4')
+tract_2 = pytrs.Tract(desc='W/2NW/4', trs='154n97w13')
 tract_2.parse()
 
 # Creating a couple PLSSDesc objects, spanning lands in T154N-R97W, T155N-R97W, T156N-R97W
 sample_text_1 = 'T154N-R97W Sec 14: SE/4, Sec 15: W/2, T155N-R97W Sec 22: S/2'
-plssdesc_1 = pyTRS.PLSSDesc(sample_text_1)
+plssdesc_1 = pytrs.PLSSDesc(sample_text_1)
 sample_text_2 = 'T154N-R97W Sec 11: S/2SE/4, T156N-R97W Sec 36: S/2S/2'
-plssdesc_2 = pyTRS.PLSSDesc(sample_text_2)
+plssdesc_2 = pytrs.PLSSDesc(sample_text_2)
 
-# parsing them into pyTRS.Tract objects, which get parsed into lots/QQs by virtue of the
-# parameter initParseQQ=True (see pyTRS docs for more info)
-plssdesc_1.parse(initParseQQ=True)
-plssdesc_2.parse(initParseQQ=True)
+# parsing them into pytrs.Tract objects, which get parsed into lots/QQs by virtue of the
+# parameter init_parse_qq=True (see pyTRS docs for more info)
+plssdesc_1.parse(init_parse_qq=True)
+plssdesc_2.parse(init_parse_qq=True)
 
 ```
 #### `PlatQueue` example
@@ -279,24 +279,24 @@ plat_1.process_queue(pq1)
 ```
 # (using the example pyTRS objects from the above block of sample code)
 
-# Unlike with PlatQueue objects, pyTRS.PLSSDesc objects can be added to a MultiPlatQueue object,
+# Unlike with PlatQueue objects, pytrs.PLSSDesc objects can be added to a MultiPlatQueue object,
 # which does allow multiple Twp/Rge's.
 # (a MultiPlatQueue object is NOT agnostic to Twp/Rge, and in fact Twp/Rge serves as its dict
 # keys -- ex: '154n97w' or '1s7e' etc.)
 
 mpq1 = pyTRSplat.MultiPlatQueue()
 
-# Add to `mpq1` our two PLSSDesc objects, and the subordinate pyTRS.Tract objects are
+# Add to `mpq1` our two PLSSDesc objects, and the subordinate pytrs.Tract objects are
 # automatically sorted by Twp/Rge and added to the appropriate PlatQueue within `mpq1`
 mpq1.queue_add(plssdesc_1)
 mpq1.queue_add(plssdesc_2)
 
-mpq1['154n97w']  # returns a PlatQueue object containing the pyTRS.Tract objects in T154N-R97W
+mpq1['154n97w']  # returns a PlatQueue object containing the pytrs.Tract objects in T154N-R97W
 mpq1['155n97w']  # Does the same, for T155N-R97W
 mpq1['156n97w']  # Does the same, for T156N-R97W
 #mpq1['157n97w']  # This would raise a KeyError, because there were no tracts in T157N-R97W
 
-# We can also add the two pyTRS.Tract objects to the MultiPlatQueue, if we want. Specifying
+# We can also add the two pytrs.Tract objects to the MultiPlatQueue, if we want. Specifying
 # the `twprge` (i.e. the appropriate dict key for these objects) here is optional, because
 # the MultiPlatQueue can deduce it from the Tract objects' own `.twp` and `.rge` attributes.
 # However, specifying `twprge` is good practice, because the pyTRS parsing algorithm is not
@@ -314,7 +314,7 @@ multiplat_1.process_queue(mpq1)
 
 ```
 
-Note that specifying `twprge` when adding a `pyTRS.PLSSDesc` via `MultiPlatQueue.queue_add()` has no effect. Because PLSS descriptions can have multiple Twp/Rge's, `MultiPlatQueue` objects mandate pulling the the Twp/Rge(s) from the `.twp` and `.rge` attributes of the `pyTRS.Tract` objects listed in the `.parsedTracts` attribute of the `PLSSDesc` object.
+Note that specifying `twprge` when adding a `pytrs.PLSSDesc` via `MultiPlatQueue.queue_add()` has no effect. Because PLSS descriptions can have multiple Twp/Rge's, `MultiPlatQueue` objects mandate pulling the the Twp/Rge(s) from the `.twp` and `.rge` attributes of the `pytrs.Tract` objects listed in the `.parsedTracts` attribute of the `PLSSDesc` object.
 
 Note also that `pyTRSplat.SectionGrid` and `pyTRSplat.TownshipGrid` objects can also be added to `PlatQueue` and `MultiPlatQueue` objects (for MPQ's, requiring `twprge` to be specified when added), but those objects
 
@@ -324,11 +324,11 @@ Note also that `pyTRSplat.SectionGrid` and `pyTRSplat.TownshipGrid` objects can 
 ```
 # This...
 
-import pyTRS
+import pytrs
 import pyTRSplat
 
 sample_text_3 = 'T154N-R97W Sec 1: Lots 1 - 3, S/2N/2'
-plssdesc_3 = pyTRS.PLSSDesc(sample_text, config='cleanQQ')
+plssdesc_3 = pytrs.PLSSDesc(sample_text, config='clean_qq')
 plssdesc_3.parse()
 mpq2 = pyTRSplat.MultiPlatQueue()
 mpq2.queue_add(plssdesc_3)
@@ -340,7 +340,7 @@ import pyTRSplat
 
 mpq2 = pyTRSplat.MultiPlatQueue()
 sample_text_3 = 'T154N-R97W Sec 1: Lots 1 - 3, S/2N/2'
-mpq2.queue_add_text(sample_text_3, config='cleanQQ')
+mpq2.queue_add_text(sample_text_3, config='clean_qq')
 
 
 # i.e. `.queue_add_text()` takes raw text of a PLSS land description, parses it (taking the
@@ -410,20 +410,20 @@ In practice, non-standard townships are common even in flat parts of the United 
 
 
 
-##### (Create a few `pyTRS.Tract` objects to use in examples)
+##### (Create a few `pytrs.Tract` objects to use in examples)
 ```
-import pyTRS
+import pytrs
 
 # Section 1, T154N-R97W has only standard lots -- i.e. Lots 1, 2, 3, and 4 correspond to
 # the NENE, NWNE, NENW, and NWNW respectively (by design of a 'standard' township)
 
-tract_1 = pyTRS.Tract(trs='154n97w01', desc='Lots 1 - 4, S/2N/2')
+tract_1 = pytrs.Tract(desc='Lots 1 - 4, S/2N/2', trs='154n97w01')
 tract_1.parse()
 
 
 # Section 25 of the same township has non-standard lots, due to a river that runs through it
 
-tract_2 = pyTRS.Tract(trs='154n97w25', desc='Lots 5, 8')
+tract_2 = pytrs.Tract(desc='Lots 5, 8', trs='154n97w25')
 tract_2.parse()
 ```
 
@@ -431,7 +431,7 @@ tract_2.parse()
 
 ##### What happens when lots are undefined in a `Plat`:
 ```
-# (An example plat with intentionally undefined lots, using the above example pyTRS.Tract objects)
+# (An example plat with intentionally undefined lots, using the above example pytrs.Tract objects)
 
 # parameter `allow_ld_defaults=False` isn't needed, since that's the default, but to be explicit
 # for this example:
@@ -452,7 +452,7 @@ print(plat_1.unhandled_lots_by_sec)  # prints "{1: ['L1', 'L2', 'L3', 'L4'], 25:
 ##### Allowing default lots with `allow_ld_defaults=True` when initializing `Plat` or `MultiPlat` objects
 ```
 # (An example plat allowing default lots, but with other lots undefined. Again using the above
-# example pyTRS.Tract objects.)
+# example pytrs.Tract objects.)
 
 # This time passing parameter `allow_ld_defaults=True` when initializing our Plat.
 plat_2 = pyTRSplat.Plat(allow_ld_defaults=True)
@@ -472,7 +472,7 @@ print(plat_2.unhandled_lots_by_sec)  # prints "{1: [], 25: ['L5', 'L8']}"
 ##### Allowing default lots with `allow_ld_defaults=True` *__AFTER__* initializing `Plat` or `MultiPlat` objects
 ```
 # (Another example plat allowing default lots, but with other lots undefined. Again using the
-# above example pyTRS.Tract objects.)
+# above example pytrs.Tract objects.)
 
 # Again being explicit with `allow_ld_defaults=False` for example purposes.
 plat_3 = pyTRSplat.Plat(allow_ld_defaults=False)
@@ -505,9 +505,9 @@ This example demonstrated:
 # explicit lot definitions
 
 
-# Example pyTRS.Tract object
-import pyTRS
-tract_3 = pyTRS.Tract(trs='155n97w01', desc='Lots 1 - 8')
+# Example pytrs.Tract object
+import pytrs
+tract_3 = pytrs.Tract(desc='Lots 1 - 8', trs='155n97w01')
 tract_3.parse()
 
 
@@ -647,7 +647,7 @@ ex: `97w` for Range 97 West; `6e` for Range 6 East
 4) `sec` and `lot` should specified as simple integers (non-numeric lots cannot currently be handled)
 5) `qq` should be in the format as follows:
     a) `NENE` for 'Northeast Quarter of the Northeast Quarter';
-       `W2` for 'West Half'; `ALL` for 'ALL' ... (These get passed through `pyTRS` parsing, so reasonable abbreviations SHOULD be captured...)
+       `W2` for 'West Half'; `ALL` for 'ALL' ... (These get passed through `pytrs` parsing, so reasonable abbreviations SHOULD be captured...)
     b) If a lot comprises more than a single QQ, separate QQs by comma (with no space), and/or use larger aliquot divisions as appropriate.
         ex: Lot 1 that comprises the N/2NE/4 could be specified under the 'qq' columns as `N2NE`
         ex: Lot 4 that sprawls across the E/2NW/4 and SW/4NW/4 could be specified under the 'qq' column as `E2NW,SWNW`
@@ -665,7 +665,7 @@ These objects are mostly beyond the scope of a quick-start guide, except to poin
 
 * `pyTRSplat.SectionGrid` -- A grid representing a section (i.e. a 4x4 grid of quarter-quarters, or 'QQs')
 
-Look into the respective documentation on these objects for how to manipulate / access their data. (Notably, when platting `pyTRS.Tract` and `pyTRS.PLSSDesc` objects, that data gets translated into these object types behind the scenes.)
+Look into the respective documentation on these objects for how to manipulate / access their data. (Notably, when platting `pytrs.Tract` and `pytrs.PLSSDesc` objects, that data gets translated into these object types behind the scenes.)
 
 Note that `TownshipGrid` and `SectionGrid` objects can be added to `PlatQueue` and `MultiPlatQueue` objects with `.queue_add()`; and both can be platted directly onto a `Plat` object with `.plat_township_grid()` and `.plat_sec_grid()`, respectively. (But to process them into a `MultiPlat` object, they must be added to a `MultiPlatObject`, which will be processed instead).
 
@@ -677,9 +677,9 @@ Also, for the simplest option for manual platting, look into the `Plat.fill_qq()
 ### Misc. functions / utilities:
 
 These functions are also beyond the scope of a quick-start guide, and why they might be useful:
-* `pyTRSplat.filter_tracts_by_twprge()` -- Filter a list of `pyTRS.Tract` objects into a dict, keyed by Twp/Rge
-* `pyTRSplat.tracts_into_twp_grids()` -- Apply the parsed data in a list of `pyTRS.Tract` objects into a dict of TownshipGrid objects (keyed by Twp/Rge)
-* `pyTRSplat.plssdesc_to_twp_grids()` -- Apply the parsed data in a `pyTRS.PLSSDesc` object into a dict of TownshipGrid objects (keyed by Twp/Rge)
+* `pyTRSplat.filter_tracts_by_twprge()` -- Filter a list of `pytrs.Tract` objects into a dict, keyed by Twp/Rge
+* `pyTRSplat.tracts_into_twp_grids()` -- Apply the parsed data in a list of `pytrs.Tract` objects into a dict of TownshipGrid objects (keyed by Twp/Rge)
+* `pyTRSplat.plssdesc_to_twp_grids()` -- Apply the parsed data in a `pytrs.PLSSDesc` object into a dict of TownshipGrid objects (keyed by Twp/Rge)
 
 I expect few users would have cause to use these functions without an already deep understanding of the whole module (so probably nobody).
 

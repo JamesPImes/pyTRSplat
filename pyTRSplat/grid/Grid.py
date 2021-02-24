@@ -4,12 +4,13 @@
 Grid-based representations of PLSS Sections (i.e. 4x4 grid of QQs) and
 Townships (i.e. 6x6 grid of Sections), as well as objects for how
 specific lots should be interpreted in terms of QQ(s). Also includes
-interpreters for converting parsed pyTRS.PLSSDesc and pyTRS.Tract data
+interpreters for converting parsed pytrs.PLSSDesc and pytrs.Tract data
 into SectionGrid and TownshipGrid objects.
 """
 
-from pyTRS import parser as pyTRS
+import pytrs
 from pyTRSplat.utils import _smooth_QQs, _lot_without_div
+
 
 class SectionGrid:
     """
@@ -83,7 +84,7 @@ class SectionGrid:
         self.twp = twp
         self.rge = rge
 
-        # 'secError' can be returned by pyTRS in the event of a flawed
+        # 'secError' can be returned by pytrs in the event of a flawed
         # parse, so we handle this by setting to 0 (a meaningless number
         # for a section that can't exist in reality) to avoid causing
         # ValueError when converting to int elsewhere.
@@ -127,7 +128,7 @@ class SectionGrid:
         # that QQ has been switched `on` -- i.e. 'val', which is either
         # 0 ('nothing') or 1 ('something') to track whether the QQ
         # (or equivalent Lot) was identified in the tract description.
-        self.QQgrid = {
+        self.qq_grid = {
             'NWNW': {'coord': (0, 0), 'val': 0},
             'NENW': {'coord': (1, 0), 'val': 0},
             'NWNE': {'coord': (2, 0), 'val': 0},
@@ -167,20 +168,20 @@ class SectionGrid:
             ex: '154n97w01', '1s7e36', etc.
         :return: A SectionGrid object.
         """
-        twp, rge, sec = pyTRS.break_trs(trs)
+        twp, rge, sec = pytrs.break_trs(trs)
         return SectionGrid(
             sec, twp, rge, ld=ld, allow_ld_defaults=allow_ld_defaults)
 
     @staticmethod
-    def from_tract(tract : pyTRS.Tract, ld=None, allow_ld_defaults=False):
+    def from_tract(tract: pytrs.Tract, ld=None, allow_ld_defaults=False):
         """
         Return a new SectionGrid object created from a parsed
-        pyTRS.Tract object and incorporate the lotList and QQList from
+        pytrs.Tract object and incorporate the `.lots` and qqs from
         that Tract.
 
         All available parameters have the same effect as for vanilla
         __init__(), except:
-        :param tract: A pyTRS.Tract object (already parsed into lots and
+        :param tract: A pytrs.Tract object (already parsed into lots and
         QQs).
         :return: A SectionGrid object.
         """
@@ -243,7 +244,7 @@ class SectionGrid:
         lots_by_QQname_dict = self.lots_by_qq_name()
         ar = self.output_array()
 
-        for qq_name, dv in self.QQgrid.items():
+        for qq_name, dv in self.qq_grid.items():
             x = dv['coord'][0]
             y = dv['coord'][1]
             lots = lots_by_QQname_dict.get(qq_name)
@@ -254,9 +255,9 @@ class SectionGrid:
 
         return ar
 
-    def incorporate_tract(self, tract: pyTRS.Tract):
+    def incorporate_tract(self, tract: pytrs.Tract):
         """
-        Check the lotList and QQList of a parsed pyTRS.Tract object,
+        Check the `.lots` and qqs of a parsed pytrs.Tract object,
         and incorporate any hits into the grid.
         NOTE: Relies on the LotDefinitions object in `.ld` at the time
         this method is called. Later changes to `.ld` will not
@@ -267,12 +268,12 @@ class SectionGrid:
         # regardless what the value of its QQ's may be (now or later on)
         self._was_pinged = True
 
-        self.incorporate_qq_list(tract.QQList)
-        self.incorporate_lot_list(tract.lotList)
+        self.incorporate_qq_list(tract.qqs)
+        self.incorporate_lot_list(tract.lots)
 
-    def incorporate_lot_list(self, lotList: list):
+    def incorporate_lot_list(self, lots: list):
         """
-        Incorporate all lots in the passed `lotList` into the grid.
+        Incorporate all lots in the passed ``.lots`` into the grid.
             ex: Passing ['L1', 'L3', 'L4', 'L5'] might set 'NENE',
                 'NENW', 'NWNW', and 'SWNW' as hits for a hypothetical
                 SectionGrid, depending on how lots 1, 3, 4, and 5 are
@@ -292,7 +293,7 @@ class SectionGrid:
 
         # Convert each lot to its equivalent QQ, per the ld, and
         # add them to the equiv_qq list.
-        for lot in lotList:
+        for lot in lots:
             # First remove any divisions in the lot (e.g., 'N2 of L1' -> 'L1')
             lot = _lot_without_div(lot)
 
@@ -304,9 +305,10 @@ class SectionGrid:
 
         self.incorporate_qq_list(equiv_qq)
 
-    def incorporate_qq_list(self, QQList : list):
+    def incorporate_qq_list(self, qqs: list):
         """
-        Incorporate all QQs in the passed QQList into the grid.
+        Incorporate all QQs in the passed list of QQs (`qqs`) into the
+        grid.
             ex: Passing 'NENE', 'NENW', 'NWNW', and 'SWNW' sets all of
                 those QQ's as hits in a SectionGrid.
         """
@@ -317,7 +319,7 @@ class SectionGrid:
 
         # `qq` can be fed in as 'NENE' or 'NENE,NWNE'. So we need to break it
         # into components before incorporating.
-        for qq in QQList:
+        for qq in qqs:
             for qq_ in qq.replace(' ', '').split(','):
                 # Also, ensure we're only getting 4-characters max -- i.e.
                 # 'N2NENE' -> 'NENE' by passing through `_smooth_QQs()`.
@@ -399,22 +401,22 @@ class SectionGrid:
         with resulting coords formatted (y, x).
         ex:
             ar = sg_obj.output_array()
-            ar[y][x]  # Accesses the value at (x, y) in `sg_obj.QQgrid`
+            ar[y][x]  # Accesses the value at (x, y) in `sg_obj.qq_grid`
         """
 
         max_x = 0
         max_y = 0
-        for qq in self.QQgrid.values():
+        for qq in self.qq_grid.values():
             if qq['coord'][0] > max_x:
                 max_x = qq['coord'][0]
             if qq['coord'][1] > max_y:
                 max_y = qq['coord'][1]
 
         # Create an array of all zero-values, with equal dimensions as
-        # in the SectionGrid.QQgrid (which is 4x4 in a standard section).
+        # in the SectionGrid.qq_grid (which is 4x4 in a standard section).
         ar = [[0 for _a in range(max_x + 1)] for _b in range(max_y + 1)]
 
-        for qq in self.QQgrid.values():
+        for qq in self.qq_grid.values():
             x = qq['coord'][0]
             y = qq['coord'][1]
             if qq['val'] != 0:
@@ -429,8 +431,8 @@ class SectionGrid:
         -- e.g. 'NENE', 'SWSE', etc.)
         """
         qq = qq.upper()
-        if qq in self.QQgrid.keys():
-            self.QQgrid[qq]['val'] = 0
+        if qq in self.qq_grid.keys():
+            self.qq_grid[qq]['val'] = 0
 
     def turn_on_qq(self, qq: str, custom_val=1):
         """
@@ -454,8 +456,8 @@ class SectionGrid:
         # might be useful for some purposes (e.g., tracking which
         # PLSS descriptions include that QQ).
         qq = qq.upper()
-        if qq in self.QQgrid.keys():
-            self.QQgrid[qq]['val'] = custom_val
+        if qq in self.qq_grid.keys():
+            self.qq_grid[qq]['val'] = custom_val
 
     def filled_coords(self) -> list:
         """
@@ -475,7 +477,7 @@ class SectionGrid:
         Return a list of QQs in the SectionGrid that contain a hit.
         """
         hits = []
-        for qq, v in self.QQgrid.items():
+        for qq, v in self.qq_grid.items():
             if v['val'] != 0:
                 hits.append(qq)
         return hits
@@ -583,7 +585,7 @@ class TownshipGrid:
 
         # Also add a nonsense 'Section 0' (which never actually exists
         # for any real-life township). This way, we can handle section
-        # errors (e.g., from a flawed parse by pyTRS, which can generate
+        # errors (e.g., from a flawed parse by pytrs, which can generate
         # a section number of 'secError') by changing them to Section 0,
         # without crashing the program, but while also being able to
         # check if there were flaws (e.g., if there are any changes made
@@ -625,7 +627,7 @@ class TownshipGrid:
         objects that were 'pinged' by any setter method, even if no
         values were set (e.g., an empty list was passed to the
         `.incorporate_lotlist()` method, resulting in no actually-set
-        values. This is potentially useful if a pyTRS.Tract object was
+        values. This is potentially useful if a pytrs.Tract object was
         parsed but did not have any identifiable lots or QQ's and we
         still want to include the corresponding SectionGrid object here.
         Defaults to False.
@@ -637,15 +639,15 @@ class TownshipGrid:
                 x_sec.append(val)
         return x_sec
 
-    def incorporate_tract(self, tract, sec_num=None):
+    def incorporate_tract(self, tract: pytrs.Tract, sec_num=None):
         """
-        Check the `.lotList` and `.QQList` attributes of a parsed
-        pyTRS.Tract object, and incorporate any hits into the
+        Check the `.lots` and `.qqs` attributes of a parsed
+        pytrs.Tract object, and incorporate any hits into the
         appropriate SectionGrid.
         NOTE: Relies on the TwpLotDefinitions object in `.tld` at the
         time this method is called. Later changes to `.tld` will not
         modify what has already been done here.
-        :param tract: The pyTRS.Tract object whose lotList and QQList
+        :param tract: The pytrs.Tract object whose lots and qqs
         should be incorporated into the TownshipGrid.
         :param sec_num: The section number for the Tract being
         incorporated. If not specified, it will pull the `.sec`
@@ -653,7 +655,7 @@ class TownshipGrid:
         """
         if sec_num is None:
             sec_num = tract.sec
-        # 'secError' can be returned by pyTRS in the event of a flawed
+        # 'secError' can be returned by pytrs in the event of a flawed
         # parse, so we handle this by setting sec_num to 0 (a section number
         # that can't exist in reality), before trying to
         # convert `sec` to an int causes a ValueError.
@@ -777,16 +779,17 @@ class LotDefinitions(dict):
         """Set definition (value) to lot (key). Overwrite, if already
         exists. Using this method ensures that the resulting format will
         be as expected elsewhere in the program (assuming input format
-        is acceptable), by passing definitions through pyTRS parsing."""
+        is acceptable), by passing definitions through pytrs parsing."""
 
         # If no leading 'L' was fed in, add it now (e.g. 1 -> 'L1')
         if str(lot).upper()[0] != 'L':
             lot = 'L' + str(lot).upper()
 
         # Ensure the definitions are broken down into QQ's by passing them
-        # through pyTRS.Tract parsing, and pulling the resulting QQList.
-        qq_list = pyTRS.Tract(
-            desc=definition, initParseQQ=True, config='cleanQQ').QQList
+        # through pytrs.Tract parsing, and pulling the resulting qqs.
+        qq_list = pytrs.Tract(
+            desc=definition, init_parse_qq=True,
+            config='clean_qq,qq_depth.2').qqs
         self[lot] = ','.join(qq_list)
 
     def absorb_ld(self, dct):
@@ -794,7 +797,7 @@ class LotDefinitions(dict):
         keys, if any. Using this method ensures that the resulting
         format will be as expected elsewhere in the program (assuming
         input format is acceptable), by passing definitions through
-        pyTRS parsing."""
+        pytrs parsing."""
         for lot, definition in dct.items():
             self.set_lot(lot, definition)
 
@@ -1042,7 +1045,7 @@ class LotDefDB(dict):
         5) qq should be in the format as follows:
             a) 'NENE' for 'Northeast Quarter of the Northeast Quarter';
                     'W2' for 'West Half'; 'ALL' for 'ALL' ...
-                        (These get passed through pyTRS parsing, so
+                        (These get passed through pytrs parsing, so
                         reasonable abbreviations SHOULD be captured...)
             b) If a lot comprises more than a single QQ, separate QQs by
                     comma (with no space), and/or use larger aliquot
@@ -1193,7 +1196,7 @@ class LotDefDB(dict):
         LotDefinitions object. Otherwise, will return None.
         """
 
-        twp, rge, sec = pyTRS.break_trs(trs)
+        twp, rge, sec = pytrs.break_trs(trs)
         twprge = twp + rge
         tld = self.get_tld(
             twprge, allow_ld_defaults=allow_ld_defaults,
@@ -1207,19 +1210,19 @@ class LotDefDB(dict):
 
 
 def plssdesc_to_twp_grids(
-        plssdesc: pyTRS.PLSSDesc, lddb=None,
+        plssdesc: pytrs.PLSSDesc, lddb=None,
         allow_ld_defaults=False) -> dict:
     """
     Generate a dict of TownshipGrid objects (keyed by T&R, i.e. up to
     3 digits for township and range number, and a single lowercase
     letter for N/S and E/W -- i.e. '154n97w' for T154N-R97W or '1s7e'
-    for T1S-R7E) from a parsed pyTRS.PLSSDesc object.
+    for T1S-R7E) from a parsed pytrs.PLSSDesc object.
 
-    :param plssdesc: An already-parsed pyTRS.PLSSDesc object whose
-    subordinate pyTRS.Tract objects (which have also been parsed into
+    :param plssdesc: An already-parsed pytrs.PLSSDesc object whose
+    subordinate pytrs.Tract objects (which have also been parsed into
     lots and QQs) should be applied to the resulting TownshipGrid
-    objects (i.e. incorporating the Tract objects' `.lotList` and
-    `.QQList` attributes into the subordinate SectionGrid objects under
+    objects (i.e. incorporating the Tract objects' `.lots` and
+    `.qqs` attributes into the subordinate SectionGrid objects under
     the TownshipGrids).
     :param lddb: Either a pyTRSplat.LotDefDB object, or a filepath (str)
     to a .csv file** that can be loaded into a LotDefDB -- for how every
@@ -1235,7 +1238,7 @@ def plssdesc_to_twp_grids(
     :return: A dict (keyed by T&R) of TownshipGrid objects, whose values
     are set according to the .
     """
-    tl = plssdesc.parsedTracts
+    tl = plssdesc.parsed_tracts
     return tracts_into_twp_grids(
         tl, lddb=lddb, allow_ld_defaults=allow_ld_defaults)
 
@@ -1243,7 +1246,7 @@ def plssdesc_to_twp_grids(
 def tracts_into_twp_grids(
         tract_list, grid_dict=None, lddb=None, allow_ld_defaults=False) -> dict:
     """
-    Incorporate a list of parsed pyTRS.Tract objects into respective
+    Incorporate a list of parsed pytrs.Tract objects into respective
     TownshipGrid objects, and return a dict of those TownshipGrid objs
     (keyed by T&R). If an existing `grid_dict` is passed, it will be
     updated and returned. If not, a new one will be created and
@@ -1251,8 +1254,8 @@ def tracts_into_twp_grids(
     Optionally specify `lddb=<LotDefDB>` to define lots and get better
     results.
 
-    :param tract_list: A list of already-parsed pyTRS.Tract objects
-    whose `.lotList` and `.QQList` attributes should incorporated into
+    :param tract_list: A list of already-parsed pytrs.Tract objects
+    whose `.lots` and `.qqs` attributes should incorporated into
     the TownshipGrid objects.
     :param grid_dict: An existing dict (keyed by T&R) of TownshipGrid
     objects (one TownshipGrid per unique Twp/Rge), which will be updated
@@ -1286,11 +1289,11 @@ def tracts_into_twp_grids(
     # exist in the grid_dict.
     for tract in tract_list:
 
-        # If there was a T&R error in the parsing by pyTRS, twp and rge
+        # If there was a T&R error in the parsing by pytrs, twp and rge
         # will both be set as 'TRerr' by `.break_TRS()`. If there was a
         # section error, `sec` will be set as `secError`. Otherwise,
         # these three variables are set usefully.
-        twp, rge, sec = pyTRS.break_trs(tract.trs)
+        twp, rge, sec = pytrs.break_trs(tract.trs)
 
         # We don't want to duplicate 'TRerr' when setting a key shortly,
         # so set twp and rge, such that only twp contains 'TRerr'.

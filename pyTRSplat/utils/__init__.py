@@ -6,19 +6,19 @@ Misc tools and utils that do not belong in other packages.
 
 
 ########################################################################
-# Sorting pyTRS.Tracts by Twp/Rge.
+# Filtering pytrs.Tracts by Twp/Rge.
 ########################################################################
 
 def filter_tracts_by_twprge(tract_list, twprge_dict=None) -> dict:
     """
-    Filter pyTRS.Tract objects into a dict, keyed by T&R (formatted
+    Filter pytrs.Tract objects into a dict, keyed by T&R (formatted
     '000x000y', or fewer digits).
     """
-    from pyTRS import PLSSDesc
+    from pytrs import PLSSDesc
 
     # If the user passes a PLSSDesc object, pull its TractList obj.
     if isinstance(tract_list, PLSSDesc):
-        tract_list = tract_list.parsedTracts
+        tract_list = tract_list.parsed_tracts
 
     # construct a dict to link Tracts to their respective Twps
     if twprge_dict is None:
@@ -58,12 +58,12 @@ def _smooth_QQs(aliquot_text) -> list:
         ex: 'S2NENE' -> ['NENE']
     NOTE: Does NOT convert lots to QQ.
     """
-    from pyTRS.parser.parser import scrub_aliquots, unpack_aliquots
+    from pytrs.parser.parser import _scrub_aliquots, _unpack_aliquots
 
     qq_l = []
     for aliq in aliquot_text.replace(' ', '').split(','):
-        scrubbed = scrub_aliquots(aliq, cleanQQ=True)
-        scrubbed = unpack_aliquots(scrubbed)
+        scrubbed = _scrub_aliquots(aliq, clean_qq=True)
+        scrubbed = _unpack_aliquots(scrubbed)
         for qq in scrubbed:
             # Append only the last 4 chars (ie. the true QQ: 'S2NENE' -> 'NENE')
             qq_l.append(qq[-4:])
