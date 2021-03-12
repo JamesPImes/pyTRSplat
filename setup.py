@@ -1,14 +1,23 @@
 from setuptools import setup
 
 
-def get_version():
-    version_var_setter = "__version__ = "
-    with open(r".\pyTRSplat\_constants.py", "r") as file:
+MODULE_DIR = "pytrsplat"
+
+
+def get_constant(constant):
+    setters = {
+        "version": "__version__ = ",
+        "author": "__author__ = ",
+        "author_email": "__email__ = ",
+        "url": "__website__ = "
+    }
+    var_setter = setters[constant]
+    with open(rf".\{MODULE_DIR}\_constants.py", "r") as file:
         for line in file:
-            if line.startswith(version_var_setter):
-                version = line[len(version_var_setter):].strip('\'\n \"')
+            if line.startswith(var_setter):
+                version = line[len(var_setter):].strip('\'\n \"')
                 return version
-        raise RuntimeError("Could not get __version__ info.")
+        raise RuntimeError(f"Could not get {constant} info.")
 
 
 description = (
@@ -17,7 +26,8 @@ description = (
 )
 
 long_description = (
-    "pyTRSplat is a Python library and GUI application for generating "
+    "pyTRSplat (imported as `pytrsplat`) is a Python library and GUI "
+    "application for generating "
     "customizable plats directly from Public Land Survey System (PLSS) "
     "land descriptions (or 'legal descriptions'), built on the "
     "[pyTRS library](https://github.com/JamesPImes/pyTRS)."
@@ -32,21 +42,21 @@ long_description = (
 
 setup(
     name='pyTRSplat',
-    version=get_version(),
+    version=get_constant('version'),
     packages=[
-        'pyTRSplat',
-        'pyTRSplat.grid',
-        'pyTRSplat.plat',
-        'pyTRSplat.utils',
-        'pyTRSplat.platqueue',
-        'pyTRSplat.imgdisplay',
-        'pyTRSplat.platsettings',
-        'pyTRSplat.settingseditor'
+        'pytrsplat',
+        'pytrsplat.grid',
+        'pytrsplat.plat',
+        'pytrsplat.utils',
+        'pytrsplat.platqueue',
+        'pytrsplat.imgdisplay',
+        'pytrsplat.platsettings',
+        'pytrsplat.settingseditor'
     ],
-    url='https://github.com/JamesPImes/pyTRSplat',
+    url=get_constant('url'),
     license='Modified Academic Public License',
-    author='James P. Imes',
-    author_email='jamesimes@gmail.com',
+    author=get_constant('author'),
+    author_email=get_constant('author_email'),
     description=description,
     long_description=long_description,
     long_description_content_type="text/markdown",

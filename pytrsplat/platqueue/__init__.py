@@ -4,4 +4,4 @@
 Streamlined queues of 'plattable' objects.
 """
 
-from .PlatQueue import PlatQueue, MultiPlatQueue
+from .platqueue import PlatQueue, MultiPlatQueue

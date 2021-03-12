@@ -1,6 +1,6 @@
 # pyTRSplat
 
-A python module and application for generating customizable plat images of PLSS descriptions (or 'legal descriptions') of land. Uses the [pyTRS library](https://github.com/JamesPImes/pyTRS) for parsing raw land descriptions into their component parts and the [Pillow (PIL) library](https://python-pillow.org/) for drawing the plats. (And also a small role for the [piltextbox module](https://github.com/JamesPImes/piltextbox), which was spun off from this project.)
+A python module (imported as `pytrsplat`) and application for generating customizable plat images of PLSS descriptions (or 'legal descriptions') of land. Uses the [pyTRS library](https://github.com/JamesPImes/pyTRS) for parsing raw land descriptions into their component parts and the [Pillow (PIL) library](https://python-pillow.org/) for drawing the plats. (And also a small role for the [piltextbox module](https://github.com/JamesPImes/piltextbox), which was spun off from this project.)
 
 ## To install
 
@@ -49,7 +49,7 @@ Lands can be added either by entering their PLSS description as raw text, or by 
 The sample code block below is a demonstration of the basic functionality of converting text into a plat. See the next section of this readme for more fine-grained explanations.
 
 ```
-import pyTRSplat
+import pytrsplat
 
 # The raw text of the PLSS description for the land we want to plat.
 
@@ -61,17 +61,17 @@ Section 13: That portion of the E/2 lying north of the river and west of the pri
 Section 14: NE/4'''
 
 
-# This .csv file is included in the pyTRSplat\_examples\ directory. It
+# This .csv file is included in the pytrsplat\_examples\ directory. It
 # defines what lot 1 means in Section 22, T154N-R97W (and other
 # lots/sections).
-lot_database_fp = r'pyTRSplat\_examples\SAMPLE_LDDB.csv'
+lot_database_fp = r'pytrsplat\_examples\SAMPLE_LDDB.csv'
 
 # Will output to a .png file (could also output to .pdf)
 output_fp = r'C:\land plats\sample_plat_01.png'
 
 # Using the 'letter' settings preset (i.e. letter-sized paper at 200ppi),
 # generate the plat, and save as .png to the specified filepath
-plats = pyTRSplat.text_to_plats(
+plats = pytrsplat.text_to_plats(
     land_description, settings='letter', lddb=lot_database_fp,
     output_filepath=output_fp)
 
@@ -80,7 +80,7 @@ print(type(plats[0]))  # prints "<class 'PIL.Image.Image'>"
 
 
 # Optionally customize the plat output by creating a Settings object
-set_obj = pyTRSplat.Settings(preset='letter')
+set_obj = pytrsplat.Settings(preset='letter')
 set_obj.write_header = False  # Disable writing of header
 set_obj.qq_side = 12  # 12px per side of each QQ square
 
@@ -90,7 +90,7 @@ set_obj.qq_side = 12  # 12px per side of each QQ square
 # Will output to a .pdf file
 output_fp_2 = r'C:\land plats\sample_plat_01.png'
 
-plats_2 = pyTRSplat.text_to_plats(
+plats_2 = pytrsplat.text_to_plats(
     land_description, settings=set_obj, lddb=lot_database_fp,
     output_filepath=output_fp_2)
 ```
@@ -99,17 +99,17 @@ plats_2 = pyTRSplat.text_to_plats(
 
 ## Overview of primary module classes and functions
 
-[`pyTRSplat.launch_app()`](https://github.com/JamesPImes/pyTRSplat#included-gui-application) -- Launch the GUI application discussed above. (Or run `pyTRSplat_app_windowed.pyw` directly.)
+[`pytrsplat.launch_app()`](https://github.com/JamesPImes/pyTRSplat#included-gui-application) -- Launch the GUI application discussed above. (Or run `pyTRSplat_app_windowed.pyw` directly.)
 
-[`pyTRSplat.text_to_plats()`](https://github.com/JamesPImes/pyTRSplat#quickly-generate-plats-from-raw-land-descriptions-with-text_to_plats) -- A function to generate plat images directly from raw PLSS land descriptions
+[`pytrsplat.text_to_plats()`](https://github.com/JamesPImes/pyTRSplat#quickly-generate-plats-from-raw-land-descriptions-with-text_to_plats) -- A function to generate plat images directly from raw PLSS land descriptions
 
-[`pyTRSplat.Plat` and `pyTRSplat.MultiPlat` objects](https://github.com/JamesPImes/pyTRSplat#get-more-control-with-plat-and-multiplat-objects) -- Generate plat images, optionally incorporating multiple data sources, custom header, etc. (Generate plats directly from raw text with the `MultiPlat.from_unparsed_text()` method.)
+[`pytrsplat.Plat` and `pytrsplat.MultiPlat` objects](https://github.com/JamesPImes/pyTRSplat#get-more-control-with-plat-and-multiplat-objects) -- Generate plat images, optionally incorporating multiple data sources, custom header, etc. (Generate plats directly from raw text with the `MultiPlat.from_unparsed_text()` method.)
 
-[`pyTRSplat.PlatQueue` and `pyTRSplat.MultiPlatQueue` objects](https://github.com/JamesPImes/pyTRSplat#easily-handle-multiple-data-sources-with-platqueue-and-multiplatqueue-objects) -- Streamline platting from multiple sources.
+[`pytrsplat.PlatQueue` and `pytrsplat.MultiPlatQueue` objects](https://github.com/JamesPImes/pyTRSplat#easily-handle-multiple-data-sources-with-platqueue-and-multiplatqueue-objects) -- Streamline platting from multiple sources.
 
-[`pyTRSplat.Settings` objects](https://github.com/JamesPImes/pyTRSplat#configure-the-output-with-settings-objects-including-presets-and-custom-settings) -- Configure the output styling and behavior of `Plat` and `MultiPlat` objects, including the `pyTRSplat.text_to_plats()` function.
+[`pytrsplat.Settings` objects](https://github.com/JamesPImes/pyTRSplat#configure-the-output-with-settings-objects-including-presets-and-custom-settings) -- Configure the output styling and behavior of `Plat` and `MultiPlat` objects, including the `pytrsplat.text_to_plats()` function.
 
-[`pyTRSplat.LotDefDB`, `pyTRSplat.TwpLotDefinitions`, and `pyTRSplat.LotDefinitions` objects](https://github.com/JamesPImes/pyTRSplat#objects-for-explicit-lot-defintions----lotdefinitions-twplotdefinitions-and-lotdefdb) -- Define how lots should be interpreted.
+[`pytrsplat.LotDefDB`, `pytrsplat.TwpLotDefinitions`, and `pytrsplat.LotDefinitions` objects](https://github.com/JamesPImes/pyTRSplat#objects-for-explicit-lot-defintions----lotdefinitions-twplotdefinitions-and-lotdefdb) -- Define how lots should be interpreted.
 * *__(See especially [loading lot definitions from .csv files](https://github.com/JamesPImes/pyTRSplat#loading-lot-definitions-data-from-csv-files-for-use-in-multiplat-and-plat-objects) for the easiest way to define lots.)__*
 * *(See also ["Why do we need lot definitions, anyway?"](https://github.com/JamesPImes/pyTRSplat#why-do-we-need-lot-definitions-anyway))*
 
@@ -123,14 +123,14 @@ plats_2 = pyTRSplat.text_to_plats(
 This convenience function is the simplest way to generate plats, other than the GUI application. It takes as input a raw PLSS land description (optionally using `pytrs` config parameters for configuring how it should be parsed), and returns flattened PIL.Image objects of the generated plats, optionally saving them to filepath as .png or .pdf files.
 Example:
 ```
-import pyTRSplat
+import pytrsplat
 
 land_description = 'T154N-R97W, Sec 14: NE/4, Sec 15: W/2'
 
 # Using the 'letter' preset (i.e. 8.5"x11" paper at 200ppi, etc.), generate plat
 # and save to the specified filepath; returns a list containing a single plat (because
 # there was only one Twp/Rge in the land description)
-plats = pyTRSplats.text_to_plats(
+plats = pytrsplat.text_to_plats(
     land_description, settings='letter', output_filepath=r'C:\Land\Plats\example_plat.png')
 
 # print to console the type of the first element in the list `plats`:
@@ -141,20 +141,20 @@ print(type(plats[0]))  # prints '<class 'PIL.Image.Image'>'
 
 ### Get more control with `Plat` and `MultiPlat` objects
 For generating more nuanced or complicated plats, or incorporating data from multiple sources, these are the objects to use.
-`pyTRSplat.Plat` -- A single plat, comprising a single PLSS township of land. (Can also plat a single section. See `pyTRSplat.Plat` documentation on `only_section=<int>` parameter.)
+`pytrsplat.Plat` -- A single plat, comprising a single PLSS township of land. (Can also plat a single section. See `pytrsplat.Plat` documentation on `only_section=<int>` parameter.)
 
-`pyTRSplat.MultiPlat` -- A collection of any number of plats (i.e. `pyTRSplat.Plat` objects, stored as a list in the `.plats` attribute), all sharing identical settings and general parameters, and each comprising a single PLSS township of land. These can also handle `pytrs.PLSSDesc` objects, whereas `Plat` objects cannot (because `PLSSDesc` objects can span multiple Twp/Rge).
+`pytrsplat.MultiPlat` -- A collection of any number of plats (i.e. `pytrsplat.Plat` objects, stored as a list in the `.plats` attribute), all sharing identical settings and general parameters, and each comprising a single PLSS township of land. These can also handle `pytrs.PLSSDesc` objects, whereas `Plat` objects cannot (because `PLSSDesc` objects can span multiple Twp/Rge).
 
 
 
 #### `Plat` example
 ```
-import pyTRSplat
+import pytrsplat
 
 # Create a Plat with the 'legal' preset (i.e. 8.5x14" paper at 200ppi, etc.);
 # will show a grid of all 36 sections, with the header 'Township 154 North, Range 97 West'
 # but with no specific lands projected onto it yet.
-plat_1 = pyTRSplat.Plat(twp='154n', rge='97w', settings='legal')
+plat_1 = pytrsplat.Plat(twp='154n', rge='97w', settings='legal')
 
 # We'll import pytrs, a module for parsing land descriptions (which this module builds on)
 import pytrs
@@ -177,12 +177,12 @@ plat_1.output(r'C:/Land/Plats/sample_01.png')
 
 #### `MultiPlat` example
 ```
-import pyTRSplat
+import pytrsplat
 
 # Create a MultiPlat with the 'legal' preset (i.e. 8.5x14" paper at 200ppi, etc.).
 # No Plats will be created at init, but any that do get created later will use the same
 # 'legal' preset.
-multiplat_1 = pyTRSplat.MultiPlat(settings='legal')
+multiplat_1 = pytrsplat.MultiPlat(settings='legal')
 
 # We'll import pytrs, a module for parsing land descriptions (which this module builds on)
 import pytrs
@@ -219,9 +219,9 @@ multiplat_1.output_to_pdf(r'C:/Land/Plats/sample_01.pdf')
 
 These objects can streamline generating `Plat` and `MultiPlat` objects with data from multiple sources:
 
-* `pyTRSplat.PlatQueue` -- A list (with additional functionality) of objects that can be projected onto a single `Plat` with the `Plat.process_queue()` or `Plat.from_queue()` methods.
+* `pytrsplat.PlatQueue` -- A list (with additional functionality) of objects that can be projected onto a single `Plat` with the `Plat.process_queue()` or `Plat.from_queue()` methods.
 
-* `pyTRSplat.MultiPlatQueue` -- A dict, keyed by Twp/Rge (e.g., `'154n97w'` or `'1s7e'`) of `PlatQueue` objects applicable to the respective Twp/Rge. This object can be sorted and automatically processed into the appropriate `Plat` object in a `MultiPlat` with the `MultiPlat.process_queue()` or `MultiPlat.from_queue()` methods.
+* `pytrsplat.MultiPlatQueue` -- A dict, keyed by Twp/Rge (e.g., `'154n97w'` or `'1s7e'`) of `PlatQueue` objects applicable to the respective Twp/Rge. This object can be sorted and automatically processed into the appropriate `Plat` object in a `MultiPlat` with the `MultiPlat.process_queue()` or `MultiPlat.from_queue()` methods.
 
 #### (some example data sources to queue up)
 ```
@@ -251,9 +251,9 @@ plssdesc_2.parse(init_parse_qq=True)
 ```
 # (using the example pyTRS objects from the above block of sample code)
 
-import pyTRSplat
+import pytrsplat
 
-pq1 = pyTRSplat.PlatQueue()
+pq1 = pytrsplat.PlatQueue()
 
 # Both `tract_1` and `tract_2` can be added to the same PlatQueue object, because
 # they represent lands in the same Twp/Rge. (It would not raise an error if they
@@ -264,7 +264,7 @@ pq1.queue_add(tract_2)
 
 # Create a Plat and process the contents of `pq1`:
 
-plat_1 = pyTRSplat.Plat(settings='letter')
+plat_1 = pytrsplat.Plat(settings='letter')
 plat_1.process_queue(pq1)
 
 # plat_1 has now colored in the lands in `tract_1` and `tract_2`, and written their text
@@ -284,7 +284,7 @@ plat_1.process_queue(pq1)
 # (a MultiPlatQueue object is NOT agnostic to Twp/Rge, and in fact Twp/Rge serves as its dict
 # keys -- ex: '154n97w' or '1s7e' etc.)
 
-mpq1 = pyTRSplat.MultiPlatQueue()
+mpq1 = pytrsplat.MultiPlatQueue()
 
 # Add to `mpq1` our two PLSSDesc objects, and the subordinate pytrs.Tract objects are
 # automatically sorted by Twp/Rge and added to the appropriate PlatQueue within `mpq1`
@@ -306,7 +306,7 @@ mpq1.queue_add(tract_1, twprge='154n97w')
 mpq1.queue_add(tract_2, twprge='154n97w')
 
 
-multiplat_1 = pyTRSplat.MultiPlat(settings='letter')
+multiplat_1 = pytrsplat.MultiPlat(settings='letter')
 multiplat_1.process_queue(mpq1)
 
 # `multiplat_1` has now generated three plats (for T154N-R97W, T155N-R97W, and T156N-R97W), with
@@ -316,7 +316,7 @@ multiplat_1.process_queue(mpq1)
 
 Note that specifying `twprge` when adding a `pytrs.PLSSDesc` via `MultiPlatQueue.queue_add()` has no effect. Because PLSS descriptions can have multiple Twp/Rge's, `MultiPlatQueue` objects mandate pulling the the Twp/Rge(s) from the `.twp` and `.rge` attributes of the `pytrs.Tract` objects listed in the `.parsedTracts` attribute of the `PLSSDesc` object.
 
-Note also that `pyTRSplat.SectionGrid` and `pyTRSplat.TownshipGrid` objects can also be added to `PlatQueue` and `MultiPlatQueue` objects (for MPQ's, requiring `twprge` to be specified when added), but those objects
+Note also that `pytrsplat.SectionGrid` and `pytrsplat.TownshipGrid` objects can also be added to `PlatQueue` and `MultiPlatQueue` objects (for MPQ's, requiring `twprge` to be specified when added), but those objects
 
 
 
@@ -325,20 +325,20 @@ Note also that `pyTRSplat.SectionGrid` and `pyTRSplat.TownshipGrid` objects can 
 # This...
 
 import pytrs
-import pyTRSplat
+import pytrsplat
 
 sample_text_3 = 'T154N-R97W Sec 1: Lots 1 - 3, S/2N/2'
 plssdesc_3 = pytrs.PLSSDesc(sample_text, config='clean_qq')
 plssdesc_3.parse()
-mpq2 = pyTRSplat.MultiPlatQueue()
+mpq2 = pytrsplat.MultiPlatQueue()
 mpq2.queue_add(plssdesc_3)
 
 
 # ... is functionally equivalent to this:
 
-import pyTRSplat
+import pytrsplat
 
-mpq2 = pyTRSplat.MultiPlatQueue()
+mpq2 = pytrsplat.MultiPlatQueue()
 sample_text_3 = 'T154N-R97W Sec 1: Lots 1 - 3, S/2N/2'
 mpq2.queue_add_text(sample_text_3, config='clean_qq')
 
@@ -351,21 +351,21 @@ mpq2.queue_add_text(sample_text_3, config='clean_qq')
 
 ### Configure the output with `Settings` objects, including presets and custom settings
 
-`pyTRSplat.Settings` -- Configure the look and behavior of Plat and MultiPlat objects (e.g., size, colors, fonts, whether to write headers/tracts/etc.). Default and presets are available and customizable.
+`pytrsplat.Settings` -- Configure the look and behavior of Plat and MultiPlat objects (e.g., size, colors, fonts, whether to write headers/tracts/etc.). Default and presets are available and customizable.
 
-Wherever a `settings=` parameter appears within this module, it can take either the name of a preset (a string, ex: `'letter'`, `'legal (gray)'`, `'square_m'`, etc.) or as a `pyTRSplat.Settings` object.
+Wherever a `settings=` parameter appears within this module, it can take either the name of a preset (a string, ex: `'letter'`, `'legal (gray)'`, `'square_m'`, etc.) or as a `pytrsplat.Settings` object.
 
 
 
 ```
-import pyTRSplat
+import pytrsplat
 
 # Using the 'square_m' preset...
-plat_1 = pyTRSplat.Plat(twp='154n', rge='97w', setting='square_m')
+plat_1 = pytrsplat.Plat(twp='154n', rge='97w', setting='square_m')
 
 
 # Or generate a custom settings object, starting from the 'letter' preset...
-custom_setting_1 = pyTRSplat.Settings('letter')
+custom_setting_1 = pytrsplat.Settings('letter')
 # ...disable writing the header:
 custom_setting_1.write_header = False
 # ...and change the font for writing section numbers, to 'Mono' (a Courier-like font):
@@ -377,9 +377,9 @@ plat_2 = Plat(twp='154n', rge='97w', setting=custom_setting_1)
 
 
 
-*__Note:__ To see a current list of available `Settings` presets, call `pyTRSplat.Settings.list_presets()`*
+*__Note:__ To see a current list of available `Settings` presets, call `pytrsplat.Settings.list_presets()`*
 
-*__Note:__ For a GUI application for viewing / editing / saving `Settings` presets, call `pyTRSplat.launch_settings_editor()`*
+*__Note:__ For a GUI application for viewing / editing / saving `Settings` presets, call `pytrsplat.launch_settings_editor()`*
 
 *[__#TODO:__ List out all `Settings` attributes, and what they control. They can all be set with the `.launch_settings_editor()`, of course, but should provide a guide to setting them programatically.]*
 
@@ -387,7 +387,7 @@ plat_2 = Plat(twp='154n', rge='97w', setting=custom_setting_1)
 
 
 ### Getting into the weeds with 'lot definitions' -- `LotDefinitions`, `TwpLotDefinitions`, and `LotDefDB` objects; and the `allow_ld_defaults=<bool>` parameter
-The most efficient way to define lots is to do so externally in a .csv file, and load them into a `pyTRSplat.LotDefDB` with init parameter `from_csv=<filepath>`. (See below.) __[#TODO: Link to that part of the readme]__
+The most efficient way to define lots is to do so externally in a .csv file, and load them into a `pytrsplat.LotDefDB` with init parameter `from_csv=<filepath>`. (See below.) __[#TODO: Link to that part of the readme]__
 
 Before talking about explicit lot definitions (i.e. `LotDefinitions`, `TwpLotDefinitions`, and `LotDefDB` objects), we'll talk about 'default' lot definitions, i.e. the 'expected' lots in a standard township.
 
@@ -435,7 +435,7 @@ tract_2.parse()
 
 # parameter `allow_ld_defaults=False` isn't needed, since that's the default, but to be explicit
 # for this example:
-plat_1 = pyTRSplat.Plat(allow_ld_defaults=False)
+plat_1 = pytrsplat.Plat(allow_ld_defaults=False)
 plat_1.plat_tract(tract_1)
 plat_1.plat_tract(tract_2)
 
@@ -455,7 +455,7 @@ print(plat_1.unhandled_lots_by_sec)  # prints "{1: ['L1', 'L2', 'L3', 'L4'], 25:
 # example pytrs.Tract objects.)
 
 # This time passing parameter `allow_ld_defaults=True` when initializing our Plat.
-plat_2 = pyTRSplat.Plat(allow_ld_defaults=True)
+plat_2 = pytrsplat.Plat(allow_ld_defaults=True)
 plat_2.plat_tract(tract_1)
 plat_2.plat_tract(tract_2)
 
@@ -475,7 +475,7 @@ print(plat_2.unhandled_lots_by_sec)  # prints "{1: [], 25: ['L5', 'L8']}"
 # above example pytrs.Tract objects.)
 
 # Again being explicit with `allow_ld_defaults=False` for example purposes.
-plat_3 = pyTRSplat.Plat(allow_ld_defaults=False)
+plat_3 = pytrsplat.Plat(allow_ld_defaults=False)
 
 # When platting individual objects or processing PlatQueue objects, we have the opportunity to again
 # specify whether to `allow_ld_defaults=<bool>` (and now it defaults to what is set in the Plat object)
@@ -494,7 +494,7 @@ To plat Lots 5 and 8 of Section 25, T154N-R97W, we have to explicitly define tho
 
 ##### IMPORTANT: Conflicts between default lot definitions and explicit lot definitions
 
-When parameter `allow_ld_defaults=True` is passed, but the user has also explicitly defined lots for a given section (via `pyTRSplat.LotDefDB` object or otherwise), the default lots will NOT be used -- even if those default lots were not included in the explicit definitions.
+When parameter `allow_ld_defaults=True` is passed, but the user has also explicitly defined lots for a given section (via `pytrsplat.LotDefDB` object or otherwise), the default lots will NOT be used -- even if those default lots were not included in the explicit definitions.
 
 For example, if we __do__ explicitly define Lots 5 - 8 in a hypothetical Section 1, but __do not__ also explicitly define Lots 1 - 4 of that section, then default lots 1 - 4 will not be picked up, even if we pass `allow_ld_defaults=True`.
 
@@ -511,18 +511,18 @@ tract_3 = pytrs.Tract(desc='Lots 1 - 8', trs='155n97w01')
 tract_3.parse()
 
 
-import pyTRSplat
+import pytrsplat
 
 # Create a LotDefDB object from a .csv file, where Lots 5 - 8 of Section 1, T155N-R97W
 # are defined as the SWNW, SENW, SWNE, SENE, respectively -- but no other lots are
 # defined for Section 1 (i.e. NOT the 'expected' Lots 1 - 4 in the N/2N/2).
 # (Lots 5 - 8 do not actually exist for that section and are only used as an example.)
-lddb_obj = pyTRSplat.LotDefDB(from_csv=r'C:\land\lddb data\some_hypothetical_file.csv')
+lddb_obj = pytrsplat.LotDefDB(from_csv=r'C:\land\lddb data\some_hypothetical_file.csv')
 
 # Now create a Plat, passing our LotDefDB object to parameter `tld=` (which pulls the
 # appropriate lot definitions from the LDDB, since we've specified Twp/Rge).
 # We will also explicitly allow default lots.
-plat_4 = pyTRSplat.Plat(twp='155n', rge='97w', tld=lddb_obj, allow_ld_defaults=True)
+plat_4 = pytrsplat.Plat(twp='155n', rge='97w', tld=lddb_obj, allow_ld_defaults=True)
 
 plat_4.plat_tract(tract_3)
 
@@ -549,13 +549,13 @@ The above examples are not the only places where the `allow_ld_defaults=` parame
 
 In this module, lots get defined in a hierarchical structure of specialized `dict` objects:
 ```
--- pyTRSplat.LotDefDB - dict, keyed by Twp/Rge (str), value-type:
----- pyTRSplat.TwpLotDefinitions - dict, keyed by sec number (int), value-type:
------- pyTRSplat.LotDefinitions - dict, keyed by lot name (ex: 'L2'), value-type:
+-- pytrsplat.LotDefDB - dict, keyed by Twp/Rge (str), value-type:
+---- pytrsplat.TwpLotDefinitions - dict, keyed by sec number (int), value-type:
+------ pytrsplat.LotDefinitions - dict, keyed by lot name (ex: 'L2'), value-type:
 -------- a string, being the name of one or more QQ's, separated by comma (ex: 'L2' -> 'NWNE')
 ```
 
-Thus, rudimentary access in a `LotDefDB` object called `lddb_obj` might be `lddb_obj['154n97w'][1]['L2']` (using Python's built-in bracket syntax), perhaps resulting in `'NWNE'` (i.e. Lot 2, of Sec 1, T154N-R97W corresponds with the NW/4NE/4 of that section). *(See `pyTRSplat.LotDefDB` docs for specific getter methods that are designed to avoid key errors and handle defaults more robustly than Python's built-in `dict` methods/syntax.)*
+Thus, rudimentary access in a `LotDefDB` object called `lddb_obj` might be `lddb_obj['154n97w'][1]['L2']` (using Python's built-in bracket syntax), perhaps resulting in `'NWNE'` (i.e. Lot 2, of Sec 1, T154N-R97W corresponds with the NW/4NE/4 of that section). *(See `pytrsplat.LotDefDB` docs for specific getter methods that are designed to avoid key errors and handle defaults more robustly than Python's built-in `dict` methods/syntax.)*
 
 However, the end user probably doesn't have much cause to directly access the contents of a `LotDefDB`, `TwpLotDefinitions` or `LotDefinitions` object. I suspect most users will only need to pass such objects as parameters for methods in `Plat` or `MultiPlat` objects, or potentially `SectionGrid` / `TownshipGrid` objects.
 
@@ -572,26 +572,26 @@ Below are the simplest options for loading lot definitions for this module. More
 
 ###### Defining lots for a `MultiPlat` object by loading from .csv file:
 ```
-import pyTRSplat
+import pytrsplat
 
-# This .csv file is included in the 'pyTRSplat\_examples\' directory. (May need to provide
+# This .csv file is included in the 'pytrsplat\_examples\' directory. (May need to provide
 # an absolute path, depending on where this code is being run.)
 lddb_filepath = r'_examples\SAMPLE_LDDB.csv'
 
 # Load the data from the .csv file into a LotDefDB object
-lddb_obj_1 = pyTRSplat.LotDefDB(from_csv=lddb_filepath)
+lddb_obj_1 = pytrsplat.LotDefDB(from_csv=lddb_filepath)
 
 # pass the `lddb_obj_1` to the `lddb=` init parameter of a MultiPlat object
-multiplat_1 = pyTRSplat.MultiPlat(settings='letter', lddb=lddb_obj_1)
+multiplat_1 = pytrsplat.MultiPlat(settings='letter', lddb=lddb_obj_1)
 
 
 ```
 
 ###### Defining lots for a `Plat` object by loading from .csv file:
 ```
-import pyTRSplat
+import pytrsplat
 
-# This .csv file is included in the 'pyTRSplat\_examples\' directory. (May need to provide
+# This .csv file is included in the 'pytrsplat\_examples\' directory. (May need to provide
 # an absolute path, depending on where this code is being run.)
 lddb_filepath = r'_examples\SAMPLE_LDDB.csv'
 
@@ -602,16 +602,16 @@ lddb_filepath = r'_examples\SAMPLE_LDDB.csv'
 # Option A -- TwpLotDefinitions.from_csv() method
 # 1) Load the data from the .csv file directly into a TwpLotDefinitions object
 # (specifying Twp/Rge is mandatory)
-tld_obj_1 = pyTRSplat.TwpLotDefinitions.from_csv(lddb_filepath, twp='154n', rge='97w)
+tld_obj_1 = pytrsplat.TwpLotDefinitions.from_csv(lddb_filepath, twp='154n', rge='97w)
 
 # 2) Pass the `tld_obj_1` to the `tld=` init parameter of a Plat object
 # (specifying Twp/Rge is optional, but won't write the appropriate header without it)
-plat_1 = pyTRSplat.Plat(settings='letter', tld=tld_obj_1, twp='154n', rge='97w')
+plat_1 = pytrsplat.Plat(settings='letter', tld=tld_obj_1, twp='154n', rge='97w')
 
 
 # Option B -- LotDefDB.get_tld() method
 # 1) Load the data from the .csv file into a LotDefDB object
-lddb_obj_2 = pyTRSplat.LotDefDB(from_csv=lddb_filepath)
+lddb_obj_2 = pytrsplat.LotDefDB(from_csv=lddb_filepath)
 
 # 2) Use the `.get_tld()` method on the LotDefDB object, by specifying the `twprge`
 # (which is a dict key). It would return and store `None` if '154n97w' were not an
@@ -621,24 +621,24 @@ tld_obj_2 = lddb_obj_1.get_tld('154n97w')
 
 # 3) Pass the `tld_obj_2` to the `tld=` init parameter of a Plat object
 # (specifying Twp/Rge is optional, but won't write the appropriate header without it)
-plat_2 = pyTRSplat.Plat(settings='letter', tld=tld_obj_2, twp='154n', rge='97w')
+plat_2 = pytrsplat.Plat(settings='letter', tld=tld_obj_2, twp='154n', rge='97w')
 
 
 # Option C -- Passing a LotDefDB to a Plat directly
 # 1) Load the data from the .csv file into a LotDefDB object
-lddb_obj_3 = pyTRSplat.LotDefDB(from_csv=lddb_filepath)
+lddb_obj_3 = pytrsplat.LotDefDB(from_csv=lddb_filepath)
 
 # 2) pass the `lddb_obj_1` to the `tld=` init parameter of a Plat object;
 # IMPORTANT: to use this option, we MUST specify Twp/Rge, or it won't know which
 # `twprge` key to use on the LotDefDB object.
-plat_3 = pyTRSplat.Plat(settings='letter', tld=lddb_obj_3, twp='154n', rge='97w')
+plat_3 = pytrsplat.Plat(settings='letter', tld=lddb_obj_3, twp='154n', rge='97w')
 ```
 
 
 
 ###### Formatting a .csv file for lot definitions
 
-Take a look at the example `SAMPLE_LDDB.csv` that is included in the `'pyTRSplat\_examples\'` directory. And follow these formatting guidelines for creating .csv files that are compatible with this module:
+Take a look at the example `SAMPLE_LDDB.csv` that is included in the `'pytrsplat\_examples\'` directory. And follow these formatting guidelines for creating .csv files that are compatible with this module:
 1) These 5 headers MUST exist, all lowercase, no quotation marks: `twp`, `rge`, `sec`, `lot`, `qq`
 2) twp must be specified in the format '000x' (up to 3 digits, plus N/S specified as a single, lowercase character 'n' or 's').
 ex: `154n` for Township 154 North; `7s` for Township 7 South
@@ -661,9 +661,9 @@ ex: `97w` for Range 97 West; `6e` for Range 6 East
 ### Manual platting with `SectionGrid` and `TownshipGrid` objects, and other methods.
 
 These objects are mostly beyond the scope of a quick-start guide, except to point you in the right direction:
-* `pyTRSplat.TownshipGrid` -- A grid representing an entire township (i.e. a 6x6 grid of sections; and storing a `SectionGrid` object for each section)
+* `pytrsplat.TownshipGrid` -- A grid representing an entire township (i.e. a 6x6 grid of sections; and storing a `SectionGrid` object for each section)
 
-* `pyTRSplat.SectionGrid` -- A grid representing a section (i.e. a 4x4 grid of quarter-quarters, or 'QQs')
+* `pytrsplat.SectionGrid` -- A grid representing a section (i.e. a 4x4 grid of quarter-quarters, or 'QQs')
 
 Look into the respective documentation on these objects for how to manipulate / access their data. (Notably, when platting `pytrs.Tract` and `pytrs.PLSSDesc` objects, that data gets translated into these object types behind the scenes.)
 
@@ -677,9 +677,9 @@ Also, for the simplest option for manual platting, look into the `Plat.fill_qq()
 ### Misc. functions / utilities:
 
 These functions are also beyond the scope of a quick-start guide, and why they might be useful:
-* `pyTRSplat.filter_tracts_by_twprge()` -- Filter a list of `pytrs.Tract` objects into a dict, keyed by Twp/Rge
-* `pyTRSplat.tracts_into_twp_grids()` -- Apply the parsed data in a list of `pytrs.Tract` objects into a dict of TownshipGrid objects (keyed by Twp/Rge)
-* `pyTRSplat.plssdesc_to_twp_grids()` -- Apply the parsed data in a `pytrs.PLSSDesc` object into a dict of TownshipGrid objects (keyed by Twp/Rge)
+* `pytrsplat.filter_tracts_by_twprge()` -- Filter a list of `pytrs.Tract` objects into a dict, keyed by Twp/Rge
+* `pytrsplat.tracts_into_twp_grids()` -- Apply the parsed data in a list of `pytrs.Tract` objects into a dict of TownshipGrid objects (keyed by Twp/Rge)
+* `pytrsplat.plssdesc_to_twp_grids()` -- Apply the parsed data in a `pytrs.PLSSDesc` object into a dict of TownshipGrid objects (keyed by Twp/Rge)
 
 I expect few users would have cause to use these functions without an already deep understanding of the whole module (so probably nobody).
 

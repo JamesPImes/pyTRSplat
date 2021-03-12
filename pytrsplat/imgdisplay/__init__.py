@@ -4,4 +4,4 @@
 A tkinter Frame for displaying an PIL.Image object.
 """
 
-from pyTRSplat.imgdisplay.ImgDisplay import ScrollResizeDisplay
+from pytrsplat.imgdisplay.imgdisplay import ScrollResizeDisplay

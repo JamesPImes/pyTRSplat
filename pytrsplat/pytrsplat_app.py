@@ -2,21 +2,21 @@
 
 """
 A GUI application for converting text of PLSS land descriptions ('legal
-descriptions') to plats using the pyTRSplat module.
+descriptions') to plats using the pytrsplat module.
 """
 
 # TODO: Allow user to save selected page(s), rather than all.
 
-import pyTRSplat._constants as _constants
-from pyTRSplat import version
-from pyTRSplat.plat import Plat, MultiPlat
-from pyTRSplat.grid import SectionGrid, LotDefDB
-from pyTRSplat.platsettings import Settings
-from pyTRSplat.platqueue import MultiPlatQueue
-from pyTRSplat.utils import _simplify_lot_number
+import pytrsplat._constants as _constants
+from pytrsplat import version
+from pytrsplat.plat import Plat, MultiPlat
+from pytrsplat.grid import SectionGrid, LotDefDB
+from pytrsplat.platsettings import Settings
+from pytrsplat.platqueue import MultiPlatQueue
+from pytrsplat.utils import _simplify_lot_number
 
-from pyTRSplat.settingseditor import SettingsEditor
-from pyTRSplat.imgdisplay import ScrollResizeDisplay
+from pytrsplat.settingseditor import SettingsEditor
+from pytrsplat.imgdisplay import ScrollResizeDisplay
 
 import pytrs
 import pytrs.interface_tools
@@ -462,7 +462,7 @@ class PlatPreview(tk.Frame):
     """A frame displaying a preview of the plat, plus its controls."""
 
     ###################
-    # pyTRSplat.settings.Settings object
+    # pytrsplat.settings.Settings object
     ###################
     # Generate a Settings object for the mini-preview, with no
     # margins. (Hard-coded here, rather than creating it as a preset,
@@ -2011,8 +2011,8 @@ class SectionFiller(tk.Frame):
         Specify EITHER `trs` OR `sec`, `twp`, and `rge`. If both sets
         are specified, will use `trs` only.
 
-        :param ld: Same purpose as for pyTRSplat.grid.SectionGrid obj.
-        :param allow_ld_defaults: Same purpose as for SectionGrid obj.
+        :param ld: Same purpose as for ``pytrsplat.grid.SectionGrid``.
+        :param allow_ld_defaults: Same purpose as for ``SectionGrid``.
         :param button_on_text: Character that should be displayed inside
         a QQ button when it's clicked.
         """
