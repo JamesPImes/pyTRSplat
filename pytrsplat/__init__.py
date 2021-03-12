@@ -3,11 +3,12 @@
 """
 pyTRSplat -- A module to generate customizable land plat images from
 PLSS land descriptions ('legal descriptions'), using the pyTRS parsing
-module; and/or from manually-selected lands. Import as a module, or use
-the GUI application ('pytrsplat/pyTRSplat_app_windowed.pyw').
+module; and/or from manually-selected lands. Import as a module (as
+``pytrsplat``), or use the GUI application by running
+``pytrsplat/pyTRSplat_app_windowed.pyw``.
 
 Quick Guide to Module Structure / Packages:
-`pytrsplat.launch_app()` -- Launch the GUI application
+``pytrsplat.launch_app()`` -- Launch the GUI application
         (or run 'pytrsplat/pyTRSplat_app_windowed.pyw' directly)
 
 These functions and classes from the various packages are all imported
@@ -20,24 +21,24 @@ be found in their respective source packages:
 
 ``pytrsplat.grid`` -- Interpret pytrs.PLSSDesc and pytrs.Tract objects,
         define how specific lots should be interpreted, manually.
-    classes:    SectionGrid, TownshipGrid, LotDefinitions,
-        TwpLotDefinitions, LotDefDB
-    functions:  tracts_into_twp_grids(), plssdesc_to_twp_grids()
+    classes:    ``SectionGrid``, ``TownshipGrid``, ``LotDefinitions``,
+        ``TwpLotDefinitions``, ``LotDefDB``
+    functions:  ``tracts_into_twp_grids()``, ``plssdesc_to_twp_grids()``
 
 ``pytrsplat.platqueue`` -- Streamlined queuing of objects to add to plats
-    classes:    PlatQueue, MultiPlatQueue
+    classes:    ``PlatQueue``, ``MultiPlatQueue``
 
 ``pytrsplat.platsettings`` -- Configure plats (size, colors, fonts, etc.)
-    classes:    Settings
+    classes:    ``Settings``
 
 ``pytrsplat.settingseditor`` -- A GUI editor for `platsettings.Settings`
-    classes:    SettingsEditor (NOTE: use the `launch_settings_editor()`
-        function to use this class, unless it is being incorporated into
-        an application.)
-    functions:  launch_settings_editor()
+    classes:    ``SettingsEditor`` (NOTE: use the
+        ``launch_settings_editor()`` function to use this class, unless
+        it is being incorporated into an application.)
+    functions:  ``launch_settings_editor()``
 
-`pytrsplat.utils` -- Misc. utils
-    functions:  filter_tracts_by_twprge()
+``pytrsplat.utils`` -- Misc. utils
+    functions:  ``filter_tracts_by_twprge()``
 """
 
 
