@@ -1,7 +1,7 @@
 from setuptools import setup
 
 
-MODULE_DIR = "<...>"
+MODULE_DIR = "pytrsplat"
 
 
 def get_constant(constant):
