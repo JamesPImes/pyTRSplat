@@ -4,12 +4,12 @@
 
 from pytrs import PLSSDesc, Tract
 
-from pyTRSplat.grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
-from pyTRSplat.grid import tracts_into_twp_grids
-from pyTRSplat.platsettings import Settings
-from pyTRSplat.platqueue import PlatQueue, MultiPlatQueue
-from pyTRSplat.plat import Plat, MultiPlat
-from pyTRSplat.plat import text_to_plats
+from pytrsplat.grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
+from pytrsplat.grid import tracts_into_twp_grids
+from pytrsplat.platsettings import Settings
+from pytrsplat.platqueue import PlatQueue, MultiPlatQueue
+from pytrsplat.plat import Plat, MultiPlat
+from pytrsplat.plat import text_to_plats
 
 
 ########################################################################
@@ -59,7 +59,7 @@ i += 1
 
 
 # The filepath to a .csv that can be read into a LotDefDB object:
-example_lddb_filepath = r'pyTRSplat/_examples/SAMPLE_LDDB.csv'
+example_lddb_filepath = r'pytrsplat/_examples/SAMPLE_LDDB.csv'
 
 # Creating a LotDefDB object by reading in a .csv file.
 example_lddb_obj = LotDefDB(from_csv=example_lddb_filepath)
