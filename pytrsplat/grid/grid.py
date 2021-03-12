@@ -9,7 +9,7 @@ into SectionGrid and TownshipGrid objects.
 """
 
 import pytrs
-from pyTRSplat.utils import _smooth_QQs, _lot_without_div
+from pytrsplat.utils import _smooth_QQs, _lot_without_div
 
 
 class SectionGrid:
@@ -63,7 +63,7 @@ class SectionGrid:
         :param rge: Range number (up to 3 digits) and E/W direction
         (as a single lowercase character).
             ex: '97w', '7e', etc.
-        :param ld: A pyTRSplat.LotDefinitions object, defining how lots
+        :param ld: A pytrsplat.LotDefinitions object, defining how lots
         should be interpreted in this section, in terms of QQs.
         :param allow_ld_defaults: Whether 'default' lot definitions are
         allowed as a fall-back option, when lots have not been
@@ -195,11 +195,11 @@ class SectionGrid:
 
     def apply_lddb(self, lddb):
         """
-        Apply the appropriate pyTRSplat.LotDefinitions object from the
-        pyTRSplat.LotDefDB object, if such a LD object exists in that
+        Apply the appropriate pytrsplat.LotDefinitions object from the
+        pytrsplat.LotDefDB object, if such a LD object exists in that
         LDDB. Will not write/overwrite anything if no LD object exists
         for this section in the LDDB.
-        :param lddb: A pyTRSplat.LotDefDB object, ideally containing a
+        :param lddb: A pytrsplat.LotDefDB object, ideally containing a
         TwpLotDefinitions object for this section's twprge, which in
         turn contains a LotDefinitions object for this section.
         """
@@ -209,11 +209,11 @@ class SectionGrid:
 
     def apply_tld(self, tld):
         """
-        Apply the appropriate pyTRSplat.LotDefinitions object from the
-        pyTRSplat.TwpLotDefinitions object, if such a LD object exists
+        Apply the appropriate pytrsplat.LotDefinitions object from the
+        pytrsplat.TwpLotDefinitions object, if such a LD object exists
         in that TLD. Will not write/overwrite anything if no LD object
         exists for this section in the TLD.
-        :param tld: A pyTRSplat.TwpLotDefinitions object, ideally
+        :param tld: A pytrsplat.TwpLotDefinitions object, ideally
         containing a LotDefinitions object for this section.
         """
         ld = tld.get(int(self.sec), None)
@@ -523,7 +523,7 @@ class TownshipGrid:
         :param rge: Range number (up to 3 digits) and E/W direction
         (as a single lowercase character).
             ex: '97w', '7e', etc.
-        :param tld: A pyTRSplat.TwpLotDefinitions object, defining how
+        :param tld: A pytrsplat.TwpLotDefinitions object, defining how
         lots should be interpreted in each respective section, in terms
         of QQs.
         :param allow_ld_defaults: Whether 'default' lot definitions are
@@ -595,13 +595,13 @@ class TownshipGrid:
 
     def apply_tld(self, tld):
         """
-        Apply the appropriate pyTRSplat.LotDefinitions objects from the
-        pyTRSplat.TwpLotDefinitions object to the respective SectionGrid
+        Apply the appropriate pytrsplat.LotDefinitions objects from the
+        pytrsplat.TwpLotDefinitions object to the respective SectionGrid
         objects in this TownshipGrid (if such LD objects exists in that
         TLD for such sections). Will not write/overwrite anything if no
         LD object exists for a given section in the TLD.
 
-        :param tld: A pyTRSplat.TwpLotDefinitions object, ideally
+        :param tld: A pytrsplat.TwpLotDefinitions object, ideally
         containing a LotDefinitions object for each section.
         """
         if not isinstance(tld, TwpLotDefinitions):
@@ -620,7 +620,7 @@ class TownshipGrid:
 
     def filled_section_grids(self, include_pinged=False) -> list:
         """
-        Return a list of pyTRSplat.SectionGrid objects that have at
+        Return a list of pytrsplat.SectionGrid objects that have at
         least one QQ filled.
 
         :param include_pinged: Optionally, also include all SectionGrid
@@ -723,7 +723,7 @@ class LotDefinitions(dict):
     LotDefinitions objects individually.
 
     Additional documentation on LotDefinitions is maintained under
-    pyTRSplat.LotDefDB objects, to avoid undue repetition.
+    pytrsplat.LotDefDB objects, to avoid undue repetition.
     """
 
     # Below are defaults for sections in a 'standard' 6x6 Township grid.
@@ -827,7 +827,7 @@ class TwpLotDefinitions(dict):
     (all ints) is passed at init, will create default LotDefinitions
     objects for those sections.
 
-    A pyTRSplat.TwpLotDefinitions object is a nested dict with this
+    A pytrsplat.TwpLotDefinitions object is a nested dict with this
     structure:
     - TwpLotDefinitions - dict, keyed by sec number (int), value-type:
     -- LotDefinitions - dict, keyed by lot name (ex: 'L2'), value-type:
@@ -852,7 +852,7 @@ class TwpLotDefinitions(dict):
     dict getters (i.e. `dct['key']` or `dct.get('key')`), because it
     adds more specific functionality for handling defaults.
 
-    These objects can be contained within a pyTRSplat.LotDefDB object
+    These objects can be contained within a pytrsplat.LotDefDB object
     (keyed by T&R, formatted '000x000x' or fewer digits -- e.g.,
     '154n97w' for T154N-R97W) for definitions of lots in the sections of
     any number of townships.
@@ -862,7 +862,7 @@ class TwpLotDefinitions(dict):
     TwpLotDefinitions objects individually.
 
     Additional documentation on TwpLotDefinitions is maintained under
-    pyTRSplat.LotDefDB objects, to avoid undue repetition.
+    pytrsplat.LotDefDB objects, to avoid undue repetition.
     """
 
     def __init__(self, default_sections=None):
@@ -1000,7 +1000,7 @@ class LotDefDB(dict):
     or '1s7e' for T1S-R7E), whose values are a TwpLotDefinition object
     for that Twp/Rge.
 
-    A pyTRSplat.LotDefDB object is a nested dict with this structure:
+    A pytrsplat.LotDefDB object is a nested dict with this structure:
     - LotDefDB - dict, keyed by Twp/Rge (str), value-type:
     -- TwpLotDefinitions - dict, keyed by sec number (int), value-type:
     --- LotDefinitions - dict, keyed by lot name (ex: 'L2'), value-type:
@@ -1224,7 +1224,7 @@ def plssdesc_to_twp_grids(
     objects (i.e. incorporating the Tract objects' `.lots` and
     `.qqs` attributes into the subordinate SectionGrid objects under
     the TownshipGrids).
-    :param lddb: Either a pyTRSplat.LotDefDB object, or a filepath (str)
+    :param lddb: Either a pytrsplat.LotDefDB object, or a filepath (str)
     to a .csv file** that can be loaded into a LotDefDB -- for how every
     lot should be interpreted in terms of its QQ counterpart(s).
     (**See LotDefDB documentation for how to properly format.)
@@ -1261,7 +1261,7 @@ def tracts_into_twp_grids(
     objects (one TownshipGrid per unique Twp/Rge), which will be updated
     and returned. (If no existing dict is passed here, a new one will be
     created and returned.)
-    :param lddb: Either a pyTRSplat.LotDefDB object, or a filepath (str)
+    :param lddb: Either a pytrsplat.LotDefDB object, or a filepath (str)
     to a .csv file** that can be loaded into a LotDefDB -- for how every
     lot should be interpreted in terms of its QQ counterpart(s).
     (**See LotDefDB documentation for how to properly format.)

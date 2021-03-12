@@ -1,13 +1,13 @@
 # Copyright (c) 2020, James P. Imes. All rights reserved.
 
-__version__ = '0.1.1'
-__versionDate__ = '9/23/2020'
+__version__ = '0.2.0-alpha'
+__versionDate__ = '3/11/2021'
 __author__ = 'James P. Imes'
 __email__ = 'jamesimes@gmail.com'
 __website__ = 'https://github.com/JamesPImes/pyTRSplat'
 
 __license__ = (
-    "Copyright (c) 2020, James P. Imes, all rights reserved.\n\n"
+    "Copyright (c) 2020-2021, James P. Imes, all rights reserved.\n\n"
     "pyTRSplat, together with all accompanying programs and modules, is licensed "
     "under a 'Modified Academic Public License', modified from the OMNeT++ "
     "license, which was written by Andras Varga (license text is in public "
@@ -21,5 +21,5 @@ __license__ = (
     "use.\n\n"
     "Various open-source software and assets are also used by pyTRSplat, and "
     "their respective copyright and license information is found in the "
-    "'pyTRSplat\\_modulelicenses' directory."
+    "'pytrsplat\\_modulelicenses' directory."
 )

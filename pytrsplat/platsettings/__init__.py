@@ -5,4 +5,4 @@ Custom or default settings for configuring the creation of Plat and
 MultiPlat objects.
 """
 
-from .PlatSettings import Settings
+from .platsettings import Settings

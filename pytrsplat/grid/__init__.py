@@ -8,10 +8,10 @@ interpreters for converting parsed pytrs.PLSSDesc and pytrs.Tract data
 into SectionGrid and TownshipGrid objects.
 """
 
-from .Grid import SectionGrid
-from .Grid import TownshipGrid
-from .Grid import LotDefinitions
-from .Grid import TwpLotDefinitions
-from .Grid import LotDefDB
+from .grid import SectionGrid
+from .grid import TownshipGrid
+from .grid import LotDefinitions
+from .grid import TwpLotDefinitions
+from .grid import LotDefDB
 
-from .Grid import plssdesc_to_twp_grids, tracts_into_twp_grids
+from .grid import plssdesc_to_twp_grids, tracts_into_twp_grids

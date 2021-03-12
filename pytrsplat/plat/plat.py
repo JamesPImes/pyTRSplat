@@ -1,7 +1,7 @@
 # Copyright (c) 2020, James P. Imes. All rights reserved.
 
 """
-pyTRSplat -- A module to generate land plat images of full townships
+pytrsplat -- A module to generate land plat images of full townships
 (6x6 grid) or single sections from PLSS land descriptions ('legal
 descriptions'), using the pytrs parsing module.
 """
@@ -13,13 +13,13 @@ from pathlib import Path
 import os
 
 # Packages from this project.
-from pyTRSplat.grid import TownshipGrid, SectionGrid
-from pyTRSplat.grid import LotDefinitions, TwpLotDefinitions, LotDefDB
-from pyTRSplat.grid import plssdesc_to_twp_grids
-from pyTRSplat.utils import filter_tracts_by_twprge, confirm_file_ext, cull_list
-from pyTRSplat.platsettings import Settings
-from pyTRSplat.platsettings.PlatSettings import _rel_path_to_abs
-from pyTRSplat.platqueue import PlatQueue, MultiPlatQueue
+from pytrsplat.grid import TownshipGrid, SectionGrid
+from pytrsplat.grid import LotDefinitions, TwpLotDefinitions, LotDefDB
+from pytrsplat.grid import plssdesc_to_twp_grids
+from pytrsplat.utils import filter_tracts_by_twprge, confirm_file_ext, cull_list
+from pytrsplat.platsettings import Settings
+from pytrsplat.platsettings.platsettings import _rel_path_to_abs
+from pytrsplat.platqueue import PlatQueue, MultiPlatQueue
 
 # For drawing the plat images, and coloring / writing on them.
 from PIL import Image, ImageDraw, ImageFont
@@ -49,17 +49,17 @@ class Plat:
     NOTE: Optionally plat a single section (rather than the defafult 6x6
     grid of sections), with init parameter `only_section=<int>`.
     (Be sure to choose settings that are appropriate for a single-
-    section plat. See pyTRSplat.platsettings docs for more info.)
+    section plat. See pytrsplat.platsettings docs for more info.)
 
     Plat objects can be configured (size, font, colors, margins, etc.)
     at init, thus:
         -- Plat init parameter `settings=` takes either of these types:
-            -- any `pyTRSplat.Settings` object
+            -- any `pytrsplat.Settings` object
             -- the name (i.e. a string) of a saved preset
                 -- Get a current list of available presets:
-                    `pyTRSplat.Settings.list_presets()`
+                    `pytrsplat.Settings.list_presets()`
                 -- View / edit / create presets with this GUI tool:
-                    `pyTRSplat.settingseditor.launch_settings_editor()`
+                    `pytrsplat.settingseditor.launch_settings_editor()`
     NOTE: Changes to settings after a Plat has been initialized will not
     necessarily have any effect. It is therefore best practice to
     configure a Settings object prior to initializing a Plat object.
@@ -70,17 +70,17 @@ class Plat:
                 existing Plat object
             `Plat.from_tract()` -- to create a new Plat object from an
                 an existing pytrs.Tract object
-        -- pyTRSplat.SectionGrid
+        -- pytrsplat.SectionGrid
             `.plat_section_grid()` -- to project a SectionGrid onto an
                 existing Plat.
             `Plat.from_section_grid()` -- to create a new Plat object
                 from an existing SectionGrid object.
-        -- pyTRSplat.TownshipGrid
+        -- pytrsplat.TownshipGrid
             `.plat_township_grid()` -- to project a TownshipGrid onto an
                 existing Plat.
             `Plat.from_township_grid()` -- to create a new Plat object
                 from an existing TownshipGrid object.
-        -- pyTRSplat.PlatQueue
+        -- pytrsplat.PlatQueue
             `.process_queue()` -- to project each of the objects in a
                 PlatQueue object onto an existing Plat.
             `.queue_add()` -- to add an object to an existing PlatQueue
@@ -93,11 +93,11 @@ class Plat:
             plat, and optionally saves to file (currently supports .png
             and .pdf formats)
 
-    For better results, pass an optional pyTRSplat.TwpLotDefinition
+    For better results, pass an optional pytrsplat.TwpLotDefinition
     object (usually abbreviated 'tld') at init with parameter `tld=`, to
     specify which lots correspond with which QQ(s) in each respective
-    section. (See more info in `pyTRSplat.TwpLotDefinition` docs and
-    `pyTRSplat.LotDefDB` docs.)
+    section. (See more info in `pytrsplat.TwpLotDefinition` docs and
+    `pytrsplat.LotDefDB` docs.)
     Also specify at init (parameter `allow_ld_defaults=<bool>`) whether
     'default' lot definitions are allowed as a fall-back option, when
     lots have not been explicitly defined for a given section.
@@ -110,7 +110,7 @@ class Plat:
     plat get added to a dict stored as the `.unhandled_lots_by_sec`
     attribute (keyed by section number integers).
 
-    A pyTRSplat.PlatQueue object is initialized for each Plat as `.pq`
+    A pytrsplat.PlatQueue object is initialized for each Plat as `.pq`
     attribute. It can be added to with `.queue_add()` and processed with
     `.process_queue()`.
     """
@@ -132,18 +132,18 @@ class Plat:
         number) here. Defaults to None.
         :param settings: How the Plat should be configured. May be
         passed as either:
-            -- any `pyTRSplat.Settings` object
+            -- any `pytrsplat.Settings` object
             -- the name (i.e. a string) of a saved preset
                 -- Get a current list of available presets:
-                    `pyTRSplat.Settings.list_presets()`
+                    `pytrsplat.Settings.list_presets()`
                 -- View / edit / create presets with this GUI tool:
-                    `pyTRSplat.settingseditor.launch_settings_editor()`
-        :param tld: A `pyTRSplat.TwpLotDefinitions` object, which
+                    `pytrsplat.settingseditor.launch_settings_editor()`
+        :param tld: A `pytrsplat.TwpLotDefinitions` object, which
         defines how each lot should be interpreted (in terms of its
         corresponding QQ or QQs).
         NOTE: If param `only_section=<int>` was passed (i.e. platting
         a single section, rather than the standard 6x6 grid), this will
-        alternatively accept a `pyTRSplat.LotDefinitions` object (which
+        alternatively accept a `pytrsplat.LotDefinitions` object (which
         defines lots for a single section).
         :param allow_ld_defaults: Whether 'default' lot definitions are
         allowed as a fall-back option, when lots have not been
@@ -282,12 +282,12 @@ class Plat:
             allow_ld_defaults=False):
         """
         Generate and return a filled-in Plat object from a PlatQueue
-        object (see: pyTRSplat.queue.PlatQueue).
+        object (see: pytrsplat.queue.PlatQueue).
 
 
         All parameters have the same effect as vanilla __init__(),
         except arg `pq`.
-        :arg pq: pyTRSplat.queue.PlatQueue object to process at init.
+        :arg pq: pytrsplat.queue.PlatQueue object to process at init.
         """
         sp_obj = Plat(
             twp=twp, rge=rge, only_section=only_section, settings=settings,
@@ -641,7 +641,7 @@ class Plat:
     def plat_section_grid(
             self, sec_grid: SectionGrid, tracts=None, qq_fill_RGBA=None):
         """
-        Project a pyTRSplat.SectionGrid object onto an existing Plat
+        Project a pytrsplat.SectionGrid object onto an existing Plat
         object (i.e. fill any QQ hits per the `SectionGrid.qq_grid`
         values). Add any lot names in the `.unhandled_lots` list of the
         SectionGrid object to the Plat's `.unhandled_lots_by_sec` dict.
@@ -678,11 +678,11 @@ class Plat:
             settings=None, tld=None, allow_ld_defaults=False):
         """
         Generate and return a new Plat object from a
-        pyTRSplat.SectionGrid object.
+        pytrsplat.SectionGrid object.
 
         All parameters have the same effect as vanilla __init__(),
         except:
-        :arg sec_grid: pyTRSplat.SectionGrid object to project at init.
+        :arg sec_grid: pytrsplat.SectionGrid object to project at init.
         NOTE: `twp` and `rge` are pulled from the SectionGrid object,
         rather than specified as parameter.
         :param single_sec: Replaces `only_section=<int>` from __init__()
@@ -712,12 +712,12 @@ class Plat:
             allow_ld_defaults=False):
         """
         Generate and return a new Plat object from a
-        pyTRSplat.TownshipGrid object.
+        pytrsplat.TownshipGrid object.
         NOTE: `only_section` parameter is NOT allowed with this method.
 
         All parameters have the same effect as vanilla __init__(),
         except:
-        :arg twp_grid: pyTRSplat.TownshipGrid object to project at init.
+        :arg twp_grid: pytrsplat.TownshipGrid object to project at init.
         NOTE: `twp` and `rge` are pulled from the TownshipGrid object,
         rather than specified as parameter.
         :param tracts: A list of pytrs.Tract objects whose text should
@@ -734,7 +734,7 @@ class Plat:
 
     def plat_township_grid(self, twp_grid, tracts=None, qq_fill_RGBA=None):
         """
-        Project a pyTRSplat.TownshipGrid object onto an existing Plat
+        Project a pytrsplat.TownshipGrid object onto an existing Plat
         object (i.e. fill any QQ hits per all `SectionGrid.qq_grid`
         values in the TownshipGrid). Add any lot names in the
         `.unhandled_lots` list of each SectionGrid to the Plat's
@@ -812,7 +812,7 @@ class Plat:
         :parameter write_tract: Whether to write the Tract text at the
         bottom of the Plat. If not specified, defaults to whatever the
         Plat settings are (in `.settings.write_tracts` attribute).
-        :param ld: A pyTRSplat.LotDefinitions object, for defining how
+        :param ld: A pytrsplat.LotDefinitions object, for defining how
         each lot should be interpreted in terms of QQ's (i.e. 'L1'
         corresponds with 'NENE' in Sec 1, T154N-R97W).
         :param allow_ld_defaults: Whether to allow 'default' lot
@@ -873,11 +873,11 @@ class Plat:
         """
         Write lot numbers in the top-left corner of the respective QQs,
         according to the lots defined (or assumed) in a
-        pyTRSplat.SectionGrid object.
+        pytrsplat.SectionGrid object.
 
         (Location of the lot text, and font typeface, color, and size
         are all as dictated in this Plat's `.settings` attributes.)
-        :param sec_grid: a pyTRSplat.SectionGrid object whose lot
+        :param sec_grid: a pytrsplat.SectionGrid object whose lot
         numbers should be written into the Plat (regardless whether any
         of the lots are actually filled).
         """
@@ -1107,7 +1107,7 @@ class MultiPlat:
                 township. Calling `.plat_plssdesc()` repeatedly on a
                 single MultiPlat object will create new Plat objects
                 every time.
-        -- pyTRSplat.MultiPlatQueue
+        -- pytrsplat.MultiPlatQueue
             `.process_queue()` -- to process all of the objects in a
                 MultiPlatQueue object into an existing MultiPlat
             `.queue_add()` -- to add an object to an existing
@@ -1132,15 +1132,15 @@ class MultiPlat:
         options for processing MultiPlatQueue objects:
                 -- pytrs.PLSSDesc
                 -- pytrs.Tract
-                -- pyTRSplat.SectionGrid
-                -- pyTRSplat.TownshipGrid
-                -- pyTRSplat.PlatQueue
+                -- pytrsplat.SectionGrid
+                -- pytrsplat.TownshipGrid
+                -- pytrsplat.PlatQueue
 
-    For better results, optionally pass a pyTRSplat.LotDefDB object (or
+    For better results, optionally pass a pytrsplat.LotDefDB object (or
     the filepath to a .csv file that can be read into a LotDefDB object)
     to init parameter `lddb=`, to specify how to handle lots -- i.e.
     which QQ's are intended by which lots. (See more info in docs for
-    `pyTRSplat.LotDefDB`.)
+    `pytrsplat.LotDefDB`.)
     Also specify at init (parameter `allow_ld_defaults=<bool>`) whether
     'default' lot definitions are allowed as a fall-back option, when
     lots have not been explicitly defined for a given section.
@@ -1159,10 +1159,10 @@ class MultiPlat:
         `.output_to_pdf()` -- Save the images as a PDF
         `.output_to_png()` -- Save each image as a separate PNG
         NOTE: The subordinate Plat objects are stored in `.plats`, where
-            they remain pyTRSplat.Plat objects but not yet 'flattened'
+            they remain pytrsplat.Plat objects but not yet 'flattened'
             images. They get flattened via the above output methods.
 
-    A pyTRSplat.MultiPlatQueue object is initialized for each MultiPlat
+    A pytrsplat.MultiPlatQueue object is initialized for each MultiPlat
     as `.mpq` attribute. It can be added to with `.queue_add()` and
     `.queue_add_text()`, and processed with `.process_queue()`.
     """
@@ -1181,17 +1181,17 @@ class MultiPlat:
 
         :param settings: How each subordinate Plat should be configured.
         May be passed as either:
-            -- any `pyTRSplat.Settings` object
+            -- any `pytrsplat.Settings` object
             -- the name (i.e. a string) of a saved preset
                 -- Get a current list of available presets:
-                    `pyTRSplat.Settings.list_presets()`
+                    `pytrsplat.Settings.list_presets()`
                 -- View / edit / create presets with this GUI tool:
-                    `pyTRSplat.settingseditor.launch_settings_editor()`
-        :param lddb: A `pyTRSplat.LotDefDB` object, which defines how
+                    `pytrsplat.settingseditor.launch_settings_editor()`
+        :param lddb: A `pytrsplat.LotDefDB` object, which defines how
         each lot should be interpreted (in terms of its corresponding QQ
         or QQs). May also pass the filepath to a .csv file containing
         appropriately formatted lot definitions. (See documentation on
-        `pyTRSplat.LotDefDB` objects for acceptable .csv formatting.)
+        `pytrsplat.LotDefDB` objects for acceptable .csv formatting.)
         :param allow_ld_defaults: Whether 'default' lot definitions are
         allowed as a fall-back option, when lots have not been
         explicitly defined for a given section. (Default lots are the
@@ -1261,7 +1261,7 @@ class MultiPlat:
         object.
 
         All parameters are identical to vanilla __init__() except:
-        :param mpq: a pyTRSplat.MultiPlatQueue object whose contents
+        :param mpq: a pytrsplat.MultiPlatQueue object whose contents
         should be processed immediately at init.
         """
 
@@ -1371,7 +1371,7 @@ class MultiPlat:
         :arg plssdesc_obj: a pytrs.PLSSDesc object (whose subordinate
         pytrs.Tract objects have also been parsed into lots/QQs) to
         process into this MultiPlat.
-        :param lddb: A pyTRSplat.LotDefDB object, for defining how
+        :param lddb: A pytrsplat.LotDefDB object, for defining how
         each lot should be interpreted in terms of QQ's (i.e. 'L1'
         corresponds with 'NENE' in Sec 1, T154N-R97W).
         :param allow_ld_defaults: Whether to allow 'default' lot
@@ -1518,7 +1518,7 @@ class TractTextBox(TextBox):
         :param size: 2-tuple of (width, height).
         :param typeface: Which typeface to use, passed either as the
         filepath to a .ttf font (absolute path, or relative to the
-        'pyTRSplat/platsettings/' directory), or as a key for the
+        'pytrsplat/platsettings/' directory), or as a key for the
         Settings.TYPEFACES dict (i.e. as the name of a stock font, such
         as 'Mono (Bold)').
         :param font_size: The size of the font to create.
@@ -1531,7 +1531,7 @@ class TractTextBox(TextBox):
         :param new_line_indent: How many spaces (i.e. characters, not
         px) to write before every subsequent line of a paragraph.
         :param spacing: How many px above each new line.
-        :param settings: A pyTRSplat.Settings object (or the name of a
+        :param settings: A pytrsplat.Settings object (or the name of a
         preset, i.e. a string), which can specify various relevant
         attribs for this TractTextBox object. (In the event that an
         attribute was set in the Settings object but ALSO specified as
@@ -1560,7 +1560,7 @@ class TractTextBox(TextBox):
         # If not a font name, then check if `typeface` is a valid
         # filepath.
         # If not a valid filepath, check if it is a relative filepath
-        # (relative to 'pyTRSplat/platsettings/' dir -- i.e. a stock
+        # (relative to 'pytrsplat/platsettings/' dir -- i.e. a stock
         # font), and if so, convert to that absolute path.
         if typeface in Settings.TYPEFACES.keys():
             typeface = Settings.TYPEFACES[typeface]
@@ -1750,7 +1750,7 @@ def text_to_plats(
     using `config=` parameters -- see pytrs.Config docs), and generate
     plat(s) for the lands described (i.e. PIL.Image.Image objects.
     Configure the plats with `settings=` parameter (see
-    pyTRSplat.Settings docs). Optionally output to .png or .pdf with
+    ``pytrsplat.Settings`` docs). Optionally output to .png or .pdf with
     `output_filepath=` (end with '.png' or '.pdf' to specify the output
     file type).  Returns a list of PIL.Image.Image objects of the plats.
 

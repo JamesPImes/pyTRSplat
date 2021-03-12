@@ -4,8 +4,8 @@
 Streamlined queues of 'plattable' objects.
 """
 
-from pyTRSplat.grid import SectionGrid, TownshipGrid
-from pyTRSplat.utils import filter_tracts_by_twprge
+from pytrsplat.grid import SectionGrid, TownshipGrid
+from pytrsplat.utils import filter_tracts_by_twprge
 import pytrs
 
 
@@ -19,8 +19,8 @@ class PlatQueue(list):
     bottom of the Plat, if the Plat is configured to do so).
 
     These object types are plattable (i.e. can be added to a PlatQueue):
-        -- pyTRSplat.SectionGrid
-        -- pyTRSplat.TownshipGrid
+        -- pytrsplat.SectionGrid
+        -- pytrsplat.TownshipGrid
         -- pytrs.Tract
     Add objects with the `.queue_add()` method.
 
@@ -136,9 +136,9 @@ class MultiPlatQueue(dict):
     (i.e. 'plattable').
 
     These object types can be added to a MultiPlatQueue:
-        -- pyTRSplat.SectionGrid [*]
-        -- pyTRSplat.TownshipGrid [*]
-        -- pyTRSplat.PlatQueue [*]
+        -- pytrsplat.SectionGrid [*]
+        -- pytrsplat.TownshipGrid [*]
+        -- pytrsplat.PlatQueue [*]
         -- pytrs.Tract [**]
         -- pytrs.PLSSDesc [***]
         [*] Single asterisk denotes object types for which twprge must

@@ -9,9 +9,9 @@ import tkinter as tk
 from tkinter.ttk import Combobox, Checkbutton
 from tkinter import messagebox, filedialog
 
-from pyTRSplat.plat import MultiPlat
-from pyTRSplat.platsettings import Settings
-from pyTRSplat.imgdisplay import ScrollResizeDisplay
+from pytrsplat.plat import MultiPlat
+from pytrsplat.platsettings import Settings
+from pytrsplat.imgdisplay import ScrollResizeDisplay
 
 class SettingsEditor(tk.Frame):
     """

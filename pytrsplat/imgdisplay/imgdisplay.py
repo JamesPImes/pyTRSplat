@@ -5,6 +5,7 @@ from tkinter import messagebox, filedialog
 
 from PIL import ImageTk
 
+
 class ScrollResizeDisplay(tk.Frame):
     """
     A frame that displays an image, which can be scaled and scrolled

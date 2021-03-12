@@ -4,5 +4,5 @@
 Generate the plat images.
 """
 
-from .Plat import Plat, MultiPlat
-from .Plat import text_to_plats
+from .plat import Plat, MultiPlat
+from .plat import text_to_plats
