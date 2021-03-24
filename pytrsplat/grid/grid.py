@@ -84,18 +84,18 @@ class SectionGrid:
         self.twp = twp
         self.rge = rge
 
-        # 'secError' can be returned by pytrs in the event of a flawed
+        # '__' or 'XX' can be returned by pytrs in the event of a flawed
         # parse, so we handle this by setting to 0 (a meaningless number
         # for a section that can't exist in reality) to avoid causing
         # ValueError when converting to int elsewhere.
-        if sec == 'secError':
+        if sec in [pytrs.TRS._UNDEF_SEC, pytrs.TRS._ERR_SEC]:
             sec = 0
 
         # Ensure sec is formatted as a two digit string -- ex: '01'
         sec = str(int(sec)).rjust(2, '0')
 
         self.sec = sec
-        self.twprge = twp + rge
+        self.twprge = f"{twp}{rge}"
         self.trs = f"{twp}{rge}{sec}".lower()
         self.unhandled_lots = []
 
@@ -168,9 +168,10 @@ class SectionGrid:
             ex: '154n97w01', '1s7e36', etc.
         :return: A SectionGrid object.
         """
-        twp, rge, sec = pytrs.break_trs(trs)
+        trs_ = pytrs.TRS(trs)
         return SectionGrid(
-            sec, twp, rge, ld=ld, allow_ld_defaults=allow_ld_defaults)
+            trs_.sec, trs_.twp, trs_.rge, ld=ld,
+            allow_ld_defaults=allow_ld_defaults)
 
     @staticmethod
     def from_tract(tract: pytrs.Tract, ld=None, allow_ld_defaults=False):
@@ -186,12 +187,12 @@ class SectionGrid:
         :return: A SectionGrid object.
         """
         twp, rge, sec = tract.twp, tract.rge, tract.sec
-        secObj = SectionGrid(
+        sec_grid = SectionGrid(
             sec=sec, twp=twp, rge=rge, ld=ld,
             allow_ld_defaults=allow_ld_defaults)
-        secObj.incorporate_tract(tract)
+        sec_grid.incorporate_tract(tract)
 
-        return secObj
+        return sec_grid
 
     def apply_lddb(self, lddb):
         """
@@ -241,13 +242,13 @@ class SectionGrid:
         ['L2'], and ['L1'], respectively.
         """
 
-        lots_by_QQname_dict = self.lots_by_qq_name()
+        lots_by_qq_name_dict = self.lots_by_qq_name()
         ar = self.output_array()
 
         for qq_name, dv in self.qq_grid.items():
             x = dv['coord'][0]
             y = dv['coord'][1]
-            lots = lots_by_QQname_dict.get(qq_name)
+            lots = lots_by_qq_name_dict.get(qq_name)
             if lots is not None:
                 ar[y][x] = lots
             else:
@@ -469,7 +470,7 @@ class SectionGrid:
         for y in range(len(ar)):
             for x in range(len(ar[y])):
                 if ar[y][x] != 0:
-                    filled.append((x,y))
+                    filled.append((x, y))
         return filled
 
     def filled_qqs(self) -> list:
@@ -541,7 +542,7 @@ class TownshipGrid:
 
         self.twp = twp
         self.rge = rge
-        self.twprge = twp + rge
+        self.twprge = f"{twp}{rge}"
 
         # dict of SectionGrid objects for each section, keyed by ints 1 - 36
         self.sections = {}
@@ -586,7 +587,7 @@ class TownshipGrid:
         # Also add a nonsense 'Section 0' (which never actually exists
         # for any real-life township). This way, we can handle section
         # errors (e.g., from a flawed parse by pytrs, which can generate
-        # a section number of 'secError') by changing them to Section 0,
+        # a section number of '__' or 'XX') by changing them to Sec 0,
         # without crashing the program, but while also being able to
         # check if there were flaws (e.g., if there are any changes made
         # to this SectionGrid object).
@@ -654,16 +655,16 @@ class TownshipGrid:
         attribute from the Tract object.
         """
         if sec_num is None:
-            sec_num = tract.sec
-        # 'secError' can be returned by pytrs in the event of a flawed
+            sec_num = tract.sec_num
+        # '__' or 'XX' can be returned by pytrs in the event of a flawed
         # parse, so we handle this by setting sec_num to 0 (a section number
         # that can't exist in reality), before trying to
         # convert `sec` to an int causes a ValueError.
-        if sec_num == 'secError':
+        if sec_num in [None, pytrs.TRS._UNDEF_SEC, pytrs.TRS._ERR_SEC]:
             sec_num = 0
-        sec_num = int(sec_num)
-        secGridObj = self.sections[sec_num]
-        secGridObj.incorporate_tract(tract)
+        sec_grid_obj = self.sections[sec_num]
+        sec_grid_obj.incorporate_tract(tract)
+        return None
 
     def turn_off_qq(self, sec_num: int, qq: str):
         """
@@ -788,7 +789,7 @@ class LotDefinitions(dict):
         # Ensure the definitions are broken down into QQ's by passing them
         # through pytrs.Tract parsing, and pulling the resulting qqs.
         qq_list = pytrs.Tract(
-            desc=definition, init_parse_qq=True,
+            desc=definition, parse_qq=True,
             config='clean_qq,qq_depth.2').qqs
         self[lot] = ','.join(qq_list)
 
@@ -1167,8 +1168,7 @@ class LotDefDB(dict):
                 default_sections=[i for i in range(0, 37)])
         elif force_tld_return:
             return TwpLotDefinitions()
-        else:
-            return None
+        return None
 
     def trs(self, trs, allow_ld_defaults=None, force_ld_return=False):
         """
@@ -1196,17 +1196,15 @@ class LotDefDB(dict):
         LotDefinitions object. Otherwise, will return None.
         """
 
-        twp, rge, sec = pytrs.break_trs(trs)
-        twprge = twp + rge
+        trs_obj = pytrs.TRS(trs)
         tld = self.get_tld(
-            twprge, allow_ld_defaults=allow_ld_defaults,
+            trs_obj.twprge, allow_ld_defaults=allow_ld_defaults,
             force_tld_return=force_ld_return)
         if tld is not None:
             return tld.get_ld(
-                sec_num=int(sec), allow_ld_defaults=allow_ld_defaults,
+                sec_num=trs_obj.sec_num, allow_ld_defaults=allow_ld_defaults,
                 force_ld_return=force_ld_return)
-        else:
-            return None
+        return None
 
 
 def plssdesc_to_twp_grids(
@@ -1238,7 +1236,7 @@ def plssdesc_to_twp_grids(
     :return: A dict (keyed by T&R) of TownshipGrid objects, whose values
     are set according to the .
     """
-    tl = plssdesc.parsed_tracts
+    tl = plssdesc.tracts
     return tracts_into_twp_grids(
         tl, lddb=lddb, allow_ld_defaults=allow_ld_defaults)
 
@@ -1289,47 +1287,24 @@ def tracts_into_twp_grids(
     # exist in the grid_dict.
     for tract in tract_list:
 
-        # If there was a T&R error in the parsing by pytrs, twp and rge
-        # will both be set as 'TRerr' by `.break_TRS()`. If there was a
-        # section error, `sec` will be set as `secError`. Otherwise,
-        # these three variables are set usefully.
-        twp, rge, sec = pytrs.break_trs(tract.trs)
-
-        # We don't want to duplicate 'TRerr' when setting a key shortly,
-        # so set twp and rge, such that only twp contains 'TRerr'.
-        if 'TRerr' in twp+rge:
-            twp = 'TRerr'
-            rge = ''
-
-        # If `sec` == 'secError', that will be passed through to
-        # `.incorporate_tract()`, which handles that error.
-
-        # Handling a twp, rge, and/or sec that are undefined.
-        if twp == '':
-            twp = 'undef'
-            rge = ''
-        if sec in ['', None]:
-            sec = 0
-
-        twprge = twp + rge
-
         # Get the TLD for this T&R from the lddb, if one exists. If not,
         # create and use a default TLD object. (We `force_tld_return` to
         # ensure that a TwpLotDefinitions object gets returned, instead
         # of None)
         tld = lddb.get_tld(
-            twprge, allow_ld_defaults=allow_ld_defaults, force_tld_return=True)
+            tract.twprge, allow_ld_defaults=allow_ld_defaults, force_tld_return=True)
 
         # If a TownshipGrid object does not yet exist for this T&R in
         # the dict, create one, and add it to the dict now.
-        grid_dict.setdefault(twprge, TownshipGrid(twp=twp, rge=rge, tld=tld))
+        grid_dict.setdefault(
+            tract.twprge, TownshipGrid(twp=tract.twp, rge=tract.rge, tld=tld))
 
         # Now incorporate the Tract object into a SectionGrid object
         # within the dict. No /new/ SectionGrid objects are created at
         # this point (since a TownshipGrid object creates all 36 of them
         # at init), but SectionGrid objects are updated at this point to
         # incorporate our tracts.
-        TwpGridObj = grid_dict[twprge]
-        TwpGridObj.incorporate_tract(tract, sec)
+        twp_grid = grid_dict[tract.twprge]
+        twp_grid.incorporate_tract(tract, tract.sec_num)
 
     return grid_dict

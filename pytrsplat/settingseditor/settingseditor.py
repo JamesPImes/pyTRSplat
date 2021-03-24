@@ -57,6 +57,7 @@ class SettingsEditor(tk.Frame):
         control_frame.grid(row=0, column=0, sticky='nesw')
 
         ctrl_next_col = 0
+        self.preview_window = None
         self.preview_btn = tk.Button(
             control_frame, text='View Example Plat', command=self.preview_btn_clicked)
         self.preview_btn.grid(row=0, column=ctrl_next_col, padx=4, pady=4, sticky='w')
@@ -160,7 +161,7 @@ class SettingsEditor(tk.Frame):
             'of the records of Example County.\n'
             'Sec 14: NE/4\n'
         )
-        d = PLSSDesc(t, init_parse_qq=True)
+        d = PLSSDesc(t, parse_qq=True)
         mp = MultiPlat.from_plssdesc(
             d, settings=set_obj, allow_ld_defaults=True)
         im = mp.output()[0]
@@ -168,7 +169,7 @@ class SettingsEditor(tk.Frame):
         # Launch a preview window with this plat
         try:
             self.preview_window.destroy()
-        except:
+        except AttributeError:
             pass
         self.preview_window = tk.Toplevel(self)
         self.preview_window.title('pyTRSplat - Settings Editor [Example Plat]')

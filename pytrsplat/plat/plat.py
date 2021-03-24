@@ -366,54 +366,29 @@ class Plat:
         platting only a single section (rather than the usual 6x6 grid).
         """
 
-        twp = str(self.twp)
-        rge = str(self.rge)
-        NS = 'undefined'
-        EW = 'undefined'
+        trs_ = pytrs.TRS.from_twprgesec(twp=self.twp, rge=self.rge)
+        if trs_.ns in ['n', 'N']:
+            ns = 'North'
+        else:
+            ns = 'South'
+        if not str(self.twp).lower().endswith(('n', 's')):
+            ns = 'Undefined'
 
-        # Check that directions for twp and rge were appropriately specified.
-        # If no direction was specified, then also check if (only) digits were
-        # specified for twp and rge. If that's the case, arbitrarily assign 'n'
-        # and 'w' as their directions (only for purposes of
-        # `pytrs.decompile_twprge()` -- will be cut off before the header
-        # itself is compiled).
-        if not twp.lower().endswith(('n', 's')):
+        if trs_.ew in ['w', 'w']:
+            ew = 'West'
+        else:
+            ew = 'East'
+        if not str(self.rge).lower().endswith(('e','w')):
+            ew = 'Undefined'
 
-            if twp != '':
-                try:
-                    twp = str(int(twp))
-                    twp = twp + 'n'
-                except ValueError:
-                    pass
-        if not rge.lower().endswith(('e', 'w')):
-            EW = 'undefined'
-            if rge != '':
-                try:
-                    rge = str(int(rge))
-                    rge = rge + 'w'
-                except ValueError:
-                    pass
-
-        twpNum, try_NS, rgeNum, try_EW = pytrs.decompile_twprge(twp + rge)
-
-        if try_NS == 'n':
-            NS = 'North'
-        elif try_NS == 's':
-            NS = 'South'
-
-        if try_EW == 'e':
-            EW = 'East'
-        elif try_EW == 'w':
-            EW = 'West'
-
-        if twp + rge == '':
+        if trs_.twprge == pytrs.TRS._UNDEF_TWPRGE:
             # If neither twp nor rge have been set, we will not write T&R in header.
             twptxt = ''
-        elif 'TRerr' in [twpNum, rgeNum]:
+        elif trs_.twp == pytrs.TRS._ERR_TWP or trs_.rge == pytrs.TRS._ERR_RGE:
             # If N/S or E/W were not specified, or if there's some other T&R error
             twptxt = '{Township/Range Error}'
         else:
-            twptxt = f'Township {twpNum} {NS}, Range {rgeNum} {EW}'
+            twptxt = f'Township {trs_.twp_num} {ns}, Range {trs_.rge_num} {ew}'
 
         if only_section is not None:
             # If we're platting a single section.
@@ -824,8 +799,8 @@ class Plat:
             allow_ld_defaults = self.allow_ld_defaults
 
         twp, rge = tract.twp, tract.rge
-        sec = tract.sec
-        if sec == 'secError':
+        sec = tract.sec_num
+        if sec is None:
             sec = 0
         sec = str(int(sec)).rjust(2, '0')
 
@@ -833,7 +808,7 @@ class Plat:
         # object, get the appropriate LD from the LDDB or TLD.
         if isinstance(ld, LotDefDB):
             ld = ld.trs(
-                twp + rge + sec, allow_ld_defaults=allow_ld_defaults)
+                f"{twp}{rge}{sec}", allow_ld_defaults=allow_ld_defaults)
         elif isinstance(ld, TwpLotDefinitions):
             ld = ld.get_ld(
                 int(sec), allow_ld_defaults=allow_ld_defaults,
@@ -1385,7 +1360,7 @@ class MultiPlat:
 
         # Get a dict linking the this PLSSDesc's parsed Tracts to their
         # respective T&R's (keyed by T&R -- same as twp_grids dict)
-        twp_to_tract = filter_tracts_by_twprge(plssdesc_obj.parsed_tracts)
+        twp_to_tract = pytrs.group_tracts(plssdesc_obj, by_attribute='twprge')
 
         # Generate Plat object of each township, and append it to `self.plats`
         for k, v in twp_grids.items():
@@ -1400,9 +1375,9 @@ class MultiPlat:
         `config=` parameters -- see pytrs docs), and generate Plat(s)
         for the lands described. Returns a MultiPlat object."""
 
-        descObj = pytrs.PLSSDesc(text, config=config, init_parse_qq=True)
+        plssdesc = pytrs.PLSSDesc(text, config=config, parse_qq=True)
         return MultiPlat.from_plssdesc(
-            descObj, settings=settings, lddb=lddb,
+            plssdesc, settings=settings, lddb=lddb,
             allow_ld_defaults=allow_ld_defaults)
 
     def show(self, index: int):
@@ -1643,12 +1618,13 @@ class TractTextBox(TextBox):
             reserve_last_line = len(ctracts) != 0
 
             font_RGBA = self.font_RGBA
-            if len(tract.lots_qqs) == 0 or tract.sec == 'secError':
+            if (len(tract.lots_qqs) == 0
+                    or tract.sec in [pytrs.TRS._ERR_SEC, pytrs.TRS._UNDEF_SEC]):
                 # If no lots/QQs were identified, or if this tract has a
-                # 'secError' (i.e. it was a flawed parse where the section
-                # number could not be successfully deduced -- in which case it
-                # could not have been projected onto this plat), then we'll
-                # write the tract in the configured warning color
+                # section number that could not be successfully deduced
+                # -- in which case it could not have been projected onto
+                # this plat), then we'll write the tract in the
+                # configured warning color
                 font_RGBA = self.settings.warningfont_RGBA
             # Any lines that could not be written will be returned and stored
             # in list `unwrit_lines` (i.e. empty if all successful)

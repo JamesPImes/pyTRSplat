@@ -36,7 +36,7 @@ class PlatQueue(list):
         and/or `.absorb()` methods after init.
         """
         super().__init__()
-        self.tracts = []
+        self.tracts = pytrs.TractList()
 
     def queue_add(self, plattable, tracts=None):
         """
@@ -207,12 +207,12 @@ class MultiPlatQueue(dict):
         as arg `plattable` are automatically added to `tracts`.
         """
 
-        def breakout_plssdesc(descObj):
+        def breakout_plssdesc(plssdesc):
             """
             pytrs.PLSSDesc objects MUST be handled specially, because
             they can generate multiple T&R's (i.e. multiple dict keys).
             """
-            twp_to_tract = filter_tracts_by_twprge(descObj)
+            twp_to_tract = filter_tracts_by_twprge(plssdesc)
             for twprge, tract_list in twp_to_tract.items():
                 self.setdefault(twprge, PlatQueue())
                 for tract in tract_list:
@@ -314,5 +314,5 @@ class MultiPlatQueue(dict):
         `config=` parameters -- see pytrs docs), and add the resulting
         PLSSDesc object to this MultiPlatQueue.
         """
-        descObj = pytrs.PLSSDesc(text, config=config, init_parse_qq=True)
-        self.queue_add(descObj)
+        plssdesc = pytrs.PLSSDesc(text, config=config, parse_qq=True)
+        self.queue_add(plssdesc)

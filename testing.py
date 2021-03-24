@@ -36,13 +36,13 @@ i = 0
 # Force a parse that will result in a 'TRerr'
 er_desc_1 = PLSSDesc(
     'Sec 14: NE/4, T155N-R97W Sec 15: NW/4',
-    init_parse_qq=True, config='TRS_desc')
+    parse_qq=True, config='TRS_desc')
 # And a parse that will result in a 'secError'
 er_desc_2 = PLSSDesc(
     'T154N-R97W The NE/4 of Section',
-    init_parse_qq=True, config='TR_desc_S')
-test_dict_1 = tracts_into_twp_grids(er_desc_1.parsed_tracts)
-test_dict_2 = tracts_into_twp_grids(er_desc_2.parsed_tracts)
+    parse_qq=True, config='TR_desc_S')
+test_dict_1 = tracts_into_twp_grids(er_desc_1.tracts)
+test_dict_2 = tracts_into_twp_grids(er_desc_2.tracts)
 # print(test_dict_1['TRerr'].sections[0].output_array())
 # print(test_dict_1['TRerr'].sections[14].output_array())  # prints array for sec 14
 # print(test_dict_2['154n97w'].sections[0].output_array())  # prints array for error 'sec 0'
@@ -71,8 +71,8 @@ Sec 01: Lots 1 - 3, S2NE
 Sec 25: Lots 1 - 8
 Sec 26: Testing tract obj that contains no items in .lots / .qqs
 T155N-R97W Sec 22: W/2'''
-d = PLSSDesc(descrip_text_1, init_parse_qq=True)
-t = d.parsed_tracts[0]
+d = PLSSDesc(descrip_text_1, parse_qq=True)
+t = d.tracts[0]
 p = Plat(settings='letter')
 p.queue_add(t)
 p.process_queue()
@@ -113,14 +113,14 @@ i += 1
 
 
 # Some miscellaneous objects that can be added to a PQ (or possibly MPQ):
-t1 = Tract('NE/4', '154n97w14', init_parse_qq=True)
-t2 = Tract('W/2', '154n97w15', init_parse_qq=True)
-t3 = Tract('Lots 1 - 3, S2NE', '154n97w01', init_parse_qq=True)
-t4 = Tract('Lots 4, 5, 7, NE4NE4', '154n97w25', init_parse_qq=True)
+t1 = Tract('NE/4', '154n97w14', parse_qq=True)
+t2 = Tract('W/2', '154n97w15', parse_qq=True)
+t3 = Tract('Lots 1 - 3, S2NE', '154n97w01', parse_qq=True)
+t4 = Tract('Lots 4, 5, 7, NE4NE4', '154n97w25', parse_qq=True)
 # PLSSDesc objects can only be added to MPQ objects -- not to PQ objects.
 d1 = PLSSDesc(
     'T154N-R97W Sec 3: Lots 1, 4, S2N2, T155N-R97W Sec 18: Lots 2 - 4, E2W2',
-    init_parse_qq=True)
+    parse_qq=True)
 sg1 = SectionGrid.from_tract(t1)
 tg1 = TownshipGrid('154n', '97w')
 tg1.incorporate_tract(t2, 15)
@@ -233,9 +233,9 @@ i += 1
 
 
 # Testing writing too many tracts than can fit in our plat.
-dx = PLSSDesc('T154N-R97W Sec 1 - 17: NE/4SW/4, NW/4SE/4', init_parse_qq=True)
+dx = PLSSDesc('T154N-R97W Sec 1 - 17: NE/4SW/4, NW/4SE/4', parse_qq=True)
 pqx = PlatQueue()
-for tr in dx.parsed_tracts:
+for tr in dx.tracts:
     pqx.queue_add(tr)
 tx = Tract(
     (
@@ -247,7 +247,7 @@ tx = Tract(
         "reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla "
         "pariatur. Excepteur sint occaecat cupidatat non proident, sunt in "
         "culpa qui officia deserunt mollit anim id est laborum."
-    ), trs='154n97w18', init_parse_qq=True)
+    ), trs='154n97w18', parse_qq=True)
 pqx.queue_add(tx)
 sp3 = Plat.from_queue(pqx, twp='154n', rge='97w', settings='letter')
 
