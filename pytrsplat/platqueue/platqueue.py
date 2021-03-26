@@ -5,7 +5,6 @@ Streamlined queues of 'plattable' objects.
 """
 
 from pytrsplat.grid import SectionGrid, TownshipGrid
-from pytrsplat.utils import filter_tracts_by_twprge
 import pytrs
 
 
@@ -154,6 +153,8 @@ class MultiPlatQueue(dict):
             definition, and because they can have multiple Twp/Rge.
     """
 
+    # TODO: Implement pytrs.TractList as a multi_plattable object type.
+
     # These types can be platted onto a MultiPlat:
     MULTI_PLATTABLES = (
         SectionGrid, TownshipGrid, pytrs.Tract, pytrs.PLSSDesc, PlatQueue)
@@ -212,7 +213,7 @@ class MultiPlatQueue(dict):
             pytrs.PLSSDesc objects MUST be handled specially, because
             they can generate multiple T&R's (i.e. multiple dict keys).
             """
-            twp_to_tract = filter_tracts_by_twprge(plssdesc)
+            twp_to_tract = pytrs.TractList(plssdesc).group("twprge")
             for twprge, tract_list in twp_to_tract.items():
                 self.setdefault(twprge, PlatQueue())
                 for tract in tract_list:
@@ -226,21 +227,13 @@ class MultiPlatQueue(dict):
             plattable -- but also the twprge and tracts, if they were
             not specified.
             """
-
             # If twprge was not specified for this object, pull it from
             # the Tract object itself.
-            if twprge in ['', None]:
-                twp, rge = tractObj.twp.lower(), tractObj.rge.lower()
-                twprge = twp+rge
-                if twprge == '':
-                    # i.e. tract.twp and tract.rge were both also ''
-                    twprge = 'undef'
-            else:
-                twprge = twprge.lower()
-
-            # Smooth out any variations of 'TRerrTRerr', 'TRerr_', etc.
-            if 'trerr' in twprge.lower():
-                twprge = 'TRerr'
+            if not twprge:
+                twprge = tractObj.twprge
+            if not twprge:
+                # i.e. twprge is still None or empty string.
+                twprge = pytrs.TRS._UNDEF_TWPRGE
 
             # Ensure this Tract object has been added to the tract list.
             confirmed_tracts = []
