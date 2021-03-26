@@ -13,7 +13,7 @@ from pytrsplat.plat import Plat, MultiPlat
 from pytrsplat.grid import SectionGrid, LotDefDB
 from pytrsplat.platsettings import Settings
 from pytrsplat.platqueue import MultiPlatQueue
-from pytrsplat.utils import _simplify_lot_number
+from pytrsplat.utils import _simplify_lot_number, break_trs
 
 from pytrsplat.settingseditor import SettingsEditor
 from pytrsplat.imgdisplay import ScrollResizeDisplay
@@ -232,7 +232,7 @@ class DescFrame(tk.Frame):
             mp, warn=False, do_not_launch=True)
 
         for desc_obj in self.master.plssdesc_list:
-            for tract in desc_obj.parsed_tracts:
+            for tract in desc_obj:
                 unpack_tract(tract, lots)
 
         if len(lots) == 0:
@@ -303,12 +303,11 @@ class DescFrame(tk.Frame):
                 'parameters. (To reconfigure already-parsed descriptions, '
                 'use the Description Editor.)')
         pc = pytrs.interface_tools.PromptConfig(
-            master=self.config_popup_tk, target_config_var=self.config_text,
+            master=self.config_popup_tk, target_var=self.config_text,
             parameters=[
                 'clean_qq', 'require_colon', 'ocr_scrub', 'segment', 'layout'
             ],
-            show_save=False, show_cancel=False, prompt_after_ok=after_prompt,
-            exit_after_ok=True)
+            show_cancel=False, prompt_after_ok=after_prompt, exit_after_ok=True)
         pc.pack(padx=20, pady=10)
 
     def parse_btn_clicked(self):
@@ -326,7 +325,7 @@ class DescFrame(tk.Frame):
         # Create a PLSSDesc object from the supplied text and parse it using the
         # specified config parameters (if any).
         desc = pytrs.PLSSDesc(
-            descrip_text, config=config_text, init_parse_qq=True)
+            descrip_text, config=config_text, parse_qq=True)
 
         if len(desc.e_flags) > 0 and self.master.warn_flawed_parse:
             eFlags = ', '.join(desc.e_flags)
@@ -1021,15 +1020,16 @@ class About(tk.Frame):
             command=self.disclaimer_btn_clicked)
         disclaimer_button.grid(row=1, column=2, ipadx=2, padx=4, sticky='e')
 
-    def about_btn_clicked(self):
+    @staticmethod
+    def about_btn_clicked():
         splash_info = (
             f"pyTRSplat {version()}\n"
-            "Copyright (c) 2020, James P. Imes, all rights reserved.\n"
+            "Copyright © 2020-2021, James P. Imes, all rights reserved.\n"
             "A program for generating plats from PLSS land descriptions (often "
             "called 'legal descriptions').\n\n"
 
             f"Built on pyTRS {pytrs_version()}.\n"
-            "Copyright (c) 2020, James P. Imes, all rights reserved.\n"
+            "Copyright © 2020-2021, James P. Imes, all rights reserved.\n"
             "A program for parsing PLSS land descriptions into their component "
             "parts.\n\n"
 
@@ -1038,7 +1038,8 @@ class About(tk.Frame):
         )
         messagebox.showinfo('pyTRSplat - About', splash_info)
 
-    def disclaimer_btn_clicked(self):
+    @staticmethod
+    def disclaimer_btn_clicked():
         """Display the disclaimer text from the pytrs module."""
         messagebox.showinfo('pyTRS disclaimer', pytrs_constants.__disclaimer__)
 
@@ -1661,7 +1662,7 @@ class SingleDescriptionEditor(tk.Frame):
             self.tract_table.destroy()
         self.tract_table = TractTable(
             self.pytrs_display_frame,
-            tract_list=source_plssdesc.parsed_tracts, more_info=self.more_info)
+            tract_list=source_plssdesc.tracts, more_info=self.more_info)
         self.tract_table.grid(
             row=self.tract_table_row_col[0],
             column=self.tract_table_row_col[1],
@@ -1684,11 +1685,11 @@ class SingleDescriptionEditor(tk.Frame):
         # Close any subordinate popups.
         try:
             self.config_popup_tk.destroy()
-        except:
+        except AttributeError:
             pass
         try:
             self.new_desc_pop_up_tk.destroy()
-        except:
+        except AttributeError:
             pass
 
         config = self.config_text.get()
@@ -1697,7 +1698,7 @@ class SingleDescriptionEditor(tk.Frame):
             # the original config
             config = self._last_used_config
         desc = self.new_desc_text
-        d_obj = pytrs.PLSSDesc(desc, config=config, init_parse_qq=True)
+        d_obj = pytrs.PLSSDesc(desc, config=config, parse_qq=True)
         # Set the main PLSSDesc obj to the new replacement.
         self.cur_plssdesc_obj = d_obj
         # Update our last-used config text (again stripping out layout,
@@ -1772,12 +1773,11 @@ class SingleDescriptionEditor(tk.Frame):
             'affect THIS description. You MUST hit \'Reparse\' '
             'for these config parameters to have any effect.')
         pc = pytrs.interface_tools.PromptConfig(
-            master=self.config_popup_tk, target_config_var=self.config_text,
+            master=self.config_popup_tk, target_var=self.config_text,
             parameters=[
                 'clean_qq', 'require_colon', 'ocr_scrub', 'segment', 'layout'
             ],
-            show_save=False, show_cancel=False, prompt_after_ok=after_prompt,
-            exit_after_ok=True)
+            show_cancel=False, prompt_after_ok=after_prompt, exit_after_ok=True)
         pc.pack(padx=20, pady=10)
 
 
@@ -2613,7 +2613,8 @@ class LotDefTable(tk.Frame):
                 uid = f"{trs}_{lot}"
                 uid_list.append(uid)
 
-                twp, rge, sec = pytrs.break_trs(trs)
+                # TODO: Refactor to use pytrs.TRS class
+                twp, rge, sec = break_trs(trs)
                 try:
                     sec = int(sec)
                 except ValueError:

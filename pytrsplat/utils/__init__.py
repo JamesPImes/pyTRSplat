@@ -6,49 +6,13 @@ Misc tools and utils that do not belong in other packages.
 
 
 ########################################################################
-# Filtering pytrs.Tracts by Twp/Rge.
-########################################################################
-
-def filter_tracts_by_twprge(tract_list, twprge_dict=None) -> dict:
-    """
-    Filter pytrs.Tract objects into a dict, keyed by T&R (formatted
-    '000x000y', or fewer digits).
-    """
-    from pytrs import PLSSDesc
-
-    # If the user passes a PLSSDesc object, pull its TractList obj.
-    if isinstance(tract_list, PLSSDesc):
-        tract_list = tract_list.parsed_tracts
-
-    # construct a dict to link Tracts to their respective Twps
-    if twprge_dict is None:
-        twprge_dict = {}
-    twprge_to_tract = {}
-
-    # Copy the twp_dict to twp_to_tract
-    for twp_key, twp_val in twprge_dict.items():
-        twprge_to_tract[twp_key] = twp_val
-
-    # Sort each Tract object in the tract_list into the new dict, alongside the
-    # old data (if any).
-    for tract in tract_list:
-        twprge = tract.twp + tract.rge
-        if 'TRerr' in twprge:
-            twprge = 'TRerr'
-        if twprge == '':
-            twprge = 'undef'
-        twprge_to_tract.setdefault(twprge, [])
-        twprge_to_tract[twprge].append(tract)
-
-    return twprge_to_tract
-
-
-########################################################################
 # Misc. tools for (re)formatting lots and QQs
 ########################################################################
 
 def _smooth_QQs(aliquot_text) -> list:
     """
+    INTERNAL USE:
+
     Ensure the input aliquot text is in a list of properly formatted
     QQ's. (Expects already-parsed data that consists only of standard
     aliquot divisions -- e.g., 'NENE' or 'N2NE' or 'S½SE¼' or 'ALL',
@@ -58,13 +22,12 @@ def _smooth_QQs(aliquot_text) -> list:
         ex: 'S2NENE' -> ['NENE']
     NOTE: Does NOT convert lots to QQ.
     """
-    from pytrs.parser.parser import _scrub_aliquots, _unpack_aliquots
+    from pytrs.parser.parser import TractParser
 
     qq_l = []
     for aliq in aliquot_text.replace(' ', '').split(','):
-        scrubbed = _scrub_aliquots(aliq, clean_qq=True)
-        scrubbed = _unpack_aliquots(scrubbed)
-        for qq in scrubbed:
+        tp = TractParser(aliq, clean_qq=True)
+        for qq in tp.qqs:
             # Append only the last 4 chars (ie. the true QQ: 'S2NENE' -> 'NENE')
             qq_l.append(qq[-4:])
     return qq_l
@@ -105,7 +68,7 @@ def confirm_file(fp, extension=None) -> bool:
     try:
         if not Path(fp).is_file():
             return False
-    except:
+    except TypeError:
         return False
 
     if extension is None:
@@ -156,3 +119,69 @@ def cull_list(
         else:
             output_list.append(list_to_cull[page_num])
     return output_list
+
+
+########################################################################
+# Deprecated pytrs functions. Use of these in this library should be
+# refactored to use pytrs.TRS objects at some point.
+########################################################################
+
+def break_trs(trs: str) -> tuple:
+    """
+    Break down a TRS that is already in the format '000n000w00' (or
+    fewer digits for twp/rge) into its component parts.
+    Returns a 3-tuple containing:
+    -- a str for `twp`
+    -- a str for `rge`
+    -- either a str or None for `sec`
+
+        ex:  '154n97w14' -> ('154n', '97w', '14')
+        ex:  '154n97w' -> ('154n', '97w', None)
+        ex:  '154n97wXX' -> ('154n', '97w', 'XX')
+        ex:  'XXXzXXXz14' -> ('XXXz', 'XXXz', '14')
+        ex:  'asdf' -> ('XXXz', 'XXXz', 'XX')
+
+    NOTE: This function is being deprecated. Better to use ``pytrs.TRS``
+    objects instead.
+    """
+
+    from pytrs.parser.parser import TRS
+
+    trs = TRS(trs)
+    sec = trs.sec
+    if not trs.sec_num:
+        sec = None
+
+    return trs.twp, trs.rge, sec
+
+
+def decompile_twprge(twprge) -> tuple:
+    """
+    Take a compiled T&R (format '000n000w', or fewer digits) and break
+    it into four elements, returned as a 4-tuple:
+    (Twp number, Twp direction, Rge number, Rge direction)
+        NOTE: If Twp and Rge cannot be matched, will return the error
+        versions of Twp/Rge:
+            ('XXXz', None, 'XXXz', None)
+        ... or the undefined versions:
+            ('___z', None, '___z', None)
+        ex: '154n97w'   -> ('154', 'n', '97', 'w')
+        ex: 'asdf'      -> ('XXXz', None, 'XXXz', None)
+        ex: ''          -> ('___z', None, '___z', None)
+
+    NOTE: This function is being deprecated. Better to use ``pytrs.TRS``
+    objects instead.
+    """
+
+    from pytrs.parser.parser import TRS
+
+    trs = TRS(twprge)
+    twp_num = trs.twp_num
+    if not trs.twp_num:
+        twp_num = trs.twp
+
+    rge_num = trs.rge_num
+    if not trs.rge_num:
+        rge_num = trs.rge
+
+    return str(twp_num), trs.twp_ns, str(rge_num), trs.rge_ew
