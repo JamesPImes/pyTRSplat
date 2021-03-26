@@ -16,7 +16,7 @@ import os
 from pytrsplat.grid import TownshipGrid, SectionGrid
 from pytrsplat.grid import LotDefinitions, TwpLotDefinitions, LotDefDB
 from pytrsplat.grid import plssdesc_to_twp_grids
-from pytrsplat.utils import filter_tracts_by_twprge, confirm_file_ext, cull_list
+from pytrsplat.utils import confirm_file_ext, cull_list, break_trs
 from pytrsplat.platsettings import Settings
 from pytrsplat.platsettings.platsettings import _rel_path_to_abs
 from pytrsplat.platqueue import PlatQueue, MultiPlatQueue
@@ -270,7 +270,7 @@ class Plat:
 
         All other parameters have the same effect as vanilla __init__().
         """
-        twp, rge, _ = pytrs.break_trs(twprge)
+        twp, rge, _ = break_trs(twprge)
 
         return Plat(
             twp=twp, rge=rge, only_section=only_section, settings=settings,
@@ -367,6 +367,8 @@ class Plat:
         """
 
         trs_ = pytrs.TRS.from_twprgesec(twp=self.twp, rge=self.rge)
+        # TODO: BUG FIX... why is this spitting out a weird Rge when it
+        #   is unspecified...?
         if trs_.ns in ['n', 'N']:
             ns = 'North'
         else:
