@@ -15,7 +15,7 @@ from pytrsplat.plat import text_to_plats
 ########################################################################
 # Examples / Testing:
 ########################################################################
-#
+
 TESTING_DIR = 'testing\\'
 
 from pathlib import Path
@@ -74,6 +74,7 @@ T155N-R97W Sec 22: W/2'''
 d = PLSSDesc(descrip_text_1, parse_qq=True)
 t = d.tracts[0]
 p = Plat(settings='letter')
+# TODO: Why is this generating an error header?
 p.queue_add(t)
 p.process_queue()
 #p.show()
