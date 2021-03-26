@@ -1,4 +1,4 @@
-# Copyright (c) 2020, James P. Imes. All rights reserved.
+# Copyright (c) 2020-2021, James P. Imes. All rights reserved.
 
 """
 pyTRSplat -- A module to generate customizable land plat images from
@@ -75,7 +75,6 @@ from pytrsplat.grid import (
 from pytrsplat.platsettings import Settings
 from pytrsplat.settingseditor import SettingsEditor, launch_settings_editor
 from pytrsplat.platqueue import PlatQueue, MultiPlatQueue
-from pytrsplat.utils import filter_tracts_by_twprge
 
 
 def launch_app():
