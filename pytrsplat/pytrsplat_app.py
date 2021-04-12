@@ -305,7 +305,13 @@ class DescFrame(tk.Frame):
         pc = pytrs.interface_tools.PromptConfig(
             master=self.config_popup_tk, target_var=self.config_text,
             parameters=[
-                'clean_qq', 'require_colon', 'ocr_scrub', 'segment', 'layout'
+                'default_ns',
+                'default_ew',
+                'clean_qq',
+                'require_colon',
+                'ocr_scrub',
+                'segment',
+                'layout'
             ],
             show_cancel=False, prompt_after_ok=after_prompt, exit_after_ok=True)
         pc.pack(padx=20, pady=10)
@@ -1775,7 +1781,13 @@ class SingleDescriptionEditor(tk.Frame):
         pc = pytrs.interface_tools.PromptConfig(
             master=self.config_popup_tk, target_var=self.config_text,
             parameters=[
-                'clean_qq', 'require_colon', 'ocr_scrub', 'segment', 'layout'
+                'default_ns',
+                'default_ew',
+                'clean_qq',
+                'require_colon',
+                'ocr_scrub',
+                'segment',
+                'layout'
             ],
             show_cancel=False, prompt_after_ok=after_prompt, exit_after_ok=True)
         pc.pack(padx=20, pady=10)
