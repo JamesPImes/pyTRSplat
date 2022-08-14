@@ -185,10 +185,10 @@ class DescFrame(tk.Frame):
         # Our current LotDefEditor toplevel (if any)
         self.lde = None
 
-        self.lddp_fp_text = tk.StringVar('')
+        self.lddp_fp_text = tk.StringVar(master=master, value='')
         self.lddp_fp_text.set(f"Current lot definitions: [None loaded]")
         lddb_label = tk.Label(desc_frame, textvariable=self.lddp_fp_text)
-        # lddb_label.grid(row=7, column=1, sticky='w')
+        lddb_label.grid(row=7, column=1, sticky='w')
 
         default_lots_frame = tk.Frame(desc_frame)
         default_lots_frame.grid(row=8, column=1, sticky='w')
