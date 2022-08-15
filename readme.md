@@ -42,7 +42,7 @@ A full-featured GUI application is included as `pyTRSplat_app_windowed.pyw`. The
 
 Lands can be added either by entering their PLSS description as raw text, or by manually selecting which QQ's to fill -- or both methods. It currently will save to PNG or PDF.
 
-![gui_01](documentation/gui_01.png)
+![plat_gui_01](documentation/plat_gui_01.gif)
 
 ## Quick demonstration of pyTRSplat as a module
 
