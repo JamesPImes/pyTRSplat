@@ -598,7 +598,13 @@ class PlatPreview(tk.Frame):
         # set to `.previews_twprge`.
         self.previews_twprge = []
         for plObj in new_preview_mp.plats:
-            self.previews_twprge.append(plObj.twprge)
+            # Extract the TwpRge in the format '154n97w'.
+            tr = plObj.twprge
+            # pytrs.TRS object will have error section, but we only need
+            # the township and range, to convert it with .pretty_twprge()
+            # to 'T154N-R97W'.
+            trs_obj = pytrs.TRS(tr)
+            self.previews_twprge.append(trs_obj.pretty_twprge())
 
         # Update the preview display
         self.update_preview_display()
@@ -625,7 +631,7 @@ class PlatPreview(tk.Frame):
 
         # Also update the footer.
         foot_txt = self.previews_twprge[index]
-        foot_txt = f"{foot_txt}  [{index + 1} / {len(self.previews)}]"
+        foot_txt = f"{foot_txt}   [{index + 1} / {len(self.previews)}]"
         self.preview_footer_text.set(foot_txt)
 
         # But if we've most recently set a dummy, clear the footer.
