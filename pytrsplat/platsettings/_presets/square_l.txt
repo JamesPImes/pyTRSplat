@@ -1,8 +1,8 @@
 dim=1200,1200
-headerfont_typeface=C:\Users\James Imes\AppData\Local\Programs\Python\Python38-32\lib\site-packages\pyTRSplat\platsettings\_fonts\LiberationSans-Regular.ttf
-tractfont_typeface=C:\Users\James Imes\AppData\Local\Programs\Python\Python38-32\lib\site-packages\pyTRSplat\platsettings\_fonts\LiberationSans-Regular.ttf
-secfont_typeface=C:\Users\James Imes\AppData\Local\Programs\Python\Python38-32\lib\site-packages\pyTRSplat\platsettings\_fonts\LiberationSans-Regular.ttf
-lotfont_typeface=C:\Users\James Imes\AppData\Local\Programs\Python\Python38-32\lib\site-packages\pyTRSplat\platsettings\_fonts\LiberationSans-Regular.ttf
+headerfont_typeface=_fonts\LiberationSans-Regular.ttf
+tractfont_typeface=_fonts\LiberationSans-Regular.ttf
+secfont_typeface=_fonts\LiberationSans-Regular.ttf
+lotfont_typeface=_fonts\LiberationSans-Regular.ttf
 headerfont_size=48
 tractfont_size=14
 secfont_size=24
