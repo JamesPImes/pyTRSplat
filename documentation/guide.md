@@ -310,7 +310,7 @@ Quarter-quarters (QQs) are not ambiguous (i.e. the NE/4NE/4 or `'NENE'` is alway
 
 In a 'standard' township, where land features, bodies of water, mountains, etc. do not overly complicate the survey, lots are predictably situated along the northern and western boundaries -- i.e. in Sections 1 - 7, 18, 19, 30, and 31. That is what is meant by `'default lots'` in this module (depicted below):
 
-![default_lots](documentation/default_lots.png)
+![default_lots](default_lots.png)
 
 In practice, non-standard townships are common even in flat parts of the United States, and so these default lot definitions cannot be blindly relied upon with too much confidence. However, defining lots for every plat could become onerous, and so they are included as a backup option (which is always disabled by default). Wherever the parameter `allow_ld_defaults=True` is passed in this module, these defaults will be used *__unless the user has explicitly defined lots for a given section__* (in which case the explicit lot defintions will control).
 
