@@ -6,12 +6,8 @@ A python module (imported as `pytrsplat`) and application for generating customi
 
 ...from the GitHub repo.
 ```
-$ pip install -r https://raw.githubusercontent.com/JamesPImes/pyTRSplat/master/requirements.txt
-
-$ pip install git+https://github.com/JamesPImes/pyTRSplat@master
+pip install git+https://github.com/JamesPImes/pyTRSplat@master
 ```
-
-(Cleaner install options coming soon.)
 
 
 ## Sample Outputs
