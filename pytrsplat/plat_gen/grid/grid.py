@@ -479,7 +479,7 @@ class SectionGrid:
 
     def filled_qqs(self) -> list:
         """
-        Return a list of QQs in the SectionGrid that contain a hit.
+        Return a list of QQs in the ``SectionGrid`` that contain a hit.
         """
         hits = []
         for qq, v in self.qq_grid.items():
@@ -490,7 +490,7 @@ class SectionGrid:
     def has_any(self):
         """
         Return a bool, whether at least one QQ contains a hit anywhere
-        in this SectionGrid.
+        in this ``SectionGrid``.
         """
         return len(self.filled_qqs()) > 0
 
