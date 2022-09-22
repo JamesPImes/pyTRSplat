@@ -22,14 +22,12 @@ def _smooth_QQs(aliquot_text) -> list:
         ex: 'S2NENE' -> ['NENE']
     NOTE: Does NOT convert lots to QQ.
     """
-    from pytrs.parser.parser import TractParser
+    from pytrs import Tract
 
     qq_l = []
     for aliq in aliquot_text.replace(' ', '').split(','):
-        tp = TractParser(aliq, clean_qq=True)
-        for qq in tp.qqs:
-            # Append only the last 4 chars (ie. the true QQ: 'S2NENE' -> 'NENE')
-            qq_l.append(qq[-4:])
+        tract = Tract(aliq, config='clean_qq, qq_depth.2', parse_qq=True)
+        qq_l.extend(tract.qqs)
     return qq_l
 
 
@@ -145,7 +143,7 @@ def break_trs(trs: str) -> tuple:
     objects instead.
     """
 
-    from pytrs.parser.parser import TRS
+    from pytrs import TRS
 
     trs = TRS(trs)
     sec = trs.sec
