@@ -3,3 +3,4 @@ testing/
 venv/
 .idea/
 /dev notes/
+/tests/results/
