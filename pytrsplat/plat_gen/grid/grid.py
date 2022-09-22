@@ -180,15 +180,17 @@ class SectionGrid:
     @staticmethod
     def from_tract(tract: pytrs.Tract, ld=None, allow_ld_defaults=False):
         """
-        Return a new SectionGrid object created from a parsed
-        pytrs.Tract object and incorporate the `.lots` and qqs from
-        that Tract.
+        Return a new ``SectionGrid`` object created from a parsed
+        ``pytrs.Tract`` object and incorporate the ``.lots`` and
+        ``.qqs`` from that ``Tract``.
 
         All available parameters have the same effect as for vanilla
         __init__(), except:
-        :param tract: A pytrs.Tract object (already parsed into lots and
-        QQs).
-        :return: A SectionGrid object.
+
+        :param tract: A ``pytrs.Tract`` object (already parsed into lots
+         and QQs).
+
+        :return: A new ``SectionGrid`` object.
         """
         twp, rge, sec = tract.twp, tract.rge, tract.sec
         sec_grid = SectionGrid(
@@ -249,6 +251,12 @@ class SectionGrid:
         ``['L4']``, ``['L3']``, ``['L2']``, and ``['L1']``,
         respectively.  (Note that they are inside lists, because
         multiple lots can correspond to a single QQ.)
+
+        .. note::
+
+            Relies on the ``LotDefinitions`` object in ``.ld`` at the
+            time this method is called. Later changes to ``.ld`` will
+            not modify what has already been done here.
         """
         lots_by_qq_name_dict = self.lots_by_qq_name()
         ar = self.output_array()
@@ -260,71 +268,66 @@ class SectionGrid:
                 ar[y][x] = lots
             else:
                 ar[y][x] = []
-
         return ar
 
     def incorporate_tract(self, tract: pytrs.Tract):
         """
-        Check the `.lots` and qqs of a parsed pytrs.Tract object,
-        and incorporate any hits into the grid.
-        NOTE: Relies on the LotDefinitions object in `.ld` at the time
-        this method is called. Later changes to `.ld` will not
-        modify what has already been done here.
-        """
+        Check the ``.lots`` and ``.qqs`` of a parsed ``pytrs.Tract``
+        object, and incorporate any hits into the grid.
 
+        .. note::
+
+            Relies on the ``LotDefinitions`` object in ``.ld`` at the
+            time this method is called. Later changes to ``.ld`` will
+            not modify what has already been done here.
+        """
         # Track that this SectionGrid was 'pinged' by a setter,
         # regardless what the value of its QQ's may be (now or later on)
         self._was_pinged = True
-
         self.incorporate_qq_list(tract.qqs)
         self.incorporate_lot_list(tract.lots)
+        return None
 
     def incorporate_lot_list(self, lots: list):
         """
-        Incorporate all lots in the passed ``.lots`` into the grid.
-            ex: Passing ['L1', 'L3', 'L4', 'L5'] might set 'NENE',
-                'NENW', 'NWNW', and 'SWNW' as hits for a hypothetical
-                SectionGrid, depending on how lots 1, 3, 4, and 5 are
-                defined in LotDefinitions object in the `.ld` attribute
-                of the SectionGrid.
-        NOTE: Relies on the LotDefinitions object in `.ld` at the time
-        this method is called. Later changes to `.ld` will not
-        modify what has already been done here.
-        """
+        Incorporate all lots in ``lots`` into the grid.
 
+        For example, passing ``['L1', 'L3', 'L4', 'L5']`` might set
+        'NENE', 'NENW', 'NWNW', and 'SWNW' as hits for a hypothetical
+        ``SectionGrid``, depending on how lots 1, 3, 4, and 5 are
+        defined in ``LotDefinitions`` object in the ``.ld`` attribute
+        of that ``SectionGrid``.
+
+        """
         # Track that this SectionGrid was 'pinged' by a setter,
         # regardless what the value of its QQ's may be (now or later on)
         self._was_pinged = True
-
         # QQ equivalents to Lots
         equiv_qq = []
-
         # Convert each lot to its equivalent QQ, per the ld, and
         # add them to the equiv_qq list.
         for lot in lots:
             # First remove any divisions in the lot (e.g., 'N2 of L1' -> 'L1')
             lot = _lot_without_div(lot)
-
             eq_qqs_from_lot = self._unpack_ld(lot)
             if eq_qqs_from_lot is None:
                 self.unhandled_lots.append(lot)
                 continue
             equiv_qq.extend(eq_qqs_from_lot)
-
         self.incorporate_qq_list(equiv_qq)
+        return None
 
     def incorporate_qq_list(self, qqs: list):
         """
-        Incorporate all QQs in the passed list of QQs (`qqs`) into the
+        Incorporate all aliquot quarter-quarters in ``qqs``) into the
         grid.
-            ex: Passing 'NENE', 'NENW', 'NWNW', and 'SWNW' sets all of
-                those QQ's as hits in a SectionGrid.
-        """
 
+        For example, passing ``['NENE', 'NENW', 'NWNW', 'SWNW']`` sets
+        all of those QQ's as hits in the ``SectionGrid``.
+        """
         # Track that this SectionGrid was 'pinged' by a setter,
         # regardless what the value of its QQ's may be (now or later on)
         self._was_pinged = True
-
         # `qq` can be fed in as 'NENE' or 'NENE,NWNE'. So we need to break it
         # into components before incorporating.
         for qq in qqs:
@@ -335,35 +338,32 @@ class SectionGrid:
                 # the first (only) element in the returned list.
                 qq_ = _smooth_QQs(qq_)[0]
                 self.turn_on_qq(qq_)
+        return None
 
     def _unpack_ld(self, lot):
         """
         INTERNAL USE:
-        Pass a lot number (string 'L1' or int 1), and get a list of the
-        corresponding / properly formatted QQ(s) from the `.ld` of this
-        SectionGrid object. Returns None if the lot is undefined, or if
-        it was defined with invalid QQ's.
-        """
 
+        Pass a lot number (string ``'L1'`` or int ``1``), and get a list
+        of the corresponding / properly formatted QQ(s) from the ``.ld``
+        of this ``SectionGrid`` object. Returns None if the lot is
+        undefined, or if it was defined with invalid QQ's.
+        """
         equiv_aliquots = []
         # Cull lot divisions (i.e. 'N2 of L1' to just 'L1')
         lot = _lot_without_div(lot)
-
         # Get the raw definition from the LotDefinitions object.
         # If undefined in the LD obj, return None.
         raw_ldef = self.ld.get(lot, None)
         if raw_ldef is None:
             return None
-
         # Ensure the raw lot definition is in the expected format and is
         # broken out into QQ chunks (e.g., a 'L1' that is defined as
         # 'N2NE4' should be converted to 'NENE' and 'NWNE').  And add
         # the resulting QQ(s) to the list of aliquots.
         equiv_aliquots.extend(_smooth_QQs(raw_ldef))
-
         if len(equiv_aliquots) == 0:
             return None
-
         return equiv_aliquots
 
     def output_text_plat(self, include_header=False) -> str:
