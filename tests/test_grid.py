@@ -15,7 +15,7 @@ from pytrsplat.plat_gen.grid import (
 )
 
 
-class GridTests(unittest.TestCase):
+class SectionGridTests(unittest.TestCase):
 
     def test_sec_grid_basic(self):
         """
