@@ -75,34 +75,23 @@ class SectionGrid:
         definitions.)
         """
 
+        try:
+            sec_num = int(sec)
+            sec = str(sec_num)
+        except ValueError:
+            sec = '00'
+            sec_num = 0
+
         # Note: twp and rge should have their direction specified
         #   ('n' or 's' for twp; and 'e' or 'w' for rge). Without doing
         #   so, various functionality may break.
-
-        twp = twp.lower()
-        rge = rge.lower()
-        self.twp = twp
-        self.rge = rge
-
-        # '__' or 'XX' can be returned by pytrs in the event of a flawed
-        # parse, so we handle this by setting to 0 (a meaningless number
-        # for a section that can't exist in reality) to avoid causing
-        # ValueError when converting to int elsewhere.
-        if sec in [pytrs.TRS._UNDEF_SEC, pytrs.TRS._ERR_SEC]:
-            sec = 0
-
-        # Ensure sec is formatted as a two digit string -- ex: '01'
-        sec = str(int(sec)).rjust(2, '0')
-
-        self.sec = sec
-        self.twprge = f"{twp}{rge}"
-        self.trs = f"{twp}{rge}{sec}".lower()
+        trs = pytrs.TRS.from_twprgesec(sec, twp, rge)
+        self.twp = trs.twp
+        self.rge = trs.rge
+        self.sec = trs.sec
+        self.twprge = trs.twprge
+        self.trs = trs.trs
         self.unhandled_lots = []
-
-        try:
-            sec_num = int(sec)
-        except ValueError:
-            sec_num = 0
 
         self.ld = {}
         if ld is None and allow_ld_defaults:
