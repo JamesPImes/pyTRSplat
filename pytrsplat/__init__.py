@@ -42,7 +42,7 @@ be found in their respective source packages:
 """
 
 
-import pytrsplat._constants as _constants
+from . import _constants
 
 __version__ = _constants.__version__
 __versionDate__ = _constants.__versionDate__
@@ -56,13 +56,13 @@ def version():
     return f'v{__version__} - {__versionDate__}'
 
 
-from pytrsplat.plat import (
+from .plat_gen.plat import (
     Plat,
     MultiPlat,
     text_to_plats,
 )
 
-from pytrsplat.grid import (
+from .plat_gen.grid import (
     TownshipGrid,
     SectionGrid,
     LotDefinitions,
@@ -72,14 +72,14 @@ from pytrsplat.grid import (
     plssdesc_to_twp_grids,
 )
 
-from pytrsplat.platsettings import Settings
-from pytrsplat.settingseditor import SettingsEditor, launch_settings_editor
-from pytrsplat.platqueue import PlatQueue, MultiPlatQueue
+from .plat_gen.platsettings import Settings
+from .gui.settingseditor import SettingsEditor, launch_settings_editor
+from .plat_gen.platqueue import PlatQueue, MultiPlatQueue
 
 
 def launch_app():
     """
     Launch the GUI application.
     """
-    from .pytrsplat_app import launch_app
+    from gui.pytrsplat_app import launch_app
     launch_app()

@@ -5,18 +5,19 @@ A GUI application for converting text of PLSS land descriptions ('legal
 descriptions') to plats using the pytrsplat module.
 """
 
-# TODO: Allow user to save selected page(s), rather than all.
+import sys
+sys.path.append('../../')
 
 import pytrsplat._constants as _constants
 from pytrsplat import version
-from pytrsplat.plat import Plat, MultiPlat
-from pytrsplat.grid import SectionGrid, LotDefDB
-from pytrsplat.platsettings import Settings
-from pytrsplat.platqueue import MultiPlatQueue
+from pytrsplat.plat_gen.plat import Plat, MultiPlat
+from pytrsplat.plat_gen.grid import SectionGrid, LotDefDB
+from pytrsplat.plat_gen.platsettings import Settings
+from pytrsplat.plat_gen.platqueue import MultiPlatQueue
 from pytrsplat.utils import _simplify_lot_number, break_trs
 
-from pytrsplat.settingseditor import SettingsEditor
-from pytrsplat.imgdisplay import ScrollResizeDisplay
+from pytrsplat.gui.settingseditor import SettingsEditor
+from pytrsplat.gui.imgdisplay import ScrollResizeDisplay
 
 import pytrs
 import pytrs.interface_tools
