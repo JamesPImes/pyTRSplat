@@ -236,23 +236,22 @@ class SectionGrid:
         is possible for more than 1 lot per QQ, so the values are all
         lists.
         """
-
         # This functionality is handled by LotDefinitions object.
         return self.ld.lots_by_qq_name()
 
     def lots_by_grid(self) -> list:
         """
-        Convert the `ld` into a grid (nested list), depicting which lots
-        fall within which coordinate. For example, 'L1' through 'L4'
-        in a standard Section 1 correspond to the N2N2 QQ's,
-        respectively -- so this method would output a grid whose
-        (0,0), (1,0), (2,0), and (3,0) are filled with ['L4'], ['L3'],
-        ['L2'], and ['L1'], respectively.
+        Convert this ``SectionGrid`` into a grid (nested list),
+        depicting which lots fall within which coordinate. For example,
+        ``'L1'`` through ``'L4'`` in a standard Section 1 correspond to
+        the N2N2 QQ's, respectively -- so this method would output a
+        grid whose (0,0), (1,0), (2,0), and (3,0) are filled with
+        ``['L4']``, ``['L3']``, ``['L2']``, and ``['L1']``,
+        respectively.  (Note that they are inside lists, because
+        multiple lots can correspond to a single QQ.)
         """
-
         lots_by_qq_name_dict = self.lots_by_qq_name()
         ar = self.output_array()
-
         for qq_name, dv in self.qq_grid.items():
             x = dv['coord'][0]
             y = dv['coord'][1]
