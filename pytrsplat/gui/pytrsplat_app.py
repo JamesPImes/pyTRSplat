@@ -309,7 +309,8 @@ class DescFrame(tk.Frame):
                 'default_ns',
                 'default_ew',
                 'clean_qq',
-                'require_colon',
+                'sec_colon_required',
+                'sec_colon_cautious',
                 'ocr_scrub',
                 'segment',
                 'layout'
