@@ -32,6 +32,8 @@ from piltextbox import TextBox
 # More info at <https://github.com/JamesPImes/pyTRS>
 import pytrs
 from pytrs import version as pytrs_version
+_ERR_SEC = pytrs.MasterConfig._ERR_SEC
+_UNDEF_SEC = pytrs.MasterConfig._UNDEF_SEC
 
 
 ########################################################################
@@ -63,7 +65,8 @@ class Plat:
     necessarily have any effect. It is therefore best practice to
     configure a Settings object prior to initializing a Plat object.
 
-    Plat objects can incorporate and/or be created from these objects:
+    Plat objects can incorporate and/or be created from these objects::
+
         -- pytrs.Tract (created externally via the pytrs module)
             `.plat_tract()` -- to project a pytrs.Tract object onto an
                 existing Plat object
@@ -87,7 +90,8 @@ class Plat:
             `Plat.from_queue()` -- to create a new Plat object from an
                 existing PlatQueue object
 
-    Plat objects can be output with this method:
+    Plat objects can be output with this method::
+
         `.output()` -- Return a flattened PIL.Image.Image object of the
             plat, and optionally saves to file (currently supports .png
             and .pdf formats)
@@ -663,13 +667,13 @@ class Plat:
         if single_sec:
             only_section = sec_grid.sec
 
-        platObj = Plat(
+        plat_obj = Plat(
             twp=sec_grid.twp, rge=sec_grid.rge, settings=settings, tld=tld,
             allow_ld_defaults=allow_ld_defaults, only_section=only_section)
-        platObj.plat_section_grid(sec_grid)
-        if platObj.settings.write_tracts:
-            platObj.write_all_tracts(tracts)
-        return platObj
+        plat_obj.plat_section_grid(sec_grid)
+        if plat_obj.settings.write_tracts:
+            plat_obj.write_all_tracts(tracts)
+        return plat_obj
 
     @staticmethod
     def from_township_grid(twp_grid, tracts=None, settings=None, tld=None,
@@ -690,11 +694,11 @@ class Plat:
         """
         twp = twp_grid.twp
         rge = twp_grid.rge
-        platObj = Plat(
+        plat_obj = Plat(
             twp=twp, rge=rge, settings=settings, tld=tld,
             allow_ld_defaults=allow_ld_defaults)
-        platObj.plat_township_grid(twp_grid=twp_grid, tracts=tracts)
-        return platObj
+        plat_obj.plat_township_grid(twp_grid=twp_grid, tracts=tracts)
+        return plat_obj
 
     def plat_township_grid(self, twp_grid, tracts=None, qq_fill_RGBA=None):
         """
@@ -756,15 +760,15 @@ class Plat:
         only_sec = None
         if single_sec:
             sec = tract.sec
-            if sec == 'secError':
+            if sec in [_ERR_SEC, _UNDEF_SEC]:
                 sec = 0
             only_sec = str(int(sec))
 
-        platObj = Plat(
+        plat_obj = Plat(
             twp=twp, rge=rge, settings=settings, only_section=only_sec,
             allow_ld_defaults=allow_ld_defaults)
-        platObj.plat_tract(tract, ld=ld)
-        return platObj
+        plat_obj.plat_tract(tract, ld=ld)
+        return plat_obj
 
     def plat_tract(
             self, tract: pytrs.Tract, write_tract=None, ld=None,
@@ -791,7 +795,7 @@ class Plat:
         sec = tract.sec_num
         if sec is None:
             sec = 0
-        sec = str(int(sec)).rjust(2, '0')
+        sec = str(sec).rjust(2, '0')
 
         # If the user fed in a LDDB or TwpLD, rather than a LotDefinitions
         # object, get the appropriate LD from the LDDB or TLD.
@@ -823,8 +827,8 @@ class Plat:
                 ld = LotDefinitions()
 
         # Generate a SectionGrid from the Tract, and plat it.
-        secGrid = SectionGrid.from_tract(tract, ld=ld)
-        self.plat_section_grid(secGrid)
+        sec_grid = SectionGrid.from_tract(tract, ld=ld)
+        self.plat_section_grid(sec_grid)
 
         # If not specified whether to write tract, default to settings
         if write_tract is None:
@@ -889,7 +893,7 @@ class Plat:
         for y in range(len(qq_coords)):
             for x in range(len(qq_coords[y])):
                 lots = qq_coords[y][x]
-                if lots == []:
+                if not lots:
                     continue
                 clean_lots = []
                 for lot in lots:
@@ -1349,7 +1353,7 @@ class MultiPlat:
 
         # Get a dict linking the this PLSSDesc's parsed Tracts to their
         # respective T&R's (keyed by T&R -- same as twp_grids dict)
-        twp_to_tract = pytrs.group_tracts(plssdesc_obj, by_attribute='twprge')
+        twp_to_tract = pytrs.group_tracts_by(plssdesc_obj, attribute='twprge')
 
         # Generate Plat object of each township, and append it to `self.plats`
         for k, v in twp_grids.items():
@@ -1608,7 +1612,7 @@ class TractTextBox(TextBox):
 
             font_RGBA = self.font_RGBA
             if (len(tract.lots_qqs) == 0
-                    or tract.sec in [pytrs.TRS._ERR_SEC, pytrs.TRS._UNDEF_SEC]):
+                    or tract.sec in [_ERR_SEC, _UNDEF_SEC]):
                 # If no lots/QQs were identified, or if this tract has a
                 # section number that could not be successfully deduced
                 # -- in which case it could not have been projected onto
