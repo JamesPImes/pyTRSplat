@@ -1,4 +1,4 @@
-# Copyright (c) 2020, James P. Imes. All rights reserved.
+# Copyright (c) 2020-2022, James P. Imes. All rights reserved.
 
 """
 Streamlined queues of 'plattable' objects.
@@ -7,6 +7,9 @@ Streamlined queues of 'plattable' objects.
 import pytrs
 
 from ..grid import SectionGrid, TownshipGrid
+
+_UNDEF_TWPRGE = pytrs.MasterConfig._UNDEF_TWPRGE
+_ERR_TWPRGE = pytrs.MasterConfig._ERR_TWPRGE
 
 
 class PlatQueue(list):
@@ -113,7 +116,7 @@ class PlatQueue(list):
         # the tract object.
         self.tracts.extend(tracts)
 
-    def absorb(self, pqObj, tracts=None):
+    def absorb(self, pq_obj, tracts=None):
         """
         Absorb a PlatQueue object into this one. The parameter `tracts=`
         should not be used directly -- it will only be used when this is
@@ -122,8 +125,8 @@ class PlatQueue(list):
         """
         if tracts is None:
             tracts = []
-        self.extend(pqObj)
-        self.tracts.extend(pqObj.tracts)
+        self.extend(pq_obj)
+        self.tracts.extend(pq_obj.tracts)
         self.tracts.extend(tracts)
 
 
@@ -214,14 +217,14 @@ class MultiPlatQueue(dict):
             pytrs.PLSSDesc objects MUST be handled specially, because
             they can generate multiple T&R's (i.e. multiple dict keys).
             """
-            twp_to_tract = pytrs.TractList(plssdesc).group("twprge")
+            twp_to_tract = pytrs.TractList(plssdesc).group_by("twprge")
             for twprge, tract_list in twp_to_tract.items():
                 self.setdefault(twprge, PlatQueue())
                 for tract in tract_list:
                     self[twprge].queue_add(tract)
             return
 
-        def handle_tract(tractObj, twprge=None, tracts=None):
+        def handle_tract(tract, twprge=None, tracts=None):
             """
             pytrs.Tract object can be handled specially too, because it
             can also have T&R specified internally. Return the original
@@ -231,19 +234,17 @@ class MultiPlatQueue(dict):
             # If twprge was not specified for this object, pull it from
             # the Tract object itself.
             if not twprge:
-                twprge = tractObj.twprge
+                twprge = tract.twprge
             if not twprge:
                 # i.e. twprge is still None or empty string.
-                twprge = pytrs.TRS._UNDEF_TWPRGE
-
+                twprge = _UNDEF_TWPRGE
             # Ensure this Tract object has been added to the tract list.
             confirmed_tracts = []
             if tracts is not None:
                 confirmed_tracts.extend(tracts)
-            if tractObj not in confirmed_tracts:
-                confirmed_tracts.append(tractObj)
-
-            return tractObj, twprge, confirmed_tracts
+            if tract not in confirmed_tracts:
+                confirmed_tracts.append(tract)
+            return tract, twprge, confirmed_tracts
 
         def handle_platqueue(pq, twprge=None, tracts=None):
             """
