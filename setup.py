@@ -1,3 +1,4 @@
+import setuptools
 from setuptools import setup
 
 
@@ -42,16 +43,7 @@ long_description = (
 setup(
     name='pyTRSplat',
     version=get_constant('version'),
-    packages=[
-        'pytrsplat',
-        'pytrsplat.grid',
-        'pytrsplat.plat',
-        'pytrsplat.utils',
-        'pytrsplat.platqueue',
-        'pytrsplat.imgdisplay',
-        'pytrsplat.platsettings',
-        'pytrsplat.settingseditor'
-    ],
+    packages=setuptools.find_packages(),
     url=get_constant('url'),
     license='Modified Academic Public License',
     author=get_constant('author'),
