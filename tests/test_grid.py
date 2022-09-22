@@ -99,3 +99,10 @@ class GridTests(unittest.TestCase):
         sg = SectionGrid(ld=ld)
         sg.incorporate_tract(tract)
         self.assertEqual(expected, sg.output_text_plat())
+
+    def test_filled_coords(self):
+        qqs = ['NENE', 'SWNW']
+        expected = [(3, 0), (0, 1)]
+        sg = SectionGrid()
+        sg.incorporate_qq_list(qqs)
+        self.assertEqual(expected, sg.filled_coords())

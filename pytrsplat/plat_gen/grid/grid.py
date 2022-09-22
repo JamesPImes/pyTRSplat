@@ -368,9 +368,8 @@ class SectionGrid:
 
     def output_text_plat(self, include_header=False) -> str:
         """
-        Output a simple plat (as a string) of the Section grid values.
+        Output a simple plat (as a string) of the Section's grid values.
         """
-
         ar = self.output_array()
         total_columns = len(ar[0])
         total_rows = len(ar)
@@ -398,20 +397,19 @@ class SectionGrid:
                         plat_txt + ('-' * box_width + '+') * (total_columns - 1)
                 )
                 plat_txt = plat_txt + '-' * box_width + '|'
-
         plat_txt = plat_txt + '\n' + '=' * total_width
-
         return (header + '\n') * include_header + plat_txt
 
     def output_array(self) -> list:
         """
         Convert the grid to an array (oriented from NWNW to SESE),
         with resulting coords formatted (y, x).
-        ex:
+
+        Example::
+
             ar = sg_obj.output_array()
             ar[y][x]  # Accesses the value at (x, y) in `sg_obj.qq_grid`
         """
-
         max_x = 0
         max_y = 0
         for qq in self.qq_grid.values():
@@ -419,46 +417,44 @@ class SectionGrid:
                 max_x = qq['coord'][0]
             if qq['coord'][1] > max_y:
                 max_y = qq['coord'][1]
-
         # Create an array of all zero-values, with equal dimensions as
         # in the SectionGrid.qq_grid (which is 4x4 in a standard section).
         ar = [[0 for _a in range(max_x + 1)] for _b in range(max_y + 1)]
-
         for qq in self.qq_grid.values():
             x = qq['coord'][0]
             y = qq['coord'][1]
             if qq['val'] != 0:
                 ar[y][x] = qq['val']
-
         return ar
 
     def turn_off_qq(self, qq: str):
         """
-        Set the value of the specified QQ (e.g. 'NENE') to 0.
+        Set the value of the specified QQ (e.g. ``'NENE'``) to ``0``.
+
         :param qq: The name of a QQ (one of the 16 standard QQs only
-        -- e.g. 'NENE', 'SWSE', etc.)
+         -- e.g. ``'NENE'``, ``'SWSE'``, etc.)
         """
         qq = qq.upper()
         if qq in self.qq_grid.keys():
             self.qq_grid[qq]['val'] = 0
+        return None
 
     def turn_on_qq(self, qq: str, custom_val=1):
         """
-        Set the value of the specified QQ (e.g. 'NENE') to 1.
+        Set the value of the specified QQ (e.g. ``'NENE'``) to ``'1'``.
 
         :param qq: The name of a QQ (one of the 16 standard QQs only
-        -- e.g. 'NENE', 'SWSE', etc.)
-        :param custom_val: Instead of 1, use a different 'on' value
-        for this QQ.
-        WARNING: Using a `custom_val` as anything other than 1 will
-        break most functionality in this module, so it should only be
-        used if you have a deep understanding of its implications.
-        """
+         -- e.g. ``'NENE'``, ``'SWSE'``, etc.)
+        :param custom_val: Instead of ``1``, use a different 'on' value
+         for this QQ.
 
+        .. warning::
+            Using a ``custom_val`` as anything other than ``1`` will
+            likely break most functionality in this module.
+        """
         # Track that this SectionGrid was 'pinged' by a setter,
         # regardless what the value of its QQ's may be (now or later on)
         self._was_pinged = True
-
         # Note: Passing anything other than `1` to `custom_val` will
         # probably cause other current functionality to break. But it
         # might be useful for some purposes (e.g., tracking which
@@ -466,11 +462,12 @@ class SectionGrid:
         qq = qq.upper()
         if qq in self.qq_grid.keys():
             self.qq_grid[qq]['val'] = custom_val
+        return None
 
     def filled_coords(self) -> list:
         """
         Return a list of coordinates in the SectionGrid that contain a
-        a hit (i.e. anything other than `0` val).
+        hit (i.e. anything other than ``0`` val).
         """
         ar = self.output_array()
         filled = []
