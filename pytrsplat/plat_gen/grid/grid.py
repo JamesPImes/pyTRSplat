@@ -466,8 +466,8 @@ class SectionGrid:
 
     def filled_coords(self) -> list:
         """
-        Return a list of coordinates in the SectionGrid that contain a
-        hit (i.e. anything other than ``0`` val).
+        Return a list of coordinates in the ``SectionGrid`` that contain
+        a hit (i.e. anything other than ``0`` val).
         """
         ar = self.output_array()
         filled = []
