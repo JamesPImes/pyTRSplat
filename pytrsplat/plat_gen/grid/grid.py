@@ -712,18 +712,18 @@ class LotDefinitions(dict):
     (inclusive) to set to the /default/ for that section in a STANDARD
     township (i.e. perhaps 'better-than-nothing').
 
-    These objects can also be contained within a TwpLotDefinitions
+    These objects can also be contained within a ``TwpLotDefinitions``
     object for a 36-section collection of such lot-to-QQ definitions.
-    In turn, TwpLotDefinitions can be contained within a LotDefDB
+    In turn, ``TwpLotDefinitions`` can be contained within a ``LotDefDB``
     object for definitions of lots in the sections of any number of
     townships.
 
-    See `LotDefDB.from_csv()` or `TwpLotDefinitions.from_csv()` for
+    See ``LotDefDB.from_csv()`` or ``TwpLotDefinitions.from_csv()`` for
     loading larger databases from .csv files, rather than creating
-    LotDefinitions objects individually.
+    ``LotDefinitions`` objects individually.
 
     Additional documentation on LotDefinitions is maintained under
-    pytrsplat.LotDefDB objects, to avoid undue repetition.
+    ``LotDefDB`` objects, to avoid undue repetition.
     """
 
     # Below are defaults for sections in a 'standard' 6x6 Township grid.
