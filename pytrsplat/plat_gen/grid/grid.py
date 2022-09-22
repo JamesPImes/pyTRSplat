@@ -11,6 +11,9 @@ into SectionGrid and TownshipGrid objects.
 import pytrs
 from pytrsplat.utils import _smooth_QQs, _lot_without_div
 
+_ERR_SEC = pytrs.MasterConfig._ERR_SEC
+_UNDEF_SEC = pytrs.MasterConfig._UNDEF_SEC,
+
 
 class SectionGrid:
     """
@@ -85,7 +88,7 @@ class SectionGrid:
         # Note: twp and rge should have their direction specified
         #   ('n' or 's' for twp; and 'e' or 'w' for rge). Without doing
         #   so, various functionality may break.
-        trs = pytrs.TRS.from_twprgesec(sec, twp, rge)
+        trs = pytrs.TRS.from_twprgesec(twp, rge, sec)
         self.twp = trs.twp
         self.rge = trs.rge
         self.sec = trs.sec
@@ -649,7 +652,7 @@ class TownshipGrid:
         # parse, so we handle this by setting sec_num to 0 (a section number
         # that can't exist in reality), before trying to
         # convert `sec` to an int causes a ValueError.
-        if sec_num in [None, pytrs.TRS._UNDEF_SEC, pytrs.TRS._ERR_SEC]:
+        if sec_num in [None, _UNDEF_SEC, _ERR_SEC]:
             sec_num = 0
         sec_grid_obj = self.sections[sec_num]
         sec_grid_obj.incorporate_tract(tract)
