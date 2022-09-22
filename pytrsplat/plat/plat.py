@@ -363,40 +363,28 @@ class Plat:
         Generate the text of a header containing the T&R and/or
         Section number.
         :param only_section: Specify with the appropriate integer when
-        platting only a single section (rather than the usual 6x6 grid).
+         platting only a single section (rather than the usual 6x6
+         grid).
         """
-
         trs_ = pytrs.TRS.from_twprgesec(twp=self.twp, rge=self.rge)
-        # TODO: BUG FIX... why is this spitting out a weird Rge when it
-        #   is unspecified...?
-        if trs_.ns in ['n', 'N']:
-            ns = 'North'
-        else:
-            ns = 'South'
-        if not str(self.twp).lower().endswith(('n', 's')):
-            ns = 'Undefined'
-
-        if trs_.ew in ['w', 'w']:
-            ew = 'West'
-        else:
-            ew = 'East'
-        if not str(self.rge).lower().endswith(('e','w')):
-            ew = 'Undefined'
-
-        if trs_.twprge == pytrs.TRS._UNDEF_TWPRGE:
+        twptxt = trs_.pretty_twprge(
+            t='Township ',
+            delim=', ',
+            r='Range ',
+            e=' East',
+            w=' West',
+            n=' North',
+            s=' South'
+        )
+        if trs_.is_undef(sec=False):
             # If neither twp nor rge have been set, we will not write T&R in header.
             twptxt = ''
-        elif trs_.twp == pytrs.TRS._ERR_TWP or trs_.rge == pytrs.TRS._ERR_RGE:
-            # If N/S or E/W were not specified, or if there's some other T&R error
+        elif trs_.is_error(sec=False):
             twptxt = '{Township/Range Error}'
-        else:
-            twptxt = f'Township {trs_.twp_num} {ns}, Range {trs_.rge_num} {ew}'
-
         if only_section is not None:
             # If we're platting a single section.
-            return f"{twptxt}{', ' * (len(twptxt) > 0)}Section {only_section}"
-        else:
-            return twptxt
+            twptxt = f"{twptxt}{', ' * (len(twptxt) > 0)}Section {only_section}"
+        return twptxt
 
     def _draw_all_sections(self, only_section=None):
         """
