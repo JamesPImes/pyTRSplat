@@ -89,7 +89,7 @@ class SectionGrid:
 
         try:
             sec_num = int(sec)
-            sec = str(sec_num)
+            sec = str(sec_num).rjust(2, '0')
         except ValueError:
             sec = '00'
             sec_num = 0
@@ -100,9 +100,9 @@ class SectionGrid:
         trs = pytrs.TRS.from_twprgesec(twp, rge, sec)
         self.twp = trs.twp
         self.rge = trs.rge
-        self.sec = trs.sec
+        self.sec = sec
         self.twprge = trs.twprge
-        self.trs = trs.trs
+        self.trs = f"{trs.twprge}{sec}"
         self.unhandled_lots = []
 
         self.ld = {}
@@ -193,6 +193,8 @@ class SectionGrid:
         :return: A new ``SectionGrid`` object.
         """
         twp, rge, sec = tract.twp, tract.rge, tract.sec
+        if sec in [None, _UNDEF_SEC, _ERR_SEC]:
+            sec = '00'
         sec_grid = SectionGrid(
             sec=sec, twp=twp, rge=rge, ld=ld,
             allow_ld_defaults=allow_ld_defaults)
