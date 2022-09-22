@@ -1,7 +1,7 @@
 include			    LICENSE.txt
 recursive-include	pytrsplat/_examples *.csv
 recursive-include	pytrsplat/_modulelicenses *.txt
-recursive-include	pytrsplat/platsettings/_presets *.txt
-recursive-include	pytrsplat/platsettings/_fonts *.txt
-recursive-include	pytrsplat/platsettings/_fonts *.ttf
-include			    pytrsplat/pyTRSplat_app_windowed.pyw
+recursive-include	pytrsplat/plat_gen/platsettings/_presets *.txt
+recursive-include	pytrsplat/plat_gen/platsettings/_fonts *.txt
+recursive-include	pytrsplat/plat_gen/platsettings/_fonts *.ttf
+include			    pytrsplat/pytrsplat_app.pyw
