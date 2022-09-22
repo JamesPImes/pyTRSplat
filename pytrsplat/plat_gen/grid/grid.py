@@ -492,12 +492,7 @@ class SectionGrid:
         Return a bool, whether at least one QQ contains a hit anywhere
         in this SectionGrid.
         """
-        ar = self.output_array()
-        for i in ar:
-            for j in i:
-                if j != 0:
-                    return True
-        return False
+        return len(self.filled_qqs()) > 0
 
 
 class TownshipGrid:

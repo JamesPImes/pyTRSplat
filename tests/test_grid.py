@@ -106,3 +106,12 @@ class GridTests(unittest.TestCase):
         sg = SectionGrid()
         sg.incorporate_qq_list(qqs)
         self.assertEqual(expected, sg.filled_coords())
+
+    def test_has_any(self):
+        qqs = ['NENE', 'SWNW']
+        expected = [(3, 0), (0, 1)]
+        sg = SectionGrid()
+        # QQ's not yet incorporated.
+        self.assertFalse(sg.has_any())
+        sg.incorporate_qq_list(qqs)
+        self.assertTrue(sg.has_any())
