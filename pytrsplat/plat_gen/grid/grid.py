@@ -200,30 +200,34 @@ class SectionGrid:
 
     def apply_lddb(self, lddb):
         """
-        Apply the appropriate pytrsplat.LotDefinitions object from the
-        pytrsplat.LotDefDB object, if such a LD object exists in that
-        LDDB. Will not write/overwrite anything if no LD object exists
-        for this section in the LDDB.
-        :param lddb: A pytrsplat.LotDefDB object, ideally containing a
-        TwpLotDefinitions object for this section's twprge, which in
-        turn contains a LotDefinitions object for this section.
+        Apply the appropriate ``LotDefinitions`` object from the
+        ``LotDefDB`` object passed as ``lddb``, if such a LD object
+        exists in that LDDB. Will not write/overwrite anything if no LD
+        object exists for this section in the LDDB.
+
+        :param lddb: A ``LotDefDB`` object, ideally containing a
+         ``TwpLotDefinitions`` object for this section's twprge, which
+         in turn contains a ``LotDefinitions`` object for this section.
         """
         ld = lddb.trs(self.trs)
         if ld is not None:
             self.ld = ld
+        return None
 
     def apply_tld(self, tld):
         """
-        Apply the appropriate pytrsplat.LotDefinitions object from the
-        pytrsplat.TwpLotDefinitions object, if such a LD object exists
-        in that TLD. Will not write/overwrite anything if no LD object
-        exists for this section in the TLD.
-        :param tld: A pytrsplat.TwpLotDefinitions object, ideally
-        containing a LotDefinitions object for this section.
+        Apply the appropriate ``LotDefinitions`` object from the
+        ``TwpLotDefinitions`` object, if such a LD object exists in that
+        TLD. Will not write/overwrite anything if no LD object exists
+        for this section in the TLD.
+
+        :param tld: A ``TwpLotDefinitions`` object, ideally containing
+         a ``LotDefinitions`` object for this section.
         """
         ld = tld.get(int(self.sec), None)
         if ld is not None:
             self.ld = ld
+        return None
 
     def lots_by_qq_name(self) -> dict:
         """
