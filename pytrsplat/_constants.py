@@ -1,7 +1,7 @@
 # Copyright (c) 2020-2022, James P. Imes. All rights reserved.
 
-__version__ = '0.3.1'
-__versionDate__ = '8/14/2022'
+__version__ = '0.4.0'
+__versionDate__ = '9/22/2022'
 __author__ = 'James P. Imes'
 __email__ = 'jamesimes@gmail.com'
 __website__ = 'https://github.com/JamesPImes/pyTRSplat'
@@ -15,7 +15,7 @@ __license__ = (
     "modified license generally allows 'non-commercial' use and modification, "
     "but DISALLOWS ANY COMMERCIAL OR FOR-PROFIT USE, MODIFICATION, AND "
     "DISTRIBUTION.\n\n"
-    "Read pyTRSplat\\LICENSE.txt for the full terms and conditions, also available "
+    "Read LICENSE.txt for the full terms and conditions, available "
     f"in full at <{__website__}>.\n\n"
     f"Contact <{__email__}> with inquiries regarding commercial or for-profit "
     "use.\n\n"
