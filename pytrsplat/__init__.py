@@ -81,5 +81,5 @@ def launch_app():
     """
     Launch the GUI application.
     """
-    from gui.pytrsplat_app import launch_app
+    from .gui.pytrsplat_app import launch_app
     launch_app()
