@@ -4,12 +4,12 @@
 
 from pytrs import PLSSDesc, Tract
 
-from pytrsplat.grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
-from pytrsplat.grid import tracts_into_twp_grids
-from pytrsplat.platsettings import Settings
-from pytrsplat.platqueue import PlatQueue, MultiPlatQueue
-from pytrsplat.plat import Plat, MultiPlat
-from pytrsplat.plat import text_to_plats
+from pytrsplat.plat_gen.grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
+from pytrsplat.plat_gen.grid import tracts_into_twp_grids
+from pytrsplat.plat_gen.platsettings import Settings
+from pytrsplat.plat_gen.platqueue import PlatQueue, MultiPlatQueue
+from pytrsplat.plat_gen.plat import Plat, MultiPlat
+from pytrsplat.plat_gen.plat import text_to_plats
 
 
 ########################################################################
