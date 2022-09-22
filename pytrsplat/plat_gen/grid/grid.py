@@ -19,63 +19,72 @@ class SectionGrid:
     """
     A grid of a single Section, divided into standard PLSS aliquot
     quarter-quarters (QQs) -- i.e. 4x4 for a standard section.
-    Takes optional `ld=` argument for specifying a LotDefinitions object
-    (defaults to a 'standard' township layout if not specified -- i.e.
-    Sections 1 - 7, 18, 19, 30, and 31 have lots, because they are along
-    the northern and/or western boundaries of the township). A
-    TwpLotDefinitions object may also be passed, so long as `sec`,
-    `twp`, and `rge` are also correctly specified.
+    Takes optional ``ld=`` argument for specifying a ``LotDefinitions``
+    object (defaults to a 'standard' township layout if not specified --
+    i.e. Sections 1 - 7, 18, 19, 30, and 31 have ~40-acre lots, because
+    they are along the northern and/or western boundaries of the
+    township). A ``TwpLotDefinitions`` object may also be passed, so
+    long as ``sec``, ``twp``, and ``rge`` are also correctly specified.
 
-    If `sec=<int or str>`, `twp=<str>`, and `rge=<str>` are not
+    If ``sec=<int or str>``, ``twp=<str>``, and ``rge=<str>`` are not
     specified at init, the object may not have full functionality in
     conjunction with other modules.
-        --example:
-            sg_obj = SectionGrid(`sec=14, twp='154n', rge='97w')
-        --equivalently:
+
+        example::
+
+            sg_obj = SectionGrid(sec=14, twp='154n', rge='97w')
+
+        equivalently::
+
             sg_obj = SectionGrid.from_trs('154n97w14')
-    (Passing `ld=...` in either example is optional, but advisable.)
+
+    (Passing ``ld=...`` in either example is optional, but advisable.)
 
     If a lot was not defined for this SectionGrid but the lot is
-    incorporated into the SectionGrid anyway, it will not set any hits,
-    but the lot will be added to the list in the `.unhandled_lots`
-    attribute.
+    incorporated into the ``SectionGrid`` anyway, it will not set any
+    hits, but the lot will be added to the list in the
+    ``.unhandled_lots`` attribute.
 
-    QQ's have been assigned these coordinates, with (0,0) being the NWNW
-    and (3,3) being the SESE -- i.e. moving from top-to-bottom and
-    left-to-right:
-    ------------------------------------------------------------------
-    | NWNW -> (0,0) | NENW -> (1,0) || NWNE -> (2,0) | NENE -> (3,0) |
-    |---------------+---------------++---------------+---------------|
-    | SWNW -> (0,1) | SENW -> (1,1) || SWNE -> (2,1) | SENE -> (3,1) |
-    |===============+===============++===============+===============|
-    | NWSW -> (0,2) | SESW -> (1,2) || NWSE -> (2,2) | NESE -> (3,2) |
-    |---------------+---------------++---------------+---------------|
-    | SWSW -> (0,3) | SESW -> (1,3) || SWSE -> (2,3) | SESE -> (3,3) |
-    ------------------------------------------------------------------
+    QQ's have been assigned these coordinates, with ``(0,0)`` being the
+    NWNW and ``(3,3)`` being the SESE -- i.e. moving from top-to-bottom
+    and left-to-right::
+
+        ------------------------------------------------------------------
+        | NWNW -> (0,0) | NENW -> (1,0) || NWNE -> (2,0) | NENE -> (3,0) |
+        |---------------+---------------++---------------+---------------|
+        | SWNW -> (0,1) | SENW -> (1,1) || SWNE -> (2,1) | SENE -> (3,1) |
+        |===============+===============++===============+===============|
+        | NWSW -> (0,2) | SESW -> (1,2) || NWSE -> (2,2) | NESE -> (3,2) |
+        |---------------+---------------++---------------+---------------|
+        | SWSW -> (0,3) | SESW -> (1,3) || SWSE -> (2,3) | SESE -> (3,3) |
+        ------------------------------------------------------------------
     """
 
     def __init__(
             self, sec='', twp='', rge='', ld=None, allow_ld_defaults=False):
         """
-
         :param sec: Section number (passed as an int, or as a 2-digit
         string).
+
         :param twp: Township number (up to 3 digits) and N/S direction
-        (as a single lowercase character).
-            ex: '154n', '1s', etc.
+         (as a single lowercase character). Such as: ``'154n'``,
+         ``'1s'``, etc.
+
         :param rge: Range number (up to 3 digits) and E/W direction
-        (as a single lowercase character).
-            ex: '97w', '7e', etc.
-        :param ld: A pytrsplat.LotDefinitions object, defining how lots
-        should be interpreted in this section, in terms of QQs.
+         (as a single lowercase character). Such as: ``'97w'``,
+         ``'7e'``, etc.
+
+        :param ld: A ``LotDefinitions`` object, defining how lots
+         should be interpreted in this section, in terms of QQs.
+
         :param allow_ld_defaults: Whether 'default' lot definitions are
-        allowed as a fall-back option, when lots have not been
-        explicitly defined for a given section. (Default lots are the
-        'usual' lots in Sections 1 - 7, 18, 19, 30, and 31 of a
-        'standard' township -- i.e. along the northern and western
-        boundaries of a township. Potentially useful as a 'better-than-
-        nothing' option, but not as reliable as user-specified lot
-        definitions.)
+         allowed as a fall-back option, when lots have not been
+         explicitly defined for a given section. (Default lots are the
+         'usual' lots in Sections 1 - 7, 18, 19, 30, and 31 of a
+         'standard' township -- i.e. along the northern and western
+         boundaries of a township. Potentially useful as a 'better-than-
+         nothing' option, but not as reliable as user-specified lot
+         definitions.)
         """
 
         try:
@@ -147,18 +156,21 @@ class SectionGrid:
     @staticmethod
     def from_trs(trs='', ld=None, allow_ld_defaults=False):
         """
-        Create and return a SectionGrid object by passing in a TRS
-        (e.g., '154n97w14'), rather than the separate Sec, Twp, Rge
-        components. Also takes optional `ld` argument for specifying
-        LotDefinitions object.
+        Create and return a ``SectionGrid`` object by passing in a
+        Twp/Rge/Sec (e.g., ``'154n97w14'``), rather than the separate
+        Sec, Twp, Rge components. Also takes optional ``ld`` argument
+        for specifying ``LotDefinitions`` object.
 
         All available parameters have the same effect as for vanilla
         __init__(), except:
+
         :param trs: The Twp/Rge/Sec specified as a single string, in the
-        format '000x000x00' (up to 3 digits for twp and rge, exactly 2
-        digits for section).
-            ex: '154n97w01', '1s7e36', etc.
-        :return: A SectionGrid object.
+         format ``'000x000x00'`` (up to 3 digits for twp and rge,
+         exactly 2 digits for section, as used in pyTRS).
+
+            ex: ``'154n97w01'``, ``'1s7e36'``, etc.
+
+        :return: A new ``SectionGrid`` object.
         """
         trs_ = pytrs.TRS(trs)
         return SectionGrid(
