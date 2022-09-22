@@ -26,6 +26,12 @@ class PlatTest(unittest.TestCase):
         plat.plat_tract(tract)
         plat.output(f"{OUTPUT_DIR}/test_plat.png")
 
+    def test_plat_error(self):
+        tract = pytrs.Tract('NE/4', 'asldkfjas', parse_qq=True)
+        plat = Plat(settings='square_m')
+        plat.plat_tract(tract)
+        plat.output(f"{OUTPUT_DIR}/test_plat_error_tract.png")
+
 
 class MultiPlatTest(unittest.TestCase):
 
