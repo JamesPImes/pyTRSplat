@@ -54,7 +54,7 @@ setup(
     install_requires=[
         'Pillow',
         'piltextbox',
-        'pytrs @ git+https://github.com/JamesPImes/pyTRS.git@master'
+        'pytrs @ git+https://github.com/JamesPImes/pyTRS.git@v2.1.0'
     ],
     include_package_data=True
 )
