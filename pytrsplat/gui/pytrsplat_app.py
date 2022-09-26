@@ -290,7 +290,7 @@ class DescFrame(tk.Frame):
         self.config_popup_tk = tk.Toplevel()
         self.config_popup_tk.focus()
         self.config_popup_tk.grab_set()
-        self.config_popup_tk.title('Set pytrs Config Parameters')
+        self.config_popup_tk.title('Set pyTRS Config Parameters')
         after_prompt = None
         if len(self.master.plssdesc_list) > 0:
             # If the user has already parsed one or more descriptions,
@@ -313,6 +313,7 @@ class DescFrame(tk.Frame):
                 'sec_colon_cautious',
                 'ocr_scrub',
                 'segment',
+                'sec_within',
                 'layout'
             ],
             show_cancel=False, prompt_after_ok=after_prompt, exit_after_ok=True)
