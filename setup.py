@@ -56,5 +56,6 @@ setup(
         'piltextbox==0.2.1',
         'pytrs @ git+https://github.com/JamesPImes/pyTRS.git@v2.1.3'
     ],
+    python_requires="<3.11",
     include_package_data=True
 )
