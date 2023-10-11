@@ -69,5 +69,5 @@ For additional functionality, including customization of the plats, and defining
 
 ## Requirements
 
-* Python 3.6+
+* Python 3.6 through 3.10
 * Windows 10+
