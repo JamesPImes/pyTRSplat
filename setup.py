@@ -52,9 +52,9 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     install_requires=[
-        'Pillow',
-        'piltextbox',
-        'pytrs @ git+https://github.com/JamesPImes/pyTRS.git@v2.1.0'
+        'Pillow<=9.1',
+        'piltextbox==0.2.1',
+        'pytrs @ git+https://github.com/JamesPImes/pyTRS.git@v2.1.3'
     ],
     include_package_data=True
 )
