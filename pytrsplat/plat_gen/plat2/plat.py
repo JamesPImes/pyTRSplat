@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from PIL import Image, ImageDraw
 import pytrs
 from pytrs.parser.tract.aliquot_simplify import AliquotNode
@@ -98,7 +97,7 @@ class IPlatOwner(ISettingsOwner, IImageOwner):
     pass
 
 
-class PlatAliquotNode(AliquotNode, SettingsOwned):
+class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
     """
     INTERNAL USE:
 
@@ -180,7 +179,7 @@ class PlatAliquotNode(AliquotNode, SettingsOwned):
             rgba = cf.qq_fill_rgba
         if self.is_leaf():
             box = get_box(self.xy, dim=self.square_dim)
-            self.owner.overlay_draw.polygon(box, rgba)
+            self.overlay_draw.polygon(box, rgba)
             if self.depth > self.settings.min_depth:
                 # TODO: Draw QQQ boundaries beyond those already drawn.
                 ...
@@ -274,7 +273,7 @@ class PlatSection(SettingsOwned, ImageOwned):
                 ew = ((x, y + div_sec_len * i), (x + sec_len, y + div_sec_len * i))
                 depth_lines[depth].append(ew)
 
-        draw = self.owner.draw
+        draw = self.draw
         for depth in reversed(depth_lines.keys()):
             lines = depth_lines[depth]
             width = settings.line_stroke.get(depth, settings.line_stroke[None])
@@ -289,7 +288,7 @@ class PlatSection(SettingsOwned, ImageOwned):
         section number there.
         """
         settings = self.settings
-        draw = self.owner.draw
+        draw = self.draw
         # Draw middle white space.
         cb_dim = settings.centerbox_dim
         x_center, y_center = calc_midpt(xy=self.xy, square_dim=self.sec_length_px)
@@ -371,12 +370,6 @@ class PlatBody(SettingsOwned, ImageOwned):
         # Coord of top-left of the grid.
         self.xy: tuple[int, int] = None
 
-    @property
-    def settings(self):
-        if self.owner is not None:
-            return self.owner.settings
-        return DEFAULT_SETTINGS
-
     def nonempty_sections(self):
         """Get a list of any sections that have aliquots to be platted."""
         output = []
@@ -428,9 +421,8 @@ class PlatFooter(SettingsOwned, ImageOwned):
         y = (stn.body_marg_top_y + stn.sec_length_px * 6 + stn.footer_px_below_body)
         self._x, self._y = (x, y)
         sample_trs = 'XXXzXXXzXX:'
-        draw = self.owner.draw
         font = stn.footerfont
-        _, _, w, h = draw.textbbox(xy=(0, 0), text=sample_trs, font=font)
+        _, _, w, h = self.draw.textbbox(xy=(0, 0), text=sample_trs, font=font)
         self._text_line_height = h
         self._trs_indent = x + w
 
@@ -446,7 +438,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
         stn = self.settings
         font = stn.footerfont
         fill = stn.footerfont_rgba
-        draw = self.owner.footer_draw
+        draw = self.footer_draw
         draw.text(xy=(x, self._y), text=text, font=font, fill=fill)
         self._y += self._text_line_height + stn.footer_px_between_lines
         return None
@@ -532,7 +524,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
          the original tract will be returned.
         """
         stn = self.settings
-        draw = self.owner.footer_draw
+        draw = self.footer_draw
         font = stn.footerfont
         fill = stn.footerfont_rgba
         trs = tract.trs
@@ -575,7 +567,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
         return unwritable_txt
 
 
-class Plat(ISettingsOwner, IImageOwner):
+class Plat(IPlatOwner):
     """A plat of a single Twp/Rge."""
 
     def __init__(
