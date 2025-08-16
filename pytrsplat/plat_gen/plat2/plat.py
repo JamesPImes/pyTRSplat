@@ -1041,6 +1041,13 @@ class PlatGroup(SettingsOwner, QueueMany):
     """
 
     def __init__(self, settings: Settings = None, lot_definer: LotDefiner = None):
+        """
+        :param settings: The ``Settings`` object to control the behavior
+         and appearance of the subordinate plats.
+        :param lot_definer: A ``LotDefiner`` object to use for defining
+         lots in tracts that are added to the queue. (Can also be
+         modified or replaced in the ``.lot_definer`` attribute later.)
+        """
         if settings is None:
             settings = Settings.preset('default')
         self._settings: Settings = settings
@@ -1109,7 +1116,43 @@ class PlatGroup(SettingsOwner, QueueMany):
 
 
 class MegaPlat(IPlatOwner, QueueMany):
-    def __init__(self, settings: Settings = None, lot_definer: LotDefiner = None):
+    """
+    A plat showing multiple townships on the same page.
+
+    Does not allow for footers, and 'headers' are instead written at the
+    center of each township.
+
+    .. warning::
+        The dimensions of a ``MegaPlat`` output are determined by the
+        number and spread of the townships in the tracts added to the
+        queue. The resulting images can probably be extremely large. As
+        a safeguard, specify ``max_dim=(int, int)`` as a limit to the
+        dimensions you are willing to generate. If either of those
+        dimensions is violated, it will raise a ``RuntimeError``.
+
+    .. note::
+        The size of each component plat (one for each township) is
+        controlled by ``.sec_length_px``. And ``.body_marg_top_y``
+        serves as the margins on all four sides of the resulting group
+        of plats.
+    """
+
+    def __init__(
+            self,
+            settings: Settings = None,
+            lot_definer: LotDefiner = None,
+            max_dim: tuple[int, int] = None,
+    ):
+        """
+        :param settings: The ``Settings`` object to control the behavior
+         and appearance of this plat.
+        :param lot_definer: A ``LotDefiner`` object to use for defining
+         lots in tracts that are added to the queue. (Can also be
+         modified or replaced in the ``.lot_definer`` attribute later.)
+        :param max_dim: (Optional) Specify the largest dimensions that
+         may be generated. If exceeded, a ``RuntimeError`` will be
+         raised prior to plat generation.
+        """
         self.queue = pytrs.TractList()
         if settings is None:
             settings = Settings()
@@ -1120,6 +1163,9 @@ class MegaPlat(IPlatOwner, QueueMany):
         self.subplats: dict[str, PlatBody] = {}
         # dim gets dynamically set when executing the queue.
         self.dim = (1, 1)
+        if max_dim is None:
+            max_dim = (float('inf'), float('inf'))
+        self.max_dim = max_dim
         self.image_layers: tuple[Image] = tuple()
 
     def _clean_queue(self, queue=None):
@@ -1204,6 +1250,9 @@ class MegaPlat(IPlatOwner, QueueMany):
             # y is set by number of twp_nums (plus margins).
             len(needed_twp_nums) * twp_len + all_marg * 2
         )
+        if self.dim[0] > self.max_dim[0] or self.dim[1] > self.max_dim[1]:
+            raise RuntimeError(
+                f"Configured max dimensions {self.max_dim} exceeded: {self.dim}")
 
         # Create the images here, because `self.dim` was just calculated.
         self.image = Image.new('RGBA', self.dim, Settings.RGBA_WHITE)
@@ -1252,6 +1301,9 @@ class MegaPlat(IPlatOwner, QueueMany):
         return subplats
 
     def configure(self):
+        """
+        Configure this ``MegaPlat`` and subordinates.
+        """
         queue = self._clean_queue()
         self._gen_subplats(queue)
 
@@ -1259,7 +1311,7 @@ class MegaPlat(IPlatOwner, QueueMany):
         """
         Execute the queue of tracts, and generate the plat.
         :return: A ``pytrs.TractList`` containing all tracts that could
-         not be written.
+         not be platted.
         """
         queue = self.queue
         if subset_twprges is not None:
