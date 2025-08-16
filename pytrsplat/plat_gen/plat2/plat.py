@@ -895,7 +895,7 @@ class Plat(IPlatOwner, QueueSingle):
         # ._all_lot_defs_cached will not be used if this Plat has an owner.
         # It's a cache of lot definitions (including defaults). Gets used while
         # executing queue, then cleared.
-        self._all_lot_defs_cached = None
+        self._all_lot_defs_cached = {}
         self.configure()
 
     @property
@@ -1050,7 +1050,7 @@ class PlatGroup(SettingsOwner, QueueMany):
         self.plats: dict[str, Plat] = {}
         # Cache of lot definitions (including defaults). Gets used while
         # executing queue, then cleared.
-        self.all_lot_defs_cached: dict = None
+        self.all_lot_defs_cached: dict = {}
 
     @property
     def settings(self):
@@ -1104,34 +1104,23 @@ class PlatGroup(SettingsOwner, QueueMany):
         )
         for plat in self.plats.values():
             plat.execute_queue()
-        self.all_lot_defs_cached = None
+        self.all_lot_defs_cached = {}
         return None
 
 
 class MegaPlat(IPlatOwner, QueueMany):
     def __init__(self, settings: Settings = None, lot_definer: LotDefiner = None):
-        self._settings: Settings = settings
-        self.settings = settings
+        self.queue = pytrs.TractList()
+        if settings is None:
+            settings = Settings()
+        self.settings: Settings = settings
         if lot_definer is None:
             lot_definer = LotDefiner()
         self.lot_definer: LotDefiner = lot_definer
         self.subplats: dict[str, PlatBody] = {}
-        self.queue = pytrs.TractList()
         # dim gets dynamically set when executing the queue.
         self.dim = (1, 1)
         self.image_layers: tuple[Image] = tuple()
-
-    @property
-    def settings(self):
-        return self._settings
-
-    @settings.setter
-    def settings(self, new_settings):
-        """
-        Set and execute the new settings, and pass them to subordinates.
-        """
-        self._settings = new_settings
-        self.configure()
 
     def _clean_queue(self, queue=None):
         """
@@ -1165,6 +1154,8 @@ class MegaPlat(IPlatOwner, QueueMany):
         :return: Two lists: One of Twp numbers, and another for Rge
          numbers.
         """
+        if not queue:
+            return [], []
         # Find the boundaries.
         tract = queue[0]
         ns = tract.ns
@@ -1228,7 +1219,7 @@ class MegaPlat(IPlatOwner, QueueMany):
         sample_tract = queue[0]
         ns = sample_tract.ns
         ew = sample_tract.ew
-
+        subplat_lotwriter_info = []
         for i, twp_num in enumerate(needed_twp_nums):
             for j, rge_num in enumerate(needed_rge_nums):
                 twp = f"{twp_num}{ns}"
@@ -1246,6 +1237,18 @@ class MegaPlat(IPlatOwner, QueueMany):
                 subplat.configure(xy=subplat_topleft)
                 subplat.draw_outline()
                 subplats[twprge] = subplat
+                # Store Twp/Rge/topleft_xy for lotwriters.
+                subplat_lotwriter_info.append((twp, rge, subplat_topleft))
+
+        if self.settings.write_lot_numbers:
+            mandated = list(subplats.keys())
+            all_defs = self.lot_definer.get_all_definitions(mandatory_twprges=mandated)
+            self.all_lot_defs_cached = all_defs
+            for twp, rge, subplat_xy in subplat_lotwriter_info:
+                lotwriter = PlatBody(twp=twp, rge=rge, owner=self, is_lot_writer=True)
+                lotwriter.configure(xy=subplat_xy)
+                lotwriter.write_lot_numbers(at_depth=2)
+            self.all_lot_defs_cached = {}
         return subplats
 
     def configure(self):
