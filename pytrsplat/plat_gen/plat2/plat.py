@@ -1117,6 +1117,8 @@ class MegaPlat(IPlatOwner, QueueMany):
         self.lot_definer: LotDefiner = lot_definer
         self.subplats: dict[str, PlatBody] = {}
         self.queue = pytrs.TractList()
+        # dim gets dynamically set when executing the queue.
+        self.dim = (1, 1)
         self.image_layers: tuple[Image] = tuple()
 
     @property
@@ -1131,29 +1133,38 @@ class MegaPlat(IPlatOwner, QueueMany):
         self._settings = new_settings
         self.configure()
 
-    def configure(self):
-        ...
-
-    def execute_queue(self) -> pytrs.TractList:
+    def _clean_queue(self, queue=None):
         """
-        Execute the queue of tracts, and generate the plat.
-        :return: A ``pytrs.TractList`` containing all tracts that could
-         not be written.
+        Scrub out any undefined or error townships in the ``queue`` of
+        tracts.
         """
-        # Confirm all tracts are valid.
-        if not self.queue:
-            return None
-        self.queue.custom_sort()
-        queue = pytrs.TractList()
-        for tract in self.queue:
+        out_queue = pytrs.TractList()
+        if queue is None:
+            queue = self.queue
+        if not queue:
+            return out_queue
+        queue.custom_sort()
+        for tract in queue:
             if not tract.trs_is_undef() and not tract.trs_is_error():
-                queue.append(tract)
+                out_queue.append(tract)
             else:
                 # TODO: Warn?
                 pass
-        if not queue:
-            return None
+        return out_queue
 
+    def _get_twprge_spans(self, queue: pytrs.TractList):
+        """
+        Get a list of Twp numbers and a list of Rge numbers that
+        encompass the entirety of the tracts in the ``queue``.
+        If the townships are "North", they will be sorted largest to
+        smallest (so that the highest number appears at the top of the
+        eventual plat); and vice versa for "South".
+        If the ranges are "West", they will be sorted largest to
+        smallest (so that the highest number appears at the left of the
+        eventual plat); and vice versa for "East".
+        :return: Two lists: One of Twp numbers, and another for Rge
+         numbers.
+        """
         # Find the boundaries.
         tract = queue[0]
         ns = tract.ns
@@ -1175,36 +1186,49 @@ class MegaPlat(IPlatOwner, QueueMany):
                 min_rge_tract = tract
             if tract.rge_num > max_rge_tract.rge_num:
                 max_rge_tract = tract
+        needed_twp_nums = list(range(min_twp_tract.twp_num, max_twp_tract.twp_num + 1))
+        needed_rge_nums = list(range(min_rge_tract.rge_num, max_rge_tract.rge_num + 1))
+        if ns == 'n':
+            needed_twp_nums.reverse()
+        if ew == 'w':
+            needed_rge_nums.reverse()
+        return needed_twp_nums, needed_rge_nums
 
-        # Generate subplats.
+    def _gen_subplats(self, queue: pytrs.TractList):
+        """
+        Generate subplats for the tracts in the ``queue`` of tracts.
+        Also establishes the ``.dim`` of the image, and the ``.image``
+        and related attributes.
+        """
         stn = self.settings
         subplats = {}
         all_marg = stn.body_marg_top_y
         topleft = (all_marg, all_marg)
         sec_len = stn.sec_length_px
         twp_len = sec_len * 6
-        needed_twp_nums = list(range(min_twp_tract.twp_num, max_twp_tract.twp_num + 1))
-        needed_rge_nums = list(range(min_rge_tract.rge_num, max_rge_tract.rge_num + 1))
-        dim = (
+        needed_twp_nums, needed_rge_nums = self._get_twprge_spans(queue)
+        self.dim = (
             # x is set by number of rge_nums (plus margins).
             len(needed_rge_nums) * twp_len + all_marg * 2,
             # y is set by number of twp_nums (plus margins).
             len(needed_twp_nums) * twp_len + all_marg * 2
         )
-        self.image = Image.new('RGBA', dim, Settings.RGBA_WHITE)
+
+        # Create the images here, because `self.dim` was just calculated.
+        self.image = Image.new('RGBA', self.dim, Settings.RGBA_WHITE)
         self.draw = ImageDraw.Draw(self.image, 'RGBA')
-        self.overlay_image = Image.new('RGBA', dim, (255, 255, 255, 0))
+        self.overlay_image = Image.new('RGBA', self.dim, (255, 255, 255, 0))
         self.overlay_draw = ImageDraw.Draw(self.overlay_image, 'RGBA')
+        # No footer to a MegaPlat.
         self.footer_image = None
         self.footer_draw = None
-        # The images in the order that they should be stacked for output.
         self.image_layers = (self.image, self.overlay_image)
-
         self.draw = ImageDraw.Draw(self.image)
-        if ns == 'n':
-            needed_twp_nums.reverse()
-        if ew == 'w':
-            needed_rge_nums.reverse()
+
+        sample_tract = queue[0]
+        ns = sample_tract.ns
+        ew = sample_tract.ew
+
         for i, twp_num in enumerate(needed_twp_nums):
             for j, rge_num in enumerate(needed_rge_nums):
                 twp = f"{twp_num}{ns}"
@@ -1222,6 +1246,28 @@ class MegaPlat(IPlatOwner, QueueMany):
                 subplat.configure(xy=subplat_topleft)
                 subplat.draw_outline()
                 subplats[twprge] = subplat
+        return subplats
+
+    def configure(self):
+        queue = self._clean_queue()
+        self._gen_subplats(queue)
+
+    def execute_queue(self, subset_twprges: list[str] = None) -> pytrs.TractList:
+        """
+        Execute the queue of tracts, and generate the plat.
+        :return: A ``pytrs.TractList`` containing all tracts that could
+         not be written.
+        """
+        queue = self.queue
+        if subset_twprges is not None:
+            queue = queue.filter(key=lambda tract: tract.twprge in subset_twprges)
+        # Confirm all tracts are valid.
+        queue = self._clean_queue(queue)
+        if not queue:
+            return None
+
+        # Generate subplats. Also determines the `.dim` of our output.
+        subplats = self._gen_subplats(queue)
 
         unplattable_tracts = pytrs.TractList()
         for tract in queue:
