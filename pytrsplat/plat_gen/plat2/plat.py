@@ -346,15 +346,23 @@ class PlatSection(SettingsOwned, ImageOwned):
         draw.text(xy=sec_topleft, text=txt, font=font, fill=fill)
         return None
 
-    def execute_queue(self):
+    def execute_queue(self) -> pytrs.TractList:
         """
         Execute the queue of tracts to fill in the plat.
         """
+        unplattable_tracts = pytrs.TractList()
         if not self.queue:
-            return None
+            return unplattable_tracts
         for tract in self.queue:
-            self.aliquot_tree.register_all_aliquots(tract.qqs)
             self.owner.lot_definer.process_tract(tract, commit=True)
+            if not tract.qqs and not tract.lots_as_qqs and not tract.undefined_lots:
+                message = (
+                    "No lots or aliquots could be identified for tract: "
+                    f"<{tract.quick_desc_short()}>"
+                )
+                warn(message, UserWarning)
+                unplattable_tracts.append(tract)
+            self.aliquot_tree.register_all_aliquots(tract.qqs)
             self.aliquot_tree.register_all_aliquots(tract.lots_as_qqs)
             if tract.undefined_lots:
                 message = (
@@ -362,9 +370,10 @@ class PlatSection(SettingsOwned, ImageOwned):
                     f"<{tract.trs}: {', '.join(tract.undefined_lots)}>"
                 )
                 warn(message, UserWarning)
-        self.aliquot_tree.configure()
-        self.aliquot_tree.fill()
-        return None
+        if len(self.queue) != len(unplattable_tracts):
+            self.aliquot_tree.configure()
+            self.aliquot_tree.fill()
+        return unplattable_tracts
 
     def write_lot_numbers(self, at_depth=2):
         """
@@ -521,7 +530,8 @@ class PlatFooter(SettingsOwned, ImageOwned):
         self._text_line_height = h
         self._trs_indent = x + w
 
-    def _write_line(self, x: int, text: str) -> None:
+    def _write_line(
+            self, x: int, text: str, fill: tuple[int, int, int, int] = None) -> None:
         """
         INTERNAL USE:
 
@@ -532,7 +542,8 @@ class PlatFooter(SettingsOwned, ImageOwned):
         """
         stn = self.settings
         font = stn.footerfont
-        fill = stn.footerfont_rgba
+        if fill is None:
+            fill = stn.footerfont_rgba
         draw = self.footer_draw
         draw.text(xy=(x, self._y), text=text, font=font, fill=fill)
         self._y += self._text_line_height + stn.footer_px_between_lines
@@ -606,7 +617,12 @@ class PlatFooter(SettingsOwned, ImageOwned):
                 unwritten.append(tract)
         return unwritten
 
-    def write_tract(self, tract: pytrs.Tract, write_partial=True) -> pytrs.Tract | None:
+    def write_tract(
+            self,
+            tract: pytrs.Tract,
+            write_partial=True,
+            font_rgba: tuple[int, int, int, int] = None,
+    ) -> pytrs.Tract | None:
         """
         Write a single tract in the footer.
 
@@ -614,6 +630,9 @@ class PlatFooter(SettingsOwned, ImageOwned):
          space to write the tract's entire description, write whatever
          will fit. (A partially written tract will NOT be returned as
          unwritten.)
+        :param font_rgba: (Optional) Specify the RGBA code to use for
+         this tract. If not specified, will use the ``.footerfont_rgba``
+         specified in the settings.
         :return: If the tract is successfully written (or partially
          written), this will return None. If it could not be written,
          the original tract will be returned.
@@ -622,6 +641,8 @@ class PlatFooter(SettingsOwned, ImageOwned):
         draw = self.footer_draw
         font = stn.footerfont
         fill = stn.footerfont_rgba
+        if font_rgba is not None:
+            fill = font_rgba
         trs = tract.trs
         desc = tract.desc
         writable_lines, unwritable_txt = self.check_text(desc, xy_0=(self._trs_indent, self._y))
@@ -636,9 +657,12 @@ class PlatFooter(SettingsOwned, ImageOwned):
             writable_lines.append('')
         # TRS is written separately.
         draw.text(xy=(self._x, self._y), text=f"{trs}:", font=font, fill=fill)
+        # If any undefined lots, use the warning color for the desc of this tract.
+        if hasattr(tract, 'undefined_lots') and len(tract.undefined_lots) > 0:
+            fill = stn.warningfont_rgba
         for line in writable_lines:
             # This moves the y cursor down appropriately.
-            self._write_line(x=self._trs_indent, text=line)
+            self._write_line(x=self._trs_indent, text=line, fill=fill)
         return None
 
     def write_text(self, txt, write_partial=False) -> str | None:
@@ -781,11 +805,15 @@ class Plat(IPlatOwner):
         """
         self.queue.append(tract)
 
-    def execute_queue(self):
+    def execute_queue(self) -> pytrs.TractList:
         """
         Execute the queue of tracts to fill in the plat.
+        :return: A ``pytrs.TractList`` containing all tracts that could
+         not be platted (no lots or aliquots identified).
         """
         twprge = f"{self.twp}{self.rge}"
+        unplattable_tracts = pytrs.TractList()
+        self.queue.custom_sort()
         if self.owner is None:
             cached = self.lot_definer.get_all_definitions(mandatory_twprges=[twprge])
             self.all_lot_defs_cached = cached
@@ -795,11 +823,16 @@ class Plat(IPlatOwner):
             plat_sec = self.body.sections[sec]
             plat_sec.queue.append(tract)
         for plat_sec in self.body.sections.values():
-            plat_sec.execute_queue()
+            unplattable = plat_sec.execute_queue()
+            unplattable_tracts.extend(unplattable)
+        if self.settings.write_tracts:
+            for tract in self.queue:
+                tractfont_rgba = self.settings.footerfont_rgba
+                if tract in unplattable_tracts:
+                    tractfont_rgba = self.settings.warningfont_rgba
+                self.footer.write_tract(tract, font_rgba=tractfont_rgba)
         if self.settings.write_header:
             self.write_header()
-        if self.settings.write_tracts:
-            self.write_tracts()
         if self.settings.write_lot_numbers:
             self.write_lot_numbers(at_depth=2)
         if self.owner is None:
