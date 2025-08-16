@@ -582,6 +582,82 @@ class PlatBody(SettingsOwned, ImageOwned):
             self.draw.line(line, fill=fill, width=width)
 
 
+class PlatHeader(SettingsOwned, ImageOwned):
+
+    def __init__(self, owner: IPlatOwner):
+        self.owner = owner
+
+    def write_header(
+            self,
+            twp=None,
+            rge=None,
+            xy: tuple[int, int] = None,
+            custom_header: str = None,
+            align='default',
+            **kw
+    ) -> None:
+        """
+        Write the header to the plat.
+
+         .. note::
+            The default header is the Twp/Rge, styled as follows
+            ``Township 154 North, Range 97 West``.
+            if ``short_header=True`` in the settings, the resulting
+            header will be styled as ``T154N-R97W``. The header can be
+            styled differently if appropriate keyword arguments are
+            passed as ``kw``. Further, the exact header text can be
+            passed as ``custom_header``, which will override everything
+            else.
+
+        :param twp: The Twp of this plat (e.g., ``'154n'``)
+        :param rge: The Rge of this plat (e.g., ``'97w'``)
+        :param xy: The anchor point at which to write. (Defaults to
+         above the plat, as configured by margins in settings.)
+        :param custom_header: (Optional) Override the default header and
+         use this text instead. If used, any other keyword arguments
+         will be ignored.
+        :param align: Either ``'default'`` (to aligned horizontally
+         centered) or ``'center_center'`` (to center both horizontally
+         and vertically).
+        :param kw: (Optional) keyword arguments to pass to
+         ``pytrs.TRS.pretty_twprge()`` to control how the Twp/Rge header
+         should be spelled out.
+        """
+        if align not in ('default', 'center_center'):
+            raise ValueError(
+                f"`align` must be one of ('default', 'center_center'). "
+                f"Passed: {align!r}"
+            )
+        header = custom_header
+        if not kw and not self.settings.short_header:
+            kw = {
+                't': 'Township ',
+                'n': ' North',
+                's': ' South',
+                'r': 'Range ',
+                'e': ' East',
+                'w': ' West',
+                'delim': ', '
+            }
+        if header is None:
+            trs = pytrs.TRS.from_twprgesec(twp, rge, 0)
+            header = trs.pretty_twprge(**kw)
+        font = self.settings.headerfont
+        fill = self.settings.headerfont_rgba
+        draw = self.draw
+        _, _, w, h = draw.textbbox(xy=(0, 0), text=header, font=font)
+        if xy is None and align == 'default':
+            x = (self.image.width - w) // 2
+            y = self.settings.body_marg_top_y - h - self.settings.header_px_above_body
+        else:
+            x, y = xy
+        if align == 'center_center':
+            x -= w // 2
+            y -= h // 2
+        draw.text(xy=(x, y), text=header, font=font, fill=fill)
+        return None
+
+
 class PlatFooter(SettingsOwned, ImageOwned):
     """
     The part of a ``Plat`` that will contain written text, such as the
@@ -804,6 +880,7 @@ class Plat(IPlatOwner, QueueSingle):
         self.footer_image: Image = None
         self.footer_draw: ImageDraw.Draw = None
         self.image_layers: tuple[Image] = None
+        self.header = PlatHeader(owner=self)
         self.body = PlatBody(twp, rge, owner=self)
         self.footer = PlatFooter(owner=self)
         # If `.owner` is used, it must include .settings attribute.
@@ -907,7 +984,7 @@ class Plat(IPlatOwner, QueueSingle):
                     tractfont_rgba = self.settings.warningfont_rgba
                 self.footer.write_tract(tract, font_rgba=tractfont_rgba)
         if self.settings.write_header:
-            self.write_header()
+            self.write_header(twp=self.twp, rge=self.rge)
         if self.settings.write_lot_numbers:
             self.write_lot_numbers(at_depth=2)
         if self.owner is None:
@@ -935,28 +1012,7 @@ class Plat(IPlatOwner, QueueSingle):
          ``pytrs.TRS.pretty_twprge()`` to control how the Twp/Rge header
          should be spelled out.
         """
-        header = custom_header
-        if not kw and not self.settings.short_header:
-            kw = {
-                't': 'Township ',
-                'n': ' North',
-                's': ' South',
-                'r': 'Range ',
-                'e': ' East',
-                'w': ' West',
-                'delim': ', '
-            }
-        if header is None:
-            trs = pytrs.TRS.from_twprgesec(self.twp, self.rge, 0)
-            header = trs.pretty_twprge(**kw)
-        font = self.settings.headerfont
-        fill = self.settings.headerfont_rgba
-        draw = self.draw
-        _, _, w, h = draw.textbbox(xy=(0, 0), text=header, font=font)
-        x = (self.image.width - w) // 2
-        y = self.settings.body_marg_top_y - h - self.settings.header_px_above_body
-        draw.text(xy=(x, y), text=header, font=font, fill=fill)
-        return None
+        self.header.write_header(custom_header=custom_header, **kw)
 
     def write_lot_numbers(self, at_depth=2):
         lotwriter = PlatBody(twp=self.twp, rge=self.rge, owner=self, is_lot_writer=True)
@@ -1052,7 +1108,7 @@ class PlatGroup(SettingsOwner, QueueMany):
         return None
 
 
-class MegaPlat(ImageOwner, QueueMany):
+class MegaPlat(IPlatOwner, QueueMany):
     def __init__(self, settings: Settings = None, lot_definer: LotDefiner = None):
         self._settings: Settings = settings
         self.settings = settings
@@ -1078,7 +1134,12 @@ class MegaPlat(ImageOwner, QueueMany):
     def configure(self):
         ...
 
-    def execute_queue(self):
+    def execute_queue(self) -> pytrs.TractList:
+        """
+        Execute the queue of tracts, and generate the plat.
+        :return: A ``pytrs.TractList`` containing all tracts that could
+         not be written.
+        """
         # Confirm all tracts are valid.
         if not self.queue:
             return None
@@ -1149,10 +1210,19 @@ class MegaPlat(ImageOwner, QueueMany):
                 twp = f"{twp_num}{ns}"
                 rge = f"{rge_num}{ew}"
                 twprge = f"{twp}{rge}"
+                subplat_topleft = (topleft[0] + twp_len * j, topleft[1] + twp_len * i)
+                # Write the header before configuring the subplat itself, so that the
+                # text appears behind the section lines, etc.
+                subplat_header = PlatHeader(owner=self)
+                # Anchor the 'header' to the center of the subplat.
+                header_xy = (subplat_topleft[0] + twp_len // 2, subplat_topleft[1] + twp_len // 2)
+                subplat_header.write_header(twp, rge, xy=header_xy, align='center_center')
+                # Create and configure the grid itself.
                 subplat = PlatBody(twp, rge, owner=self)
-                subplat.configure(xy=(topleft[0] + twp_len * j, topleft[1] + twp_len * i))
+                subplat.configure(xy=subplat_topleft)
                 subplat.draw_outline()
                 subplats[twprge] = subplat
+
         unplattable_tracts = pytrs.TractList()
         for tract in queue:
             self.lot_definer.process_tract(tract, commit=True)
@@ -1164,3 +1234,4 @@ class MegaPlat(ImageOwner, QueueMany):
             for plat_sec in subplat.sections.values():
                 unplattable = plat_sec.execute_queue()
                 unplattable_tracts.extend(unplattable)
+        return unplattable_tracts
