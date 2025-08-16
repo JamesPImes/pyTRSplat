@@ -6,18 +6,19 @@ import pytrs
 from pytrs.parser.tract.aliquot_simplify import AliquotNode
 
 from ..plat_settings2 import Settings
-from ...utils2 import calc_midpt, get_box
+from ...utils2 import calc_midpt, get_box, get_box_outline
 from .lot_definer import LotDefiner
 
 __all__ = [
     'Plat',
     'PlatGroup',
+    'MegaPlat',
 ]
 
 DEFAULT_SETTINGS = Settings()
 
 
-class ISettingsOwner:
+class SettingsOwner:
     """
     Interface for a class that has a ``Settings`` object in its
     ``.settings`` attribute.
@@ -25,7 +26,7 @@ class ISettingsOwner:
     settings: Settings
 
 
-class IImageOwner:
+class ImageOwner:
     """
     Interface for a class that has the following attributes:
 
@@ -35,6 +36,9 @@ class IImageOwner:
     ``.overlay_draw``  (``ImageDraw.Draw``)
     ``.footer_image``  (``Image``)
     ``.footer_draw``  (``ImageDraw.Draw``)
+    ``.image_layers``  (tuple of ``Image``)
+
+    And an ``.output()`` method.
     """
     image: Image
     draw: ImageDraw.Draw
@@ -42,6 +46,16 @@ class IImageOwner:
     overlay_draw: ImageDraw.Draw
     footer_image: Image
     footer_draw: ImageDraw.Draw
+    image_layers: tuple[Image]
+
+    def output(self):
+        """Compile and return the merged image of the plat."""
+        if not self.image_layers:
+            return None
+        merged = Image.alpha_composite(*self.image_layers[:2])
+        for i in range(2, len(self.image_layers)):
+            merged = Image.alpha_composite(merged, self.image_layers[i])
+        return merged
 
 
 class ILotDefinerOwner:
@@ -55,7 +69,7 @@ class ILotDefinerOwner:
     all_lot_defs_cached: dict
 
 
-class IPlatOwner(ISettingsOwner, IImageOwner, ILotDefinerOwner):
+class IPlatOwner(SettingsOwner, ImageOwner, ILotDefinerOwner):
     """
     Composite interface for a class that incorporates all necessary
     interfaces necessary for platting.
@@ -63,9 +77,9 @@ class IPlatOwner(ISettingsOwner, IImageOwner, ILotDefinerOwner):
     pass
 
 
-class ISettingsLotDefinerOwner(ISettingsOwner, ILotDefinerOwner):
+class ISettingsLotDefinerOwner(SettingsOwner, ILotDefinerOwner):
     """
-    Composite interface for a class that incorporates ``ISettingsOwner``
+    Composite interface for a class that incorporates ``SettingsOwner``
     and ``ILotDefinerOwner``.
     """
     pass
@@ -73,11 +87,11 @@ class ISettingsLotDefinerOwner(ISettingsOwner, ILotDefinerOwner):
 
 class SettingsOwned:
     """
-    Class with an ``owner`` (``ISettingsOwner``) that has a
+    Class with an ``owner`` (``SettingsOwner``) that has a
     ``.settings`` attribute to be passed down as a ``.settings``
     property.
     """
-    owner: ISettingsOwner
+    owner: SettingsOwner
 
     @property
     def settings(self):
@@ -88,10 +102,10 @@ class SettingsOwned:
 
 class ImageOwned:
     """
-    Class with an ``owner`` (``IImageOwner``) with the various image and
+    Class with an ``owner`` (``ImageOwner``) with the various image and
     draw properties needed for platting.
     """
-    owner: IImageOwner
+    owner: ImageOwner
 
     @property
     def image(self):
@@ -116,6 +130,70 @@ class ImageOwned:
     @property
     def footer_draw(self):
         return self.owner.footer_draw
+
+
+class QueueSingle:
+    """
+    Class that can take in a ``pytrs.Tract`` and add it to the
+    ``.queue`` (a ``pytrs.TractList``).
+    """
+
+    queue: pytrs.TractList()
+
+    def add_tract(self, tract: pytrs.Tract):
+        """
+        Add a tract to the queue.
+
+        .. note::
+          The tract must already be parsed for lots/QQs. (See ``pyTRS``
+          documentation for details.)
+        """
+        self.queue.append(tract)
+
+
+class QueueMany(QueueSingle):
+    """
+    Class that can take in multiple tracts or a raw PLSS description and
+    add the results to the ``.queue`` (a ``pytrs.TractList``).
+    """
+
+    def add_tracts(
+            self, tracts: list[pytrs.Tract] | pytrs.TractList | pytrs.PLSSDesc) -> None:
+        """
+        Add multiple tracts to the queue. If no plat yet exists for the
+        Twp/Rge of any of these tracts, plats will be created as needed.
+
+        .. note::
+          The tracts must already be parsed for lots/QQs. (See ``pyTRS``
+          documentation for details.)
+
+        :param tracts: A collection of ``pytrs.Tract`` objects,
+         such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any other
+         iterable object that contains ``pytrs.Tract``.
+        """
+        for tract in tracts:
+            self.add_tract(tract)
+        return None
+
+    def add_description(self, txt: str, pytrs_config: str = None) -> pytrs.TractList:
+        """
+        Parse the land description and add the resulting tracts to the
+        plat group. If one or more Twp/Rge's are newly identified, plats
+        will be created as needed.
+
+        :param txt: The land description.
+        :param pytrs_config: The config parameters for parsing. (See
+         pyTRS documentation for details.)
+        :return: A ``pytrs.TractList`` containing the tracts in which
+         the parser could not identify any lots or aliquots.
+        """
+        plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=pytrs_config)
+        self.add_tracts(plssdesc)
+        no_lots_qqs = pytrs.TractList()
+        for tract in plssdesc:
+            if not tract.lots_qqs:
+                no_lots_qqs.append(tract)
+        return no_lots_qqs
 
 
 class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
@@ -222,6 +300,7 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
         for child in self.children.values():
             child.write_lot_numbers(at_depth)
 
+
 class PlatSection(SettingsOwned, ImageOwned):
     """A section of land, as represented in the plat."""
 
@@ -293,12 +372,7 @@ class PlatSection(SettingsOwned, ImageOwned):
         # Top-left of this section.
         x, y = self.xy
         sec_len = settings.sec_length_px
-        sec_lines = [
-            [(x, y), (x + sec_len, y)],  # top
-            [(x, y), (x, y + sec_len)],  # left
-            [(x + sec_len, y), (x + sec_len, y + sec_len)],  # right
-            [(x, y + sec_len), (x + sec_len, y + sec_len)],  # bottom
-        ]
+        sec_lines = get_box_outline(xy=(x, y), dim=sec_len)
         # Calculate coords for desired lines.
         # ... Outer lines are section boundaries.
         depth_lines: dict[int, list[tuple[int, int]]] = {0: sec_lines}
@@ -496,6 +570,17 @@ class PlatBody(SettingsOwned, ImageOwned):
             sec_plat.write_lot_numbers(at_depth)
         return None
 
+    def draw_outline(self):
+        """
+        Draw the boundary around the township.
+        """
+        stn = self.settings
+        lines = get_box_outline(xy=self.xy, dim=stn.sec_length_px * 6)
+        width = stn.line_stroke[-1]
+        fill = stn.line_rgba[-1]
+        for line in lines:
+            self.draw.line(line, fill=fill, width=width)
+
 
 class PlatFooter(SettingsOwned, ImageOwned):
     """
@@ -686,7 +771,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
         return unwritable_txt
 
 
-class Plat(IPlatOwner):
+class Plat(IPlatOwner, QueueSingle):
     """A plat of a single Twp/Rge."""
 
     def __init__(
@@ -695,7 +780,7 @@ class Plat(IPlatOwner):
             rge: str = None,
             settings: Settings = None,
             lot_definer: LotDefiner = None,
-            owner: ISettingsOwner | None = None):
+            owner: SettingsOwner | None = None):
         """
         :param twp: The Twp of the Twp/Rge represented by this Plat.
         :param rge: The Rge of the Twp/Rge represented by this Plut.
@@ -795,16 +880,6 @@ class Plat(IPlatOwner):
         self.footer.configure()
         return None
 
-    def add_tract(self, tract: pytrs.Tract):
-        """
-        Add a tract to the queue.
-
-        .. note::
-          The tract must already be parsed for lots/QQs. (See ``pyTRS``
-          documentation for details.)
-        """
-        self.queue.append(tract)
-
     def execute_queue(self) -> pytrs.TractList:
         """
         Execute the queue of tracts to fill in the plat.
@@ -901,15 +976,8 @@ class Plat(IPlatOwner):
         """Write a block of text in the footer."""
         return self.footer.write_text(txt)
 
-    def output(self):
-        """Compile and return the merged image of the plat."""
-        merged = Image.alpha_composite(*self.image_layers[:2])
-        for i in range(2, len(self.image_layers)):
-            merged = Image.alpha_composite(merged, self.image_layers[i])
-        return merged
 
-
-class PlatGroup(ISettingsOwner):
+class PlatGroup(SettingsOwner, QueueMany):
     """
     A collection of Plats that can span multiple Twp/Rge. Access the
     plats in ``.plats`` (keyed by a ``twprge`` string in the ``pytrs``
@@ -971,44 +1039,6 @@ class PlatGroup(ISettingsOwner):
         plat.add_tract(tract)
         return None
 
-    def add_tracts(
-            self, tracts: list[pytrs.Tract] | pytrs.TractList | pytrs.PLSSDesc) -> None:
-        """
-        Add multiple tracts to the queue. If no plat yet exists for the
-        Twp/Rge of any of these tracts, plats will be created as needed.
-
-        .. note::
-          The tracts must already be parsed for lots/QQs. (See ``pyTRS``
-          documentation for details.)
-
-        :param tracts: A collection of ``pytrs.Tract`` objects,
-         such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any other
-         iterable object that contains ``pytrs.Tract``.
-        """
-        for tract in tracts:
-            self.add_tract(tract)
-        return None
-
-    def add_description(self, txt: str, pytrs_config: str = None) -> pytrs.TractList:
-        """
-        Parse the land description and add the resulting tracts to the
-        plat group. If one or more Twp/Rge's are newly identified, plats
-        will be created as needed.
-
-        :param txt: The land description.
-        :param pytrs_config: The config parameters for parsing. (See
-         pyTRS documentation for details.)
-        :return: A ``pytrs.TractList`` containing the tracts in which
-         the parser could not identify any lots or aliquots.
-        """
-        plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=pytrs_config)
-        self.add_tracts(plssdesc)
-        no_lots_qqs = pytrs.TractList()
-        for tract in plssdesc:
-            if not tract.lots_qqs:
-                no_lots_qqs.append(tract)
-        return no_lots_qqs
-
     def execute_queue(self):
         """
         Execute the queue of tracts to fill in the plats.
@@ -1020,3 +1050,117 @@ class PlatGroup(ISettingsOwner):
             plat.execute_queue()
         self.all_lot_defs_cached = None
         return None
+
+
+class MegaPlat(ImageOwner, QueueMany):
+    def __init__(self, settings: Settings = None, lot_definer: LotDefiner = None):
+        self._settings: Settings = settings
+        self.settings = settings
+        if lot_definer is None:
+            lot_definer = LotDefiner()
+        self.lot_definer: LotDefiner = lot_definer
+        self.subplats: dict[str, PlatBody] = {}
+        self.queue = pytrs.TractList()
+        self.image_layers: tuple[Image] = tuple()
+
+    @property
+    def settings(self):
+        return self._settings
+
+    @settings.setter
+    def settings(self, new_settings):
+        """
+        Set and execute the new settings, and pass them to subordinates.
+        """
+        self._settings = new_settings
+        self.configure()
+
+    def configure(self):
+        ...
+
+    def execute_queue(self):
+        # Confirm all tracts are valid.
+        if not self.queue:
+            return None
+        self.queue.custom_sort()
+        queue = pytrs.TractList()
+        for tract in self.queue:
+            if not tract.trs_is_undef() and not tract.trs_is_error():
+                queue.append(tract)
+            else:
+                # TODO: Warn?
+                pass
+        if not queue:
+            return None
+
+        # Find the boundaries.
+        tract = queue[0]
+        ns = tract.ns
+        ew = tract.ew
+        min_twp_tract = tract
+        max_twp_tract = tract
+        min_rge_tract = tract
+        max_rge_tract = tract
+        for tract in queue:
+            if tract.ns != ns:
+                raise ValueError('Township N/S must all be the same.')
+            if tract.ew != ew:
+                raise ValueError('Range E/W must all be the same.')
+            if tract.twp_num < min_twp_tract.twp_num:
+                min_twp_tract = tract
+            if tract.twp_num > max_twp_tract.twp_num:
+                max_twp_tract = tract
+            if tract.rge_num < min_rge_tract.rge_num:
+                min_rge_tract = tract
+            if tract.rge_num > max_rge_tract.rge_num:
+                max_rge_tract = tract
+
+        # Generate subplats.
+        stn = self.settings
+        subplats = {}
+        all_marg = stn.body_marg_top_y
+        topleft = (all_marg, all_marg)
+        sec_len = stn.sec_length_px
+        twp_len = sec_len * 6
+        needed_twp_nums = list(range(min_twp_tract.twp_num, max_twp_tract.twp_num + 1))
+        needed_rge_nums = list(range(min_rge_tract.rge_num, max_rge_tract.rge_num + 1))
+        dim = (
+            # x is set by number of rge_nums (plus margins).
+            len(needed_rge_nums) * twp_len + all_marg * 2,
+            # y is set by number of twp_nums (plus margins).
+            len(needed_twp_nums) * twp_len + all_marg * 2
+        )
+        self.image = Image.new('RGBA', dim, Settings.RGBA_WHITE)
+        self.draw = ImageDraw.Draw(self.image, 'RGBA')
+        self.overlay_image = Image.new('RGBA', dim, (255, 255, 255, 0))
+        self.overlay_draw = ImageDraw.Draw(self.overlay_image, 'RGBA')
+        self.footer_image = None
+        self.footer_draw = None
+        # The images in the order that they should be stacked for output.
+        self.image_layers = (self.image, self.overlay_image)
+
+        self.draw = ImageDraw.Draw(self.image)
+        if ns == 'n':
+            needed_twp_nums.reverse()
+        if ew == 'w':
+            needed_rge_nums.reverse()
+        for i, twp_num in enumerate(needed_twp_nums):
+            for j, rge_num in enumerate(needed_rge_nums):
+                twp = f"{twp_num}{ns}"
+                rge = f"{rge_num}{ew}"
+                twprge = f"{twp}{rge}"
+                subplat = PlatBody(twp, rge, owner=self)
+                subplat.configure(xy=(topleft[0] + twp_len * j, topleft[1] + twp_len * i))
+                subplat.draw_outline()
+                subplats[twprge] = subplat
+        unplattable_tracts = pytrs.TractList()
+        for tract in queue:
+            self.lot_definer.process_tract(tract, commit=True)
+            subplat = subplats[tract.twprge]
+            sec = tract.sec_num
+            plat_sec = subplat.sections[sec]
+            plat_sec.queue.append(tract)
+        for subplat in subplats.values():
+            for plat_sec in subplat.sections.values():
+                unplattable = plat_sec.execute_queue()
+                unplattable_tracts.extend(unplattable)
