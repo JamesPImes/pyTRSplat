@@ -1117,10 +1117,11 @@ class PlatGroup(SettingsOwner, QueueMany):
 
 class MegaPlat(IPlatOwner, QueueMany):
     """
-    A plat showing multiple townships on the same page.
+    A dynamic plat showing multiple townships on the same page.
 
     Does not allow for footers, and 'headers' are instead written at the
-    center of each township.
+    center of each township. Consider using a ``.headerfont_rgba`` in
+    the settings that is faint, to avoid obfuscating section lines, etc.
 
     .. warning::
         The dimensions of a ``MegaPlat`` output are determined by the
@@ -1135,6 +1136,13 @@ class MegaPlat(IPlatOwner, QueueMany):
         controlled by ``.sec_length_px``. And ``.body_marg_top_y``
         serves as the margins on all four sides of the resulting group
         of plats.
+
+    .. note::
+        This will not allow Townships in the queue to be both North and
+        South (i.e., ``'154n'`` and ``'27s'`` cannot coexist in the
+        queue). Similarly, Ranges may not be both East and West
+        (``'97w'`` and ``'58e'`` cannot coexist). If either condition is
+        violated, a ``ValueError`` will be raised.
     """
 
     def __init__(
