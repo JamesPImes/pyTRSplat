@@ -1,4 +1,5 @@
 from __future__ import annotations
+from warnings import warn
 
 from PIL import Image, ImageDraw
 import pytrs
@@ -6,6 +7,7 @@ from pytrs.parser.tract.aliquot_simplify import AliquotNode
 
 from ..plat_settings2 import Settings
 from ...utils2 import calc_midpt, get_box
+from .lot_definer import LotDefiner
 
 __all__ = [
     'Plat',
@@ -18,7 +20,7 @@ DEFAULT_SETTINGS = Settings()
 class ISettingsOwner:
     """
     Interface for a class that has a ``Settings`` object in its
-    ``.settings`` object.
+    ``.settings`` attribute.
     """
     settings: Settings
 
@@ -40,6 +42,33 @@ class IImageOwner:
     overlay_draw: ImageDraw.Draw
     footer_image: Image
     footer_draw: ImageDraw.Draw
+
+
+class ILotDefinerOwner:
+    """
+    Interface for a class that has a ``LotDefiner`` object in its
+    ``.lot_definer`` attribute.
+    """
+    lot_definer: LotDefiner
+    # Cache of lot definitions (including defaults). Gets used while
+    # executing queue, then cleared.
+    all_lot_defs_cached: dict
+
+
+class IPlatOwner(ISettingsOwner, IImageOwner, ILotDefinerOwner):
+    """
+    Composite interface for a class that incorporates all necessary
+    interfaces necessary for platting.
+    """
+    pass
+
+
+class ISettingsLotDefinerOwner(ISettingsOwner, ILotDefinerOwner):
+    """
+    Composite interface for a class that incorporates ``ISettingsOwner``
+    and ``ILotDefinerOwner``.
+    """
+    pass
 
 
 class SettingsOwned:
@@ -89,14 +118,6 @@ class ImageOwned:
         return self.owner.footer_draw
 
 
-class IPlatOwner(ISettingsOwner, IImageOwner):
-    """
-    Interface for a class that incorporates both ``ISettingsOwner``
-    and ``IImageOwner``.
-    """
-    pass
-
-
 class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
     """
     INTERNAL USE:
@@ -112,7 +133,6 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
          will be drawn on.)
         """
         super().__init__(parent=parent, label=label)
-        self.depth: int = None
         # Coord of top-left of this square.
         self.xy: tuple[int, int] = None
         # `.owner` must have .settings, .image, .draw, .overlay_image, .overlay_draw
@@ -129,13 +149,11 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
         Calculate the length of this aliquot division's line, in pixels,
         based on the configured length of a section line.
         """
-        return self.sec_length_px // (2 ** (self.depth - 1))
+        return self.sec_length_px // (2 ** self.depth)
 
     def configure(
             self,
-            parent_xy: tuple[int, int] = None,
-            # owner: Plat = None,
-            _depth: int = 1,
+            parent_xy: tuple[int, int] = None
     ):
         """
         Retrofit this node and all its children for platting, using the
@@ -143,10 +161,8 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
 
         :param parent_xy: The top-left coord of the parent node (or for
          the root node, the section's top-left coord).
-        :param _depth: (Internal use) This node's depth in the tree.
         """
         stn = self.settings
-        self.depth = _depth
         if parent_xy is None:
             parent_xy = self.xy
         x, y = parent_xy
@@ -158,14 +174,14 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
             if self.label in ('SE', 'SW'):
                 y += self.square_dim
         self.xy = (x, y)
-        if stn.max_depth is not None and _depth > stn.max_depth:
+        if stn.max_depth is not None and self.depth >= stn.max_depth:
             # Discard nodes beyond the specified ``max_depth``. (Destroys
             # all granularity in aliquots beyond that depth.)
             self.children = {}
             return None
         for label, child_node in self.children.items():
             child_node.owner = self.owner
-            child_node.configure(parent_xy=self.xy, _depth=self.depth + 1)
+            child_node.configure(parent_xy=self.xy)
         return None
 
     def fill(self, rgba: tuple[int, int, int, int] = None):
@@ -180,13 +196,31 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
         if self.is_leaf():
             box = get_box(self.xy, dim=self.square_dim)
             self.overlay_draw.polygon(box, rgba)
-            if self.depth > self.settings.min_depth:
-                # TODO: Draw QQQ boundaries beyond those already drawn.
-                ...
         for child in self.children.values():
             child.fill(rgba)
         return None
 
+    def write_lot_numbers(self, at_depth):
+        """
+        Write lot numbers to the plat.
+
+        :param at_depth: Depth at which to write the lots. MUST match
+         the depth at which the lot definitions have been parsed.
+         Default is 2 (i.e., quarter-quarters), specified above in the
+         stack.
+        """
+        if self.depth == at_depth:
+            lot_txt = ', '.join(str(l) for l in sorted(self.sources))
+            stn = self.settings
+            draw = self.draw
+            font = stn.lotfont
+            fill = stn.lotfont_rgba
+            offset = stn.lot_num_offset_px
+            x, y = self.xy
+            draw.text(xy=(x + offset, y + offset), text=lot_txt, font=font, fill=fill)
+            return None
+        for child in self.children.values():
+            child.write_lot_numbers(at_depth)
 
 class PlatSection(SettingsOwned, ImageOwned):
     """A section of land, as represented in the plat."""
@@ -195,7 +229,8 @@ class PlatSection(SettingsOwned, ImageOwned):
             self,
             trs: pytrs.TRS = None,
             grid_offset: tuple[int, int] = None,
-            owner: IPlatOwner = None
+            owner: IPlatOwner = None,
+            is_lot_writer: bool = False,
     ):
         """
         :param trs: The Twp/Rge/Sec (a ``pytrs.TRS`` object) of this
@@ -207,6 +242,8 @@ class PlatSection(SettingsOwned, ImageOwned):
          this section. (Controls the settings that dictate platting
          behavior and appearance, and contains the image objects that
          will be drawn on.)
+        :param is_lot_writer: If True, this is only intended for writing
+         lot numbers to the plat.
         """
         if trs is not None:
             trs = pytrs.TRS(trs)
@@ -220,6 +257,7 @@ class PlatSection(SettingsOwned, ImageOwned):
         self.grid_offset: tuple[int, int] = grid_offset
         # `.owner` must have .settings, .image, .draw, .overlay_image, .overlay_draw
         self.owner: IPlatOwner = owner
+        self.is_lot_writer = is_lot_writer
 
     def configure(self, grid_xy):
         """
@@ -237,8 +275,9 @@ class PlatSection(SettingsOwned, ImageOwned):
         self.sec_length_px = sec_length_px
         self.square_dim = sec_length_px
         self.xy = (x, y)
-        self.draw_lines()
-        self.clear_center()
+        if not self.is_lot_writer:
+            self.draw_lines()
+            self.clear_center()
         self.aliquot_tree.configure(parent_xy=self.xy)
 
     def draw_lines(self):
@@ -314,10 +353,35 @@ class PlatSection(SettingsOwned, ImageOwned):
         if not self.queue:
             return None
         for tract in self.queue:
-            # TODO: Handle lots.
             self.aliquot_tree.register_all_aliquots(tract.qqs)
+            self.owner.lot_definer.process_tract(tract, commit=True)
+            self.aliquot_tree.register_all_aliquots(tract.lots_as_qqs)
+            if tract.undefined_lots:
+                message = (
+                    "Undefined lots that could not be shown on the plat: "
+                    f"<{tract.trs}: {', '.join(tract.undefined_lots)}>"
+                )
+                warn(message, UserWarning)
         self.aliquot_tree.configure()
         self.aliquot_tree.fill()
+        return None
+
+    def write_lot_numbers(self, at_depth=2):
+        """
+        Write the lot numbers in the section.
+
+        :param at_depth: At which depth to write the numbers. Defaults
+         to 2 (i.e., quarter-quarters).
+        """
+        ld = self.owner.all_lot_defs_cached
+        lots_definitions = ld.get(self.trs.twprge, {}).get(self.trs.sec_num, {})
+        for lot, definitions in lots_definitions.items():
+            tract = pytrs.Tract(
+                definitions, parse_qq=True, config=f"clean_qq,qq_depth.{at_depth}")
+            ilot = int(lot.split('L')[-1])
+            self.aliquot_tree.register_all_aliquots(tract.qqs, ilot)
+        self.aliquot_tree.configure(parent_xy=self.xy)
+        self.aliquot_tree.write_lot_numbers(at_depth)
         return None
 
 
@@ -344,7 +408,13 @@ class PlatBody(SettingsOwned, ImageOwned):
     SEC_NUMS.extend(list(range(31, 37)))
     SEC_NUMS = tuple(SEC_NUMS)
 
-    def __init__(self, twp: str = None, rge: str = None, owner: IPlatOwner = None):
+    def __init__(
+            self,
+            twp: str = None,
+            rge: str = None,
+            owner: IPlatOwner = None,
+            is_lot_writer=False
+    ):
         """
         :param twp: The Twp of the Twp/Rge represented by this body.
         :param rge: The Rge of the Twp/Rge represented by this body.
@@ -352,6 +422,10 @@ class PlatBody(SettingsOwned, ImageOwned):
          this body. (Controls the settings that dictate platting
          behavior and appearance, and contains the image objects that
          will be drawn on.)
+        :param is_lot_writer: Tell this ``PlatBody`` that it will only
+         be used to write lots onto the plat. (If ``True``, prevents
+         redrawing section lines, quarter lines, etc.; and enables the
+         writing of lot numbers in the respective QQs.)
         """
         self.owner: IPlatOwner = owner
         self.twp = twp
@@ -364,11 +438,16 @@ class PlatBody(SettingsOwned, ImageOwned):
             for j in range(sections_per_side):
                 sec_num = self.SEC_NUMS[k]
                 trs = pytrs.TRS.from_twprgesec(twp, rge, sec_num)
-                plat_sec = PlatSection(trs, grid_offset=(i, j), owner=self.owner)
+                plat_sec = PlatSection(
+                    trs,
+                    grid_offset=(i, j),
+                    owner=self.owner,
+                    is_lot_writer=is_lot_writer)
                 self.sections[sec_num] = plat_sec
                 k += 1
         # Coord of top-left of the grid.
         self.xy: tuple[int, int] = None
+        self.is_lot_writer = is_lot_writer
 
     def nonempty_sections(self):
         """Get a list of any sections that have aliquots to be platted."""
@@ -392,6 +471,22 @@ class PlatBody(SettingsOwned, ImageOwned):
             plat_sec.configure(grid_xy=xy)
         return None
 
+    def write_lot_numbers(self, at_depth=2):
+        """
+        Write the lot numbers into the respective squares.
+
+        :param at_depth: At which depth to write the numbers. Defaults
+         to 2 (i.e., quarter-quarters).
+        """
+        if not self.is_lot_writer:
+            raise ValueError(
+                'This `PlatBody` is not a lot writer. '
+                'Pass `is_lot_writer=True` at init.'
+            )
+        for sec_plat in self.sections.values():
+            sec_plat.write_lot_numbers(at_depth)
+        return None
+
 
 class PlatFooter(SettingsOwned, ImageOwned):
     """
@@ -401,10 +496,10 @@ class PlatFooter(SettingsOwned, ImageOwned):
 
     def __init__(self, owner: IPlatOwner = None):
         """
-        :param owner: The ``Plat`` object that is the ultimate owner of
-         this footer. (Controls the settings that dictate platting
-         behavior and appearance, and contains the image objects that
-         will be drawn on.)
+        :param owner: The ``Plat`` object (or other appropriate type)
+         that is the ultimate owner of this footer. (Controls the
+         settings that dictate platting behavior and appearance, and
+         contains the image objects that will be drawn on.)
         """
         self.owner: IPlatOwner = owner
         self._x = None
@@ -575,6 +670,7 @@ class Plat(IPlatOwner):
             twp: str = None,
             rge: str = None,
             settings: Settings = None,
+            lot_definer: LotDefiner = None,
             owner: ISettingsOwner | None = None):
         """
         :param twp: The Twp of the Twp/Rge represented by this Plat.
@@ -602,11 +698,18 @@ class Plat(IPlatOwner):
         self.body = PlatBody(twp, rge, owner=self)
         self.footer = PlatFooter(owner=self)
         # If `.owner` is used, it must include .settings attribute.
-        self.owner: ISettingsOwner | None = owner
+        self.owner: ISettingsLotDefinerOwner | None = owner
         # ._settings will not be used if this Plat has an owner.
         self._settings: Settings = settings
         if settings is None and owner is None:
             self._settings = DEFAULT_SETTINGS
+        self._lot_definer: LotDefiner | None = lot_definer
+        if lot_definer is None and owner is None:
+            self._lot_definer = LotDefiner()
+        # ._all_lot_defs_cached will not be used if this Plat has an owner.
+        # It's a cache of lot definitions (including defaults). Gets used while
+        # executing queue, then cleared.
+        self._all_lot_defs_cached = None
         self.configure()
 
     @property
@@ -627,6 +730,32 @@ class Plat(IPlatOwner):
             )
         self._settings = new_settings
         self.configure()
+
+    @property
+    def lot_definer(self):
+        if self.owner is not None:
+            return self.owner.lot_definer
+        return self._lot_definer
+
+    @lot_definer.setter
+    def lot_definer(self, new_lot_definer):
+        if self.owner is not None:
+            raise AttributeError(
+                'Attempting to change `lot_definer` in an object that has an owner.'
+                ' Change the `lot_definer` in the owner object instead.'
+            )
+        self._new_lot_definer = new_lot_definer
+
+    @property
+    def all_lot_defs_cached(self):
+        if self.owner is not None:
+            return self.owner.all_lot_defs_cached
+        return self._all_lot_defs_cached
+
+    @all_lot_defs_cached.setter
+    def all_lot_defs_cached(self, new_cached):
+        if self.owner is None:
+            self._all_lot_defs_cached = new_cached
 
     def configure(self):
         """Configure this plat and its subordinates."""
@@ -656,7 +785,12 @@ class Plat(IPlatOwner):
         """
         Execute the queue of tracts to fill in the plat.
         """
+        twprge = f"{self.twp}{self.rge}"
+        if self.owner is None:
+            cached = self.lot_definer.get_all_definitions(mandatory_twprges=[twprge])
+            self.all_lot_defs_cached = cached
         for tract in self.queue:
+            self.lot_definer.process_tract(tract, commit=True)
             sec = tract.sec_num
             plat_sec = self.body.sections[sec]
             plat_sec.queue.append(tract)
@@ -666,6 +800,10 @@ class Plat(IPlatOwner):
             self.write_header()
         if self.settings.write_tracts:
             self.write_tracts()
+        if self.settings.write_lot_numbers:
+            self.write_lot_numbers(at_depth=2)
+        if self.owner is None:
+            self.all_lot_defs_cached = None
         return None
 
     def write_header(self, custom_header: str = None, **kw) -> None:
@@ -712,6 +850,12 @@ class Plat(IPlatOwner):
         draw.text(xy=(x, y), text=header, font=font, fill=fill)
         return None
 
+    def write_lot_numbers(self, at_depth=2):
+        lotwriter = PlatBody(twp=self.twp, rge=self.rge, owner=self, is_lot_writer=True)
+        lotwriter.configure(xy=self.settings.grid_xy)
+        lotwriter.write_lot_numbers(at_depth)
+        return None
+
     def write_tracts(self, tracts: pytrs.TractList | pytrs.PLSSDesc = None):
         """
         Write all the tract descriptions in the footer.
@@ -739,11 +883,17 @@ class PlatGroup(ISettingsOwner):
     format, e.g., ``'154n97w'``).
     """
 
-    def __init__(self, settings: Settings = None):
+    def __init__(self, settings: Settings = None, lot_definer: LotDefiner = None):
         if settings is None:
             settings = Settings.preset('default')
         self._settings: Settings = settings
+        if lot_definer is None:
+            lot_definer = LotDefiner()
+        self.lot_definer: LotDefiner = lot_definer
         self.plats: dict[str, Plat] = {}
+        # Cache of lot definitions (including defaults). Gets used while
+        # executing queue, then cleared.
+        self.all_lot_defs_cached: dict = None
 
     @property
     def settings(self):
@@ -830,6 +980,10 @@ class PlatGroup(ISettingsOwner):
         """
         Execute the queue of tracts to fill in the plats.
         """
+        self.all_lot_defs_cached = self.lot_definer.get_all_definitions(
+            mandatory_twprges=list(self.plats.keys())
+        )
         for plat in self.plats.values():
             plat.execute_queue()
+        self.all_lot_defs_cached = None
         return None
