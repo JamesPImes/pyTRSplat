@@ -327,7 +327,7 @@ class Settings:
 
         :param purpose: One of ``'header'``, ``'footer'``, ``'sec'``, or
          ``'lot'``.
-        :param size: In of font size.
+        :param size: Int of font size.
         :param typeface: A string specifying which typeface to use,
          specified as one of the following:
           * Relative path (str) to a stock font (with extension ``.ttf``)
@@ -349,7 +349,7 @@ class Settings:
 
         # If `typeface` and `size` are BOTH None, the ImageFont object
         # won't change. (RGBA does not get encoded in ImageFont object.)
-        if None not in [typeface, size]:
+        if typeface is None and size is None:
             return
         if typeface is None:
             typeface = getattr(self, f"{purpose}font_typeface")
