@@ -30,16 +30,18 @@ class ImageOwner:
     """
     Interface for a class that has the following attributes:
 
+    ``.background``  (``Image``)
     ``.image``  (``Image``)
     ``.draw``  (``ImageDraw.Draw``)
     ``.overlay_image``  (``Image``)
     ``.overlay_draw``  (``ImageDraw.Draw``)
     ``.footer_image``  (``Image``)
     ``.footer_draw``  (``ImageDraw.Draw``)
-    ``.image_layers``  (tuple of ``Image``)
+    ``.image_layers``  (list of ``Image`` objects)
 
     And an ``.output()`` method.
     """
+    background: Image
     image: Image
     draw: ImageDraw.Draw
     overlay_image: Image
@@ -870,6 +872,7 @@ class Plat(IPlatOwner, QueueSingle):
         self.twp = twp
         self.rge = rge
         self.queue = pytrs.TractList()
+        self.background: Image = None
         # Main image and draw object.
         self.image: Image = None
         self.draw: ImageDraw.Draw = None
@@ -879,7 +882,7 @@ class Plat(IPlatOwner, QueueSingle):
         # Footer image and draw object.
         self.footer_image: Image = None
         self.footer_draw: ImageDraw.Draw = None
-        self.image_layers: tuple[Image] = None
+        self.image_layers: list[Image] = []
         self.header = PlatHeader(owner=self)
         self.body = PlatBody(twp, rge, owner=self)
         self.footer = PlatFooter(owner=self)
@@ -945,6 +948,7 @@ class Plat(IPlatOwner, QueueSingle):
 
     def configure(self):
         """Configure this plat and its subordinates."""
+        self.background = Image.new('RGBA', self.settings.dim, Settings.RGBA_WHITE)
         self.image = Image.new('RGBA', self.settings.dim, Settings.RGBA_WHITE)
         self.draw = ImageDraw.Draw(self.image, 'RGBA')
         self.overlay_image = Image.new('RGBA', self.settings.dim, (255, 255, 255, 0))
@@ -952,7 +956,7 @@ class Plat(IPlatOwner, QueueSingle):
         self.footer_image = Image.new('RGBA', self.settings.dim, (255, 255, 255, 0))
         self.footer_draw = ImageDraw.Draw(self.footer_image, 'RGBA')
         # The images in the order that they should be stacked for output.
-        self.image_layers = (self.image, self.overlay_image, self.footer_image)
+        self.image_layers = [self.background, self.image, self.overlay_image, self.footer_image]
         self.body.configure()
         self.footer.configure()
         return None
@@ -1174,7 +1178,22 @@ class MegaPlat(IPlatOwner, QueueMany):
         if max_dim is None:
             max_dim = (float('inf'), float('inf'))
         self.max_dim = max_dim
-        self.image_layers: tuple[Image] = tuple()
+        self.image_layers: list[Image] = []
+        self.configure()
+
+    def configure(self):
+        """
+        Configure this ``MegaPlat`` and subordinates.
+        """
+        self.background = Image.new('RGBA', self.dim, Settings.RGBA_WHITE)
+        self.image = Image.new('RGBA', self.dim, Settings.RGBA_WHITE)
+        self.draw = ImageDraw.Draw(self.image, 'RGBA')
+        self.overlay_image = Image.new('RGBA', self.dim, (255, 255, 255, 0))
+        self.overlay_draw = ImageDraw.Draw(self.overlay_image, 'RGBA')
+        # No footer to a MegaPlat.
+        self.footer_image = None
+        self.footer_draw = None
+        self.image_layers = [self.background, self.image, self.overlay_image]
 
     def _clean_queue(self, queue=None):
         """
@@ -1266,15 +1285,7 @@ class MegaPlat(IPlatOwner, QueueMany):
                 f"Configured max dimensions {self.max_dim} exceeded: {self.dim}")
 
         # Create the images here, because `self.dim` was just calculated.
-        self.image = Image.new('RGBA', self.dim, Settings.RGBA_WHITE)
-        self.draw = ImageDraw.Draw(self.image, 'RGBA')
-        self.overlay_image = Image.new('RGBA', self.dim, (255, 255, 255, 0))
-        self.overlay_draw = ImageDraw.Draw(self.overlay_image, 'RGBA')
-        # No footer to a MegaPlat.
-        self.footer_image = None
-        self.footer_draw = None
-        self.image_layers = (self.image, self.overlay_image)
-        self.draw = ImageDraw.Draw(self.image)
+        self.configure()
 
         sample_tract = queue[0]
         ns = sample_tract.ns
@@ -1310,13 +1321,6 @@ class MegaPlat(IPlatOwner, QueueMany):
                 lotwriter.write_lot_numbers(at_depth=2)
             self.all_lot_defs_cached = {}
         return subplats
-
-    def configure(self):
-        """
-        Configure this ``MegaPlat`` and subordinates.
-        """
-        queue = self._clean_queue()
-        self._gen_subplats(queue)
 
     def execute_queue(self, subset_twprges: list[str] = None) -> pytrs.TractList:
         """
