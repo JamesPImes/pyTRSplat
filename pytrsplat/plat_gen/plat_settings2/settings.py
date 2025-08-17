@@ -538,6 +538,46 @@ class Settings:
         sq_tn.write_header = False
         sq_tn.centerbox_dim = 12
         sq_tn.save_preset('square_tiny')
+
+        mp = Settings.preset('default')
+        mp.sec_length_px = 120
+        mp.short_header = True
+        mp.set_font(
+            purpose='header',
+            rgba=(192, 192, 192, 255),
+            typeface='Mono (Bold)',
+            size=72
+        )
+        mp.set_font(
+            purpose='sec',
+            size=24
+        )
+        mp.line_stroke[-1] = 8
+        mp.line_stroke[1] = 1
+        mp.line_stroke[2] = 1
+        mp.centerbox_dim = 38
+        mp.save_preset('megaplat_default')
+
+        mp_s = mp
+        mp_s.body_marg_top_y = 14
+        mp_s.sec_length_px = 64
+        mp_s.short_header = True
+        mp_s.set_font(
+            purpose='header',
+            rgba=(192, 192, 192, 255),
+            typeface='Mono (Bold)',
+            size=48
+        )
+        mp_s.set_font(
+            purpose='sec',
+            size=14
+        )
+        mp_s.line_stroke[-1] = 4
+        mp_s.line_stroke[0] = 0
+        mp_s.line_stroke[1] = 0
+        mp_s.line_stroke[2] = 0
+        mp_s.centerbox_dim = 20
+        mp_s.save_preset('megaplat_s')
         return None
 
 
