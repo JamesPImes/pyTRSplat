@@ -1188,11 +1188,14 @@ class MegaPlat(IPlatOwner, QueueMany):
             return out_queue
         queue.custom_sort()
         for tract in queue:
-            if not tract.trs_is_undef() and not tract.trs_is_error():
+            if not tract.trs_is_undef(sec=False) and not tract.trs_is_error(sec=False):
                 out_queue.append(tract)
             else:
-                # TODO: Warn?
-                pass
+                message = (
+                    "Undefined or otherwise erroneous Twp/Rge. Excluding from plat. "
+                    f"<{tract.quick_desc_short()}>"
+                )
+                warn(message, UserWarning)
         return out_queue
 
     def _get_twprge_spans(self, queue: pytrs.TractList):
