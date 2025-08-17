@@ -1,15 +1,15 @@
 # Copyright (C) 2020, James P. Imes, all rights reserved.
 
 """
-Grid-based representations of PLSS Sections (i.e. 4x4 grid of QQs) and
-Townships (i.e. 6x6 grid of Sections), as well as objects for how
+Grid-based representations of PLSS Sections (i.e. 4x4 _grid of QQs) and
+Townships (i.e. 6x6 _grid of Sections), as well as objects for how
 specific lots should be interpreted in terms of QQ(s). Also includes
 interpreters for converting parsed pytrs.PLSSDesc and pytrs.Tract data
 into SectionGrid and TownshipGrid objects.
 """
 
 import pytrs
-from pytrsplat.utils import _smooth_QQs, _lot_without_div
+from pytrsplat._utils import _smooth_QQs, _lot_without_div
 
 _ERR_SEC = pytrs.MasterConfig._ERR_SEC
 _UNDEF_SEC = pytrs.MasterConfig._UNDEF_SEC,
@@ -17,7 +17,7 @@ _UNDEF_SEC = pytrs.MasterConfig._UNDEF_SEC,
 
 class SectionGrid:
     """
-    A grid of a single Section, divided into standard PLSS aliquot
+    A _grid of a single Section, divided into standard PLSS aliquot
     quarter-quarters (QQs) -- i.e. 4x4 for a standard section.
     Takes optional ``ld=`` argument for specifying a ``LotDefinitions``
     object (defaults to a 'standard' township layout if not specified --
@@ -125,7 +125,7 @@ class SectionGrid:
         # A dict for the 16 aliquot divisions of a standard section,
         # with (0, 0) being NWNW and (3, 3) being SESE -- i.e. beginning
         # at the NWNW, and running east and south. The nested dict for
-        # each QQ contains the x,y coordinates in the grid, and whether
+        # each QQ contains the x,y coordinates in the _grid, and whether
         # that QQ has been switched `on` -- i.e. 'val', which is either
         # 0 ('nothing') or 1 ('something') to track whether the QQ
         # (or equivalent Lot) was identified in the tract description.
@@ -245,11 +245,11 @@ class SectionGrid:
 
     def lots_by_grid(self) -> list:
         """
-        Convert this ``SectionGrid`` into a grid (nested list),
+        Convert this ``SectionGrid`` into a _grid (nested list),
         depicting which lots fall within which coordinate. For example,
         ``'L1'`` through ``'L4'`` in a standard Section 1 correspond to
         the N2N2 QQ's, respectively -- so this method would output a
-        grid whose (0,0), (1,0), (2,0), and (3,0) are filled with
+        _grid whose (0,0), (1,0), (2,0), and (3,0) are filled with
         ``['L4']``, ``['L3']``, ``['L2']``, and ``['L1']``,
         respectively.  (Note that they are inside lists, because
         multiple lots can correspond to a single QQ.)
@@ -275,7 +275,7 @@ class SectionGrid:
     def incorporate_tract(self, tract: pytrs.Tract):
         """
         Check the ``.lots`` and ``.qqs`` of a parsed ``pytrs.Tract``
-        object, and incorporate any hits into the grid.
+        object, and incorporate any hits into the _grid.
 
         .. note::
 
@@ -292,7 +292,7 @@ class SectionGrid:
 
     def incorporate_lot_list(self, lots: list):
         """
-        Incorporate all lots in ``lots`` into the grid.
+        Incorporate all lots in ``lots`` into the _grid.
 
         For example, passing ``['L1', 'L3', 'L4', 'L5']`` might set
         'NENE', 'NENW', 'NWNW', and 'SWNW' as hits for a hypothetical
@@ -322,7 +322,7 @@ class SectionGrid:
     def incorporate_qq_list(self, qqs: list):
         """
         Incorporate all aliquot quarter-quarters in ``qqs``) into the
-        grid.
+        _grid.
 
         For example, passing ``['NENE', 'NENW', 'NWNW', 'SWNW']`` sets
         all of those QQ's as hits in the ``SectionGrid``.
@@ -370,7 +370,7 @@ class SectionGrid:
 
     def output_text_plat(self, include_header=False) -> str:
         """
-        Output a simple plat (as a string) of the Section's grid values.
+        Output a simple _plat (as a string) of the Section's _grid values.
         """
         ar = self.output_array()
         total_columns = len(ar[0])
@@ -404,7 +404,7 @@ class SectionGrid:
 
     def output_array(self) -> list:
         """
-        Convert the grid to an array (oriented from NWNW to SESE),
+        Convert the _grid to an array (oriented from NWNW to SESE),
         with resulting coords formatted (y, x).
 
         Example::
@@ -499,7 +499,7 @@ class SectionGrid:
 
 class TownshipGrid:
     """
-    A grid of a single Township/Range, containing in its `.sections`
+    A _grid of a single Township/Range, containing in its `.sections`
     attribute a dict (keyed by integers 1 - 36, inclusive) of a separate
     SectionGrid object for each of its 36 sections. Also contains a dict
     key `0` (i.e. a nonsense 'Section 0'), as a 'junk drawer' for error-
@@ -513,7 +513,7 @@ class TownshipGrid:
 
     def __init__(self, twp='', rge='', tld=None, allow_ld_defaults=False):
         """
-        A grid of a single Township/Range, containing in its `.sections`
+        A _grid of a single Township/Range, containing in its `.sections`
         attribute a dict (keyed by integers 1 - 36, inclusive) of a
         separate SectionGrid object for each of its 36 sections. Also
         contains a dict key `0` (i.e. a nonsense 'Section 0'), as a
@@ -728,7 +728,7 @@ class LotDefinitions(dict):
     ``LotDefDB`` objects, to avoid undue repetition.
     """
 
-    # Below are defaults for sections in a 'standard' 6x6 Township grid.
+    # Below are defaults for sections in a 'standard' 6x6 Township _grid.
     # (Sections along the north and west boundaries of the township have
     # 'expected' lot locations. In practice, these might only RARELY be
     # the only lots in a township, and they are not always consistent,

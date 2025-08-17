@@ -7,7 +7,7 @@ sys.path.append(r'..\..')
 
 import pytrs
 
-from pytrsplat.plat_gen.plat import (
+from pytrsplat.plat_gen._plat import (
     Plat,
     MultiPlat,
 )

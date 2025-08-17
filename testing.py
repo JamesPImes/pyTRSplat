@@ -4,12 +4,12 @@
 
 from pytrs import PLSSDesc, Tract
 
-from pytrsplat.plat_gen.grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
-from pytrsplat.plat_gen.grid import tracts_into_twp_grids
-from pytrsplat.plat_gen.platsettings import Settings
-from pytrsplat.plat_gen.platqueue import PlatQueue, MultiPlatQueue
-from pytrsplat.plat_gen.plat import Plat, MultiPlat
-from pytrsplat.plat_gen.plat import text_to_plats
+from pytrsplat.plat_gen._grid import TownshipGrid, SectionGrid, LotDefinitions, TwpLotDefinitions, LotDefDB
+from pytrsplat.plat_gen._grid import tracts_into_twp_grids
+from pytrsplat.plat_gen._platsettings import Settings
+from pytrsplat.plat_gen._platqueue import PlatQueue, MultiPlatQueue
+from pytrsplat.plat_gen._plat import Plat, MultiPlat
+from pytrsplat.plat_gen._plat import text_to_plats
 
 
 ########################################################################
@@ -91,7 +91,7 @@ print(mp.all_unhandled_lots)
 mp.output_to_png(f"{TESTING_DIR}\\{str(i).rjust(3, '0')}_mp_unhandled_lots.png")
 i += 1
 
-# Generating a list of plat images from `descrip_text_1` string:
+# Generating a list of _plat images from `descrip_text_1` string:
 ttp = text_to_plats(
     descrip_text_1, config='clean_qq', lddb=example_lddb_filepath, settings='letter')
 #ttp[0].show()  # Display the first image in the list (i.e. 154n97w in this case)
@@ -193,7 +193,7 @@ mpq_obj.queue_add(d1)
 # Note that feeding the filepath to `lddb=` will create the LotDefDB
 # object (by reading from file) when this MultiPlat is created.
 mp1 = MultiPlat.from_queue(mpq_obj, settings='letter', lddb=example_lddb_filepath)
-#mp1.show(0)  # Show the first plat (i.e. 154n97w, in this case)
+#mp1.show(0)  # Show the first _plat (i.e. 154n97w, in this case)
 mp1.output_to_png(f"{TESTING_DIR}\\{str(i).rjust(3, '0')}_from_mpq.png")
 i += 1
 
@@ -201,7 +201,7 @@ i += 1
 # (external) MultiPlatQueue object...
 mp2 = MultiPlat(settings='letter', lddb=example_lddb_filepath)
 mp2.process_queue(mpq_obj)
-#mp2.show(0)  # Show the first plat (i.e. 154n97w, in this case)
+#mp2.show(0)  # Show the first _plat (i.e. 154n97w, in this case)
 mp2.output_to_png(f"{TESTING_DIR}\\{str(i).rjust(3, '0')}_process_mpq.png")
 i += 1
 
@@ -215,7 +215,7 @@ mp3.queue_add(tg1, '154n97w', t2)
 mp3.queue_add(t3, '154n97w')
 mp3.queue_add(d1)
 mp3.process_queue()
-#mp3.show(0)  # Show the first plat (i.e. 154n97w, in this case)
+#mp3.show(0)  # Show the first _plat (i.e. 154n97w, in this case)
 mp3.output_to_png(f"{TESTING_DIR}\\{str(i).rjust(3, '0')}_queue_mpq_then_process.png")
 i += 1
 
@@ -228,12 +228,12 @@ mp4 = MultiPlat(settings='letter', lddb=example_lddb_obj)
 mp4.queue_add_text(descrip_text_2, config='clean_qq')
 mp4.queue_add_text(descrip_text_3, config='clean_qq')
 mp4.process_queue()
-#mp4.show(0)  # Show the first plat (i.e. 154n97w, in this case)
+#mp4.show(0)  # Show the first _plat (i.e. 154n97w, in this case)
 mp4.output_to_png(f"{TESTING_DIR}\\{str(i).rjust(3, '0')}_add_text_mpq.png")
 i += 1
 
 
-# Testing writing too many tracts than can fit in our plat.
+# Testing writing too many tracts than can fit in our _plat.
 dx = PLSSDesc('T154N-R97W Sec 1 - 17: NE/4SW/4, NW/4SE/4', parse_qq=True)
 pqx = PlatQueue()
 for tr in dx.tracts:

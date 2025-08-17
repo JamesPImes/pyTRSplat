@@ -1,7 +1,7 @@
 # Copyright (c) 2020, James P. Imes. All rights reserved.
 
 """
-Generate the plat images.
+Generate the _plat images.
 """
 
 from .plat import Plat, MultiPlat

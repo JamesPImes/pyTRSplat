@@ -1,26 +1,26 @@
 # Copyright (c) 2020, James P. Imes. All rights reserved.
 
 """
-pytrsplat -- A module to generate land plat images of full townships
-(6x6 grid) or single sections from PLSS land descriptions ('legal
+pytrsplat -- A module to generate land _plat images of full townships
+(6x6 _grid) or single sections from PLSS land descriptions ('legal
 descriptions'), using the pytrs parsing module.
 """
 
 # TODO: Give the option to depict `.unhandled_lots` on plats somewhere.
-#  i.e. warn users that certain lots were not incorporated onto the plat
+#  i.e. warn users that certain lots were not incorporated onto the _plat
 
 from pathlib import Path
 import os
 
-from ...utils import confirm_file_ext, cull_list, break_trs
-from ..grid import TownshipGrid, SectionGrid
-from ..grid import LotDefinitions, TwpLotDefinitions, LotDefDB
-from ..grid import plssdesc_to_twp_grids
-from ..platsettings import Settings
-from ..platsettings.platsettings import _rel_path_to_abs
-from ..platqueue import PlatQueue, MultiPlatQueue
+from ..._utils import confirm_file_ext, cull_list, break_trs
+from .._grid import TownshipGrid, SectionGrid
+from .._grid import LotDefinitions, TwpLotDefinitions, LotDefDB
+from .._grid import plssdesc_to_twp_grids
+from .._platsettings import Settings
+from .._platsettings.platsettings import _rel_path_to_abs
+from .._platqueue import PlatQueue, MultiPlatQueue
 
-# For drawing the plat images, and coloring / writing on them.
+# For drawing the _plat images, and coloring / writing on them.
 from PIL import Image, ImageDraw, ImageFont
 
 # piltextbox.TextBox gets customized into TractTextBox class here, for
@@ -43,14 +43,14 @@ _UNDEF_SEC = pytrs.MasterConfig._UNDEF_SEC
 class Plat:
     """
     A configurable projection of land within a single PLSS 'township'
-    (i.e. a standard 6x6 grid of 'sections', which in turn are a 4x4
-    grid of aliquot quarter-quarters or 'QQs'). Can be output as a
+    (i.e. a standard 6x6 _grid of 'sections', which in turn are a 4x4
+    _grid of aliquot quarter-quarters or 'QQs'). Can be output as a
     PIL.Image object or saved as a .png or .pdf file.
 
-    NOTE: Optionally plat a single section (rather than the defafult 6x6
-    grid of sections), with init parameter `only_section=<int>`.
+    NOTE: Optionally _plat a single section (rather than the defafult 6x6
+    _grid of sections), with init parameter `only_section=<int>`.
     (Be sure to choose settings that are appropriate for a single-
-    section plat. See pytrsplat.platsettings docs for more info.)
+    section _plat. See pytrsplat._platsettings docs for more info.)
 
     Plat objects can be configured (size, font, colors, margins, etc.)
     at init, thus:
@@ -93,7 +93,7 @@ class Plat:
     Plat objects can be output with this method::
 
         `.output()` -- Return a flattened PIL.Image.Image object of the
-            plat, and optionally saves to file (currently supports .png
+            _plat, and optionally saves to file (currently supports .png
             and .pdf formats)
 
     For better results, pass an optional pytrsplat.TwpLotDefinition
@@ -110,7 +110,7 @@ class Plat:
     than-nothing' option, but not as reliable as user-specified lot
     definitions.)
     NOTE: All lots that were not defined but which the user tried to
-    plat get added to a dict stored as the `.unhandled_lots_by_sec`
+    _plat get added to a dict stored as the `.unhandled_lots_by_sec`
     attribute (keyed by section number integers).
 
     A pytrsplat.PlatQueue object is initialized for each Plat as `.pq`
@@ -124,14 +124,14 @@ class Plat:
     def __init__(self, twp='', rge='', only_section=None, settings=None,
                  tld=None, allow_ld_defaults=False):
         """
-        A 6x6 grid of sections (which are a 4x4 grid of QQs). Limit to
-        only a 1x1 grid of a single section with init parameter
+        A 6x6 _grid of sections (which are a 4x4 _grid of QQs). Limit to
+        only a 1x1 _grid of a single section with init parameter
         `only_section=<int>`.
 
         :param twp: Township number and N/S (ex: '154n' or '7s')
         :param rge: Range number and E/W (ex: '97w' or '8e')
-        :param only_section: To plat only a single section rather than
-        the standard 6x6 grid, pass an integer (representing section
+        :param only_section: To _plat only a single section rather than
+        the standard 6x6 _grid, pass an integer (representing section
         number) here. Defaults to None.
         :param settings: How the Plat should be configured. May be
         passed as either:
@@ -145,7 +145,7 @@ class Plat:
         defines how each lot should be interpreted (in terms of its
         corresponding QQ or QQs).
         NOTE: If param `only_section=<int>` was passed (i.e. platting
-        a single section, rather than the standard 6x6 grid), this will
+        a single section, rather than the standard 6x6 _grid), this will
         alternatively accept a `pytrsplat.LotDefinitions` object (which
         defines lots for a single section).
         :param allow_ld_defaults: Whether 'default' lot definitions are
@@ -182,11 +182,11 @@ class Plat:
             settings = Settings(settings)
         self.settings = settings
 
-        # The main Image of the plat, and an ImageDraw object for it.
+        # The main Image of the _plat, and an ImageDraw object for it.
         self.image = Image.new('RGBA', settings.dim, Settings.RGBA_WHITE)
         self.draw = ImageDraw.Draw(self.image, 'RGBA')
 
-        # Overlay on which we'll plat QQ's, and an ImageDraw object for it
+        # Overlay on which we'll _plat QQ's, and an ImageDraw object for it
         self.overlay = Image.new('RGBA', settings.dim, (255, 255, 255, 0))
         self.overlay_draw = ImageDraw.Draw(self.overlay, 'RGBA')
 
@@ -194,7 +194,7 @@ class Plat:
         self.sec_coords = {}
 
         # Draw the standard 36 sections, or the `only_section` (an int).
-        # (If `only_section` is None, then will draw all 36 in 6x6 grid.
+        # (If `only_section` is None, then will draw all 36 in 6x6 _grid.
         # If specified, will draw only that section.)
         self._draw_all_sections(only_section=only_section)
         self.header = self._gen_header(only_section=only_section)
@@ -311,14 +311,14 @@ class Plat:
 
         IMPORTANT: Passing an object in `tracts` does NOT add it to the
         queue to be platted -- only to the tracts whose text will be
-        written at the bottom of the plat(s), if so configured.
+        written at the bottom of the _plat(s), if so configured.
 
         :param plattable: The object to be added to the queue. (Must be
         a type acceptable to PlatQueue -- see docs for those objects.)
         :param tracts: A list of pytrs.Tract objects whose text should
         eventually be written at the bottom of the Plat (assuming the
         Plat is configured in settings to write Tract text).
-        NOTE: Objects added to `tracts` do NOT get drawn on the plat --
+        NOTE: Objects added to `tracts` do NOT get drawn on the _plat --
         only written at the bottom. But pytrs.Tract objects passed here
         as arg `plattable` are automatically added to `tracts`.
         :return: None
@@ -367,7 +367,7 @@ class Plat:
         Section number.
         :param only_section: Specify with the appropriate integer when
          platting only a single section (rather than the usual 6x6
-         grid).
+         _grid).
         """
         trs_ = pytrs.TRS.from_twprgesec(twp=self.twp, rge=self.rge)
         twptxt = trs_.pretty_twprge(
@@ -392,7 +392,7 @@ class Plat:
     def _draw_all_sections(self, only_section=None):
         """
         INTERNAL USE:
-        Draw the lines for 36 sections in the standard 6x6 grid; or draw
+        Draw the lines for 36 sections in the standard 6x6 _grid; or draw
         a single section if `only_section=<int>` is specified.
         """
 
@@ -401,13 +401,13 @@ class Plat:
 
         w, h = settings.dim
 
-        # Our township (a square) will either be a 6x6 grid of sections,
+        # Our township (a square) will either be a 6x6 _grid of sections,
         # or a single section (i.e. 1x1).
         sections_per_side = 6
         if only_section is not None:
             sections_per_side = 1
 
-        # Number of QQ divisions per section -- i.e. a 4x4 grid of QQ's,
+        # Number of QQ divisions per section -- i.e. a 4x4 _grid of QQ's,
         # or a square of 4 units (QQ's) by 4 units.
         qqs_per_sec_side = 4
 
@@ -417,11 +417,11 @@ class Plat:
         # section side.
         section_length = settings.qq_side * qqs_per_sec_side
 
-        # We'll horizontally center our plat on the page. (4 is the number
+        # We'll horizontally center our _plat on the page. (4 is the number
         # of QQ's drawn per section)
         x_start = (w - (section_length * sections_per_side)) // 2
 
-        # The plat will start this many px below the top of the page.
+        # The _plat will start this many px below the top of the page.
         y_start = settings.y_top_marg
 
         # PLSS sections "snake" from the NE corner of the township west
@@ -447,12 +447,12 @@ class Plat:
         if only_section is not None:
             sec_nums = [int(only_section)]
 
-        # Generate section(s) on the plat, and number them.
+        # Generate section(s) on the _plat, and number them.
         #
         # For each section, we start at (x_start, y_start) and move
         # `j` section-lengths over, and `i` section-lengths down,
         # at which point we are at the NW corner of the section,
-        # from which we'll draw our 4x4 grid for that section and
+        # from which we'll draw our 4x4 _grid for that section and
         # mark the coord in the `.sec_coords` dict.
         #
         # Remember that sections_per_side is `1` if we're platting only
@@ -544,7 +544,7 @@ class Plat:
         if settings is None:
             settings = self.settings
 
-        # Number of QQ divisions per section -- i.e. a 4x4 grid of QQ's,
+        # Number of QQ divisions per section -- i.e. a 4x4 _grid of QQ's,
         # or a square of 4 units (QQ's) by 4 units.
         qqs_per_sec_side = 4
 
@@ -554,23 +554,23 @@ class Plat:
         # section side.
         sec_len = settings.qq_side * qqs_per_sec_side
 
-        # If we platted all 36 sections, there are 6 per side (6x6 grid)
+        # If we platted all 36 sections, there are 6 per side (6x6 _grid)
         secs_per_twp_side = 6
         if len(self.sec_coords.keys()) == 1:
-            # But if we only platted one, it's a 1x1 grid.
+            # But if we only platted one, it's a 1x1 _grid.
             secs_per_twp_side = 1
 
         # First available x (i.e. the left margin)
         x0 = settings.x_text_left_marg
 
-        # First available y below the plat...
+        # First available y below the _plat...
         #   Starting at the top of the image, move down to the top of
-        #   the plat itself...
+        #   the _plat itself...
         y0 = settings.y_top_marg
-        #   Then go to the bottom of the plat...
+        #   Then go to the bottom of the _plat...
         y0 += sec_len * secs_per_twp_side
         #   And then finally add the settings-specified buffer between
-        #   the plat and the first line of text
+        #   the _plat and the first line of text
         y0 += settings.y_px_before_tracts
 
         return (x0, y0)
@@ -578,7 +578,7 @@ class Plat:
     def output(self, filepath=None):
         """
         Merge the drawn overlay (i.e. filled QQ's) onto the base
-        township plat image and return an Image object. Also include
+        township _plat image and return an Image object. Also include
         TractTextBox if it exists. Optionally save the image to file if
         `filepath=<filepath>` is specified (must be either '.png' or
         '.pdf' file).
@@ -590,9 +590,9 @@ class Plat:
 
         # TODO: Add the option with *args to specify which layers get
         #   included in the output. That also will require me to have
-        #   separate layers for QQ's, the grid, labels, etc.
+        #   separate layers for QQ's, the _grid, labels, etc.
         #   And that, in turn, will require me to change methods to
-        #   /plat/ onto multiple layers.
+        #   /_plat/ onto multiple layers.
 
         if filepath is not None:
             merged.save(filepath)
@@ -601,7 +601,7 @@ class Plat:
 
     def show(self):
         """
-        Flatten and display the plat PIL.Image.Image object (WARNING:
+        Flatten and display the _plat PIL.Image.Image object (WARNING:
         will hang the program until the image is closed).
         """
         self.output().show()
@@ -636,7 +636,7 @@ class Plat:
             self.write_lots(sec_grid)
         self.unhandled_lots_by_sec[sec_num] = sec_grid.unhandled_lots
 
-        # Write the Tract data to the bottom of the plat (or not, per settings).
+        # Write the Tract data to the bottom of the _plat (or not, per settings).
         if self.settings.write_tracts and self.text_box is not None:
             self.text_box.write_all_tracts(tracts)
 
@@ -655,9 +655,9 @@ class Plat:
         rather than specified as parameter.
         :param single_sec: Replaces `only_section=<int>` from __init__()
         in that it takes a bool, rather than an integer -- i.e. specify
-        `single_sec=True` to plat a single section (with the section
+        `single_sec=True` to _plat a single section (with the section
         number pulled from the `.sec` attribute of the SectionGrid obj),
-        or `False` (the default) to plat the full 6x6 grid of sections.
+        or `False` (the default) to _plat the full 6x6 _grid of sections.
         :param tracts: A list of pytrs.Tract objects whose text should
         be written at the bottom of the Plat (if the Plat settings are
         configured to write Tract text).
@@ -733,7 +733,7 @@ class Plat:
                 self.write_lots(sec_grid)
             self.plat_section_grid(sec_grid, qq_fill_RGBA=qq_fill_RGBA)
 
-        # Write the Tract data to the bottom of the plat (or not, per settings).
+        # Write the Tract data to the bottom of the _plat (or not, per settings).
         if self.settings.write_tracts and self.text_box is not None:
             self.text_box.write_all_tracts(tracts)
 
@@ -750,9 +750,9 @@ class Plat:
         than specified as parameter.
         :param single_sec: Replaces `only_section=<int>` from __init__()
         in that it takes a bool, rather than an integer -- i.e. specify
-        `single_sec=True` to plat a single section (with the section
+        `single_sec=True` to _plat a single section (with the section
         number pulled from the `.sec` attribute of the Tract obj), or
-        `False` (the default) to plat the full 6x6 grid of sections.
+        `False` (the default) to _plat the full 6x6 _grid of sections.
         """
         twp = tract.twp
         rge = tract.rge
@@ -826,7 +826,7 @@ class Plat:
                 # Otherwise, fall back to an empty LD.
                 ld = LotDefinitions()
 
-        # Generate a SectionGrid from the Tract, and plat it.
+        # Generate a SectionGrid from the Tract, and _plat it.
         sec_grid = SectionGrid.from_tract(tract, ld=ld)
         self.plat_section_grid(sec_grid)
 
@@ -856,7 +856,7 @@ class Plat:
             xy_start = self.sec_coords[int(sec_grid.sec)]
             x_start, y_start = xy_start
 
-            # Break out the grid location of the QQ into x, y
+            # Break out the _grid location of the QQ into x, y
             x_grid, y_grid = grid_location
 
             # Calculate the pixel location of the NWNW corner of the QQ.
@@ -904,11 +904,11 @@ class Plat:
 
     def fill_qq(self, sec_num: int, grid_location: tuple, qq_fill_RGBA=None):
         """
-        Fill in a single QQ on the plat.
+        Fill in a single QQ on the _plat.
 
         :param sec_num: An integer, being the number of a section that
-        is already depicted on the plat (i.e. 1 - 36 for a standard 6x6
-        plat; or the only section, if only one section is platted).
+        is already depicted on the _plat (i.e. 1 - 36 for a standard 6x6
+        _plat; or the only section, if only one section is platted).
         NOTE: When 0 is passed as `sec_num`, this method returns
         immediately without filling any QQ's and without raising any
         errors. This is to handle flawed parses where the section number
@@ -918,7 +918,7 @@ class Plat:
         module, 'secError' should first get converted to int 0 prior to
         passing it as `sec_num` in this method.
         :param grid_location: A coord value (0, 0) to (3, 3), which
-        represents the QQ to be filled in the 4x4 grid -- i.e. the same
+        represents the QQ to be filled in the 4x4 _grid -- i.e. the same
         coord system as SectionGrid objects, where (0, 0) is the NWNW
         and (3, 3) is the SESE.
             ex:  (0, 0) -> 'NWNW'
@@ -934,14 +934,14 @@ class Plat:
             return
 
         if qq_fill_RGBA is None:
-            # If not specified, pull from plat settings.
+            # If not specified, pull from _plat settings.
             qq_fill_RGBA = self.settings.qq_fill_RGBA
 
         # Get the pixel location of the NWNW corner of the sec_num:
         xy_start = self.sec_coords[sec_num]
         x_start, y_start = xy_start
 
-        # Break out the grid location of the QQ into x, y
+        # Break out the _grid location of the QQ into x, y
         x_grid, y_grid = grid_location
 
         # Calculate the pixel location of the NWNW corner of the QQ. (Remember
@@ -961,7 +961,7 @@ class Plat:
     def _draw_sec(self, top_left_corner, sec_num=None):
         """
         INTERNAL USE:
-        Draw the 4x4 grid of a section with an ImageDraw object, at the
+        Draw the 4x4 _grid of a section with an ImageDraw object, at the
         specified `top_left_corner` (i.e. px coord). Optionally specify
         the section number with `sec_num=<int>`.
         (Pulls sizes, lengths, etc. from this Plat's `.settings`)
@@ -1118,7 +1118,7 @@ class MultiPlat:
     than-nothing' option, but not as reliable as user-specified lot
     definitions.)
     NOTE: All lots that were not defined but which the user tried to
-    plat are compiled into a nested dict via the `.all_unhandled_lots`
+    _plat are compiled into a nested dict via the `.all_unhandled_lots`
     property (keyed by twprge).
 
     MultiPlat objects can be output with these methods:
@@ -1214,7 +1214,7 @@ class MultiPlat:
     @property
     def all_unhandled_lots(self):
         """
-        Get a nested dict of all of the unhandled lots in each plat,
+        Get a nested dict of all of the unhandled lots in each _plat,
         keyed by T&R.
         """
         uhl = {}
@@ -1273,7 +1273,7 @@ class MultiPlat:
         eventually be written at the bottom of the appropriate Plat
         (assuming the MultiPlat is configured in settings to write Tract
         text).
-        NOTE: Objects added to `tracts` do NOT get drawn on the plat --
+        NOTE: Objects added to `tracts` do NOT get drawn on the _plat --
         only written at the bottom. But pytrs.Tract objects passed here
         as arg `plattable` are automatically added to `tracts`.
         """
@@ -1375,7 +1375,7 @@ class MultiPlat:
 
     def show(self, index: int):
         """
-        Flatten and display the plat PIL.Image.Image object,
+        Flatten and display the _plat PIL.Image.Image object,
         specifically the one in the `.plats` list at the specified
         `index`.
         (WARNING: will hang the program until the image is closed).
@@ -1460,7 +1460,7 @@ class MultiPlat:
         for p in self.plats:
             plat_ims.append(p.output().convert('RGB'))
 
-        # Cull our list of plat images to only the pages requested
+        # Cull our list of _plat images to only the pages requested
         # (if not specified -- i.e. `pages=None` -- returns all images)
         output_list = cull_list(plat_ims, pages)
 
@@ -1486,7 +1486,7 @@ class TractTextBox(TextBox):
         :param size: 2-tuple of (width, height).
         :param typeface: Which typeface to use, passed either as the
         filepath to a .ttf font (absolute path, or relative to the
-        'pytrsplat/platsettings/' directory), or as a key for the
+        'pytrsplat/_platsettings/' directory), or as a key for the
         Settings.TYPEFACES dict (i.e. as the name of a stock font, such
         as 'Mono (Bold)').
         :param font_size: The size of the font to create.
@@ -1528,7 +1528,7 @@ class TractTextBox(TextBox):
         # If not a font name, then check if `typeface` is a valid
         # filepath.
         # If not a valid filepath, check if it is a relative filepath
-        # (relative to 'pytrsplat/platsettings/' dir -- i.e. a stock
+        # (relative to 'pytrsplat/_platsettings/' dir -- i.e. a stock
         # font), and if so, convert to that absolute path.
         if typeface in Settings.TYPEFACES.keys():
             typeface = Settings.TYPEFACES[typeface]
@@ -1616,7 +1616,7 @@ class TractTextBox(TextBox):
                 # If no lots/QQs were identified, or if this tract has a
                 # section number that could not be successfully deduced
                 # -- in which case it could not have been projected onto
-                # this plat), then we'll write the tract in the
+                # this _plat), then we'll write the tract in the
                 # configured warning color
                 font_RGBA = self.settings.warningfont_RGBA
             # Any lines that could not be written will be returned and stored
@@ -1717,7 +1717,7 @@ def text_to_plats(
     (A convenience function, for simplified interaction with MultiPlat
     objects.) Parse the raw text of a PLSS land description (optionally
     using `config=` parameters -- see pytrs.Config docs), and generate
-    plat(s) for the lands described (i.e. PIL.Image.Image objects.
+    _plat(s) for the lands described (i.e. PIL.Image.Image objects.
     Configure the plats with `settings=` parameter (see
     ``pytrsplat.Settings`` docs). Optionally output to .png or .pdf with
     `output_filepath=` (end with '.png' or '.pdf' to specify the output

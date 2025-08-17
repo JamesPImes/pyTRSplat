@@ -10,11 +10,11 @@ sys.path.append('../../')
 
 import pytrsplat._constants as _constants
 from pytrsplat import version
-from pytrsplat.plat_gen.plat import Plat, MultiPlat
-from pytrsplat.plat_gen.grid import SectionGrid, LotDefDB
-from pytrsplat.plat_gen.platsettings import Settings
-from pytrsplat.plat_gen.platqueue import MultiPlatQueue
-from pytrsplat.utils import _simplify_lot_number, break_trs
+from pytrsplat.plat_gen._plat import Plat, MultiPlat
+from pytrsplat.plat_gen._grid import SectionGrid, LotDefDB
+from pytrsplat.plat_gen._platsettings import Settings
+from pytrsplat.plat_gen._platqueue import MultiPlatQueue
+from pytrsplat._utils import _simplify_lot_number, break_trs
 
 from pytrsplat.gui.settingseditor import SettingsEditor
 from pytrsplat.gui.imgdisplay import ScrollResizeDisplay
@@ -48,7 +48,7 @@ class MainWindow(tk.Tk):
         self.lddb = LotDefDB()
 
         # Store (initially empty) queue of ad-hoc objects to be added to
-        # the plat(s) -- e.g. SectionGrid, TownshipGrid, etc.
+        # the _plat(s) -- e.g. SectionGrid, TownshipGrid, etc.
         self.ad_hoc_mpq = MultiPlatQueue()
 
         # Store a plain list (currently empty) of PLSSDesc objects that
@@ -74,11 +74,11 @@ class MainWindow(tk.Tk):
         right_side_frame = tk.Frame(self)
         right_side_frame.grid(row=1, column=2, sticky='ns')
 
-        # A widget for displaying a mini preview of the plat so far
+        # A widget for displaying a mini preview of the _plat so far
         self.preview_frame = PlatPreview(right_side_frame, preview_owner=self)
         self.preview_frame.grid(row=1, column=2, sticky='n')
 
-        # A widget for output settings / buttons. (Contains the plat
+        # A widget for output settings / buttons. (Contains the _plat
         # generator at `.output_frame.gen_plat()`
         self.output_frame = OutputFrame(right_side_frame, output_owner=self)
         self.output_frame.grid(row=2, column=2, pady=24, sticky='s')
@@ -121,7 +121,7 @@ class MainWindow(tk.Tk):
 
 class DescFrame(tk.Frame):
     """A frame for getting / clearing text of description to parse and
-    add to the plat, getting LotDefDB from .csv."""
+    add to the _plat, getting LotDefDB from .csv."""
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
         self.master = master
@@ -300,7 +300,7 @@ class DescFrame(tk.Frame):
                 'The config parameters that have just been set will ONLY '
                 'affect descriptions that are parsed AFTER this point. Any '
                 'descriptions that have already been parsed and added to '
-                'the plat will NOT be affected by changes to these config '
+                'the _plat will NOT be affected by changes to these config '
                 'parameters. (To reconfigure already-parsed descriptions, '
                 'use the Description Editor.)')
         pc = pytrs.interface_tools.PromptConfig(
@@ -323,7 +323,7 @@ class DescFrame(tk.Frame):
         """
         Pull the entered text, and use the chosen config parameters (if
         any) to generate a PLSSDesc object, and add it to the queue to
-        plat.
+        _plat.
         """
         config_text = self.config_text.get()
         descrip_text = self.desc_box_entry.get("1.0", "end-1c")
@@ -360,7 +360,7 @@ class DescFrame(tk.Frame):
         # Clear the text from the desc_box_entry
         self.desc_box_entry.delete("1.0", 'end-1c')
 
-        # And update the preview plat.
+        # And update the preview _plat.
         self.trigger_update_preview()
 
     def trigger_update_preview(self):
@@ -381,7 +381,7 @@ class DescFrame(tk.Frame):
             # Set the `.plssdesc_list` to an empty list
             self.master.plssdesc_list = []
 
-            # Generate a new preview (which will be an empty plat)
+            # Generate a new preview (which will be an empty _plat)
             self.master.preview_frame.gen_preview()
 
     def lddb_btn_clicked(self):
@@ -455,7 +455,7 @@ class DescFrame(tk.Frame):
             "lots in any other sections."
             "\n\n"
             "'Trust Default Lots' may be useful as a backup option, but "
-            "a more accurate plat can be achieved by defining specific lots "
+            "a more accurate _plat can be achieved by defining specific lots "
             "individually with the 'Define Lots' feature, and/or by defining "
             "them in a .csv spreadsheet and loading from that."
         )
@@ -467,7 +467,7 @@ class DescFrame(tk.Frame):
 ########################################################################
 
 class PlatPreview(tk.Frame):
-    """A frame displaying a preview of the plat, plus its controls."""
+    """A frame displaying a preview of the _plat, plus its controls."""
 
     ###################
     # pytrsplat.settings.Settings object
@@ -495,7 +495,7 @@ class PlatPreview(tk.Frame):
         set_obj.write_tracts = False
         set_obj.write_lot_numbers = False
 
-    # When there is nothing to preview, will show a grayed-out dummy plat.
+    # When there is nothing to preview, will show a grayed-out dummy _plat.
     PREVIEW_SETTINGS_NONE.sec_line_RGBA = (148, 148, 148, 255)
     PREVIEW_SETTINGS_NONE.secfont_RGBA = (168, 168, 168, 255)
     PREVIEW_SETTINGS_NONE.ql_RGBA = (196, 196, 196, 255)
@@ -515,18 +515,18 @@ class PlatPreview(tk.Frame):
         self.previews_twprge = []
         # Current index of the preview
         self.preview_index = 0
-        # Tracking if we're displaying a dummy (empty plat) in the preview
+        # Tracking if we're displaying a dummy (empty _plat) in the preview
         self.dummy_set = False
 
-        # Subframe for handling everything with the plat, other than getting
+        # Subframe for handling everything with the _plat, other than getting
         # the PLSS descrips.
         plat_frame = tk.Frame(self)
         plat_frame.grid(row=0, column=2, sticky='n')
 
-        # # Subframe for showing a preview of the plat, and controls for
+        # # Subframe for showing a preview of the _plat, and controls for
         # # left/right
         # plat_preview_frame = tk.Frame(plat_frame)
-        # plat_preview_frame.grid(row=1, column=1, sticky='n')
+        # plat_preview_frame._grid(row=1, column=1, sticky='n')
 
         # Subframe for showing the preview (this one does get stored to
         # self, because it gets updated with a new image periodically.
@@ -587,14 +587,14 @@ class PlatPreview(tk.Frame):
 
         self.dummy_set = False
 
-        # If there's nothing yet in the MPQ, manually create a 'dummy' plat
-        # and append it, so that there's something to show (an empty plat)
+        # If there's nothing yet in the MPQ, manually create a 'dummy' _plat
+        # and append it, so that there's something to show (an empty _plat)
         if len(mpq.keys()) == 0:
             dummy = Plat(settings=self.PREVIEW_SETTINGS_NONE)
             new_preview_mp.plats.append(dummy)
             self.dummy_set = True
 
-        # Output the plat images to a list, and set to `.previews`
+        # Output the _plat images to a list, and set to `.previews`
         self.previews = new_preview_mp.output()
 
         # And create a list of 'twprge' values for each of the images, and
@@ -658,7 +658,7 @@ class PlatPreview(tk.Frame):
 
 class OutputFrame(tk.Frame):
     """A frame containing output settings, preview button, and save
-    button, and corresponding functionality. Also contains the plat
+    button, and corresponding functionality. Also contains the _plat
     generator. (Interacts with the `preview_frame` and `.mpq` of
     `master`."""
     def __init__(self, master=None, output_owner=None):
@@ -676,7 +676,7 @@ class OutputFrame(tk.Frame):
         # Choosing Plat Settings
         ####################################
 
-        # Subframe for getting the plat settings from user.
+        # Subframe for getting the _plat settings from user.
         self.settings_frame = tk.Frame(self)
         self.settings_frame.grid(row=1, column=1, sticky='n')
 
@@ -782,7 +782,7 @@ class OutputFrame(tk.Frame):
         :param use_tiny: Whether to use 'tiny' settings, when we don't
         actually care about the output, and just want to process as
         quickly as possible to see what issues would pop up for when we
-        eventually create the plat for real (e.g., unhandled lots).
+        eventually create the _plat for real (e.g., unhandled lots).
         """
 
         if use_tiny:
@@ -858,7 +858,7 @@ class OutputFrame(tk.Frame):
                 'One or more lots were identified in the parsed '
                 'description(s) for which no definitions have been given:\n'
                 f"{txt}\n\n"
-                'These cannot be depicted on the plat until defined. '
+                'These cannot be depicted on the _plat until defined. '
                 'Do so now?'
             )
 
@@ -1065,7 +1065,7 @@ class About(tk.Frame):
 
 class FullPreviewWindow(tk.Toplevel):
     """A popup window containing a full-size preview of the requested
-    plat page."""
+    _plat page."""
 
     def __init__(self, master=None, img=None, settings_name=None):
         tk.Toplevel.__init__(self, master=master)
@@ -1107,7 +1107,7 @@ class TableRow(tk.Frame):
         (List must have the same number of elements as `column_data`.)
         :param is_header: Whether this row contains headers. (Defaults
         to False.)
-        :param first_tk_col: The first tkinter grid column in which to
+        :param first_tk_col: The first tkinter _grid column in which to
         place the table (probably only used for TableRow subclasses).
         """
         tk.Frame.__init__(self, master)
@@ -1275,10 +1275,10 @@ class DescriptionEditor(tk.Toplevel):
             return
 
         if self.displayed_sde is not None:
-            # If we've already displayed an sde, remove it from the grid now
+            # If we've already displayed an sde, remove it from the _grid now
             self.displayed_sde.grid_remove()
 
-        # Set the new displayed_sde, and place it on the grid.
+        # Set the new displayed_sde, and place it on the _grid.
         self.displayed_sde = self.editors[index]
         self.displayed_sde.grid(
             row=DescriptionEditor.SDE_ROW,
@@ -1331,7 +1331,7 @@ class DescriptionEditor(tk.Toplevel):
 
     def export_to_master(self):
         """Collect the updated PLSSDesc objects in a new list, and set it
-        to the plssdesc_list_owner's `.plssdesc_list`. Update the plat
+        to the plssdesc_list_owner's `.plssdesc_list`. Update the _plat
         previews. And close this window."""
         self.plssdesc_list_owner.plssdesc_list = self.collect_plssdesc_objects()
         try:
@@ -1362,7 +1362,7 @@ class DescriptionEditor(tk.Toplevel):
         if not confirm:
             return
 
-        # Remove this SDE from the grid
+        # Remove this SDE from the _grid
         self.editors[ind].grid_remove()
 
         # Remove the SDE from the list of `editors`
@@ -1389,7 +1389,7 @@ class DescriptionEditor(tk.Toplevel):
         confirm = tk.messagebox.askyesno(
             'Confirm Restore',
             'Discard all changes (including deletions) that have not '
-            'yet been applied to the plat?')
+            'yet been applied to the _plat?')
         self.focus()
         self.grab_set()
 
@@ -1554,7 +1554,7 @@ class SingleDescriptionEditor(tk.Frame):
         self.pytrs_display_frame.grid(row=0, column=3, sticky='n')
 
         # Variables to configure how/where the TractTable and FlagTable
-        # should be placed in the grid.
+        # should be placed in the _grid.
         self.tract_table_row_col = (1, 1)
         self.tract_table_padx_pady = (5, 5)
         self.flag_table_row_col = (3, 1)
@@ -1641,7 +1641,7 @@ class SingleDescriptionEditor(tk.Frame):
             self.pytrs_display_frame, wflag_list=source_plssdesc.w_flags,
             eflag_list=source_plssdesc.e_flags, more_info=self.more_info)
         if self.more_info:
-            # Only if `.more_info==True` do we place this on the grid.
+            # Only if `.more_info==True` do we place this on the _grid.
             self.flag_table.grid(
                 row=self.flag_table_row_col[0],
                 column=self.flag_table_row_col[1],
@@ -1981,7 +1981,7 @@ class FlagTable(tk.Frame):
 
 class CustomSettingsEditor(SettingsEditor):
     """
-    An editor for configuring plat settings, somewhat customized for
+    An editor for configuring _plat settings, somewhat customized for
     this application.
     """
     def __init__(self, master=None, output_frame=None, first_settings_obj=None,
@@ -2023,7 +2023,7 @@ class CustomSettingsEditor(SettingsEditor):
 
 class SectionFiller(tk.Frame):
     """
-    A frame with 4x4 button grid for manually turning on/off QQ's.
+    A frame with 4x4 button _grid for manually turning on/off QQ's.
     """
     def __init__(
             self, master=None, sec=0, twp='', rge='', trs='', ld=None,
@@ -2032,7 +2032,7 @@ class SectionFiller(tk.Frame):
         Specify EITHER `trs` OR `sec`, `twp`, and `rge`. If both sets
         are specified, will use `trs` only.
 
-        :param ld: Same purpose as for ``pytrsplat.grid.SectionGrid``.
+        :param ld: Same purpose as for ``pytrsplat._grid.SectionGrid``.
         :param allow_ld_defaults: Same purpose as for ``SectionGrid``.
         :param button_on_text: Character that should be displayed inside
         a QQ button when it's clicked.
@@ -2320,7 +2320,7 @@ class LotDefEditor(tk.Toplevel):
         # Our LotDefTable object, which will be populated shortly.
         self.table = None
 
-        # Where to place the table in the grid
+        # Where to place the table in the _grid
         self.table_row = 1
         self.table_column = 0
 
@@ -2519,7 +2519,7 @@ class LotDefTable(tk.Frame):
     col_wrap = [None, None, ld_wraplength]
     max_rows_per_page = 15
 
-    # The tk grid column in the LotDefTable frame holding TableRow objs
+    # The tk _grid column in the LotDefTable frame holding TableRow objs
     tbrow_col = 2
 
     def __init__(
@@ -2590,7 +2590,7 @@ class LotDefTable(tk.Frame):
         self.display_frame.grid(row=2, column=1, sticky='nesw')
 
         # A dict for keeping track of each TableRow, which lot definitions
-        # it corresponds to, where to find it in the tk grid, etc. Keyed
+        # it corresponds to, where to find it in the tk _grid, etc. Keyed
         # by unique ID in the format of TRS_lotnumber (ex: '154n97w01_L1')
         self.ld_dict = {}
 
@@ -2696,10 +2696,10 @@ class LotDefTable(tk.Frame):
             return
 
         if self.current_page is not None:
-            # If we've already displayed an sde, remove it from the grid now
+            # If we've already displayed an sde, remove it from the _grid now
             self.current_page.grid_remove()
 
-        # Set the new page, and place it on the grid.
+        # Set the new page, and place it on the _grid.
         self.current_page = self.pages[page_index]
         self.current_page.grid( row=0, column=0, sticky='nwse')
         self.update_header()
@@ -2983,7 +2983,7 @@ class ManualPlatter(tk.Frame):
             # Re-define our target_mpq to point to this new MPQ
             self.target_mpq = self.master.ad_hoc_mpq
 
-            # Generate a new preview (which will be an empty plat)
+            # Generate a new preview (which will be an empty _plat)
             self.master.preview_frame.gen_preview()
 
     def new_platter(self):

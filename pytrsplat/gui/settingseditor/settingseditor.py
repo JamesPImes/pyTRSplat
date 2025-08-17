@@ -9,8 +9,8 @@ import tkinter as tk
 from tkinter.ttk import Combobox, Checkbutton
 from tkinter import messagebox, filedialog
 
-from ...plat_gen.plat import MultiPlat
-from ...plat_gen.platsettings import Settings
+from ...plat_gen._plat import MultiPlat
+from ...plat_gen._platsettings import Settings
 
 from ..imgdisplay import ScrollResizeDisplay
 
@@ -135,7 +135,7 @@ class SettingsEditor(tk.Frame):
 
     def preview_btn_clicked(self):
         """
-        Show an example plat using the current settings.
+        Show an example _plat using the current settings.
         """
 
         # Compile a Settings object
@@ -167,7 +167,7 @@ class SettingsEditor(tk.Frame):
             d, settings=set_obj, allow_ld_defaults=True)
         im = mp.output()[0]
 
-        # Launch a preview window with this plat
+        # Launch a preview window with this _plat
         try:
             self.preview_window.destroy()
         except AttributeError:
@@ -370,7 +370,7 @@ class _EditorFrame(tk.Frame):
 
         self.y_header_marg = self.IntVarSetter(
             self, var_name='y_header_marg', start_val=ls.y_header_marg,
-            display_name='How far above grid to write header (within top margin)')
+            display_name='How far above _grid to write header (within top margin)')
         self.y_header_marg.grid(
             row=next_avail_row, column=1, padx=self.MW_PADX, pady=self.MW_PADY,
             sticky='w')
@@ -455,7 +455,7 @@ class _EditorFrame(tk.Frame):
         #################################
         self.y_px_before_tracts = self.IntVarSetter(
             self, var_name='y_px_before_tracts', start_val=ls.y_px_before_tracts,
-            display_name='Distance between bottom of the grid and the first written tract')
+            display_name='Distance between bottom of the _grid and the first written tract')
         self.y_px_before_tracts.grid(
             row=next_avail_row, column=1, padx=self.MW_PADX, pady=self.MW_PADY,
             sticky='w')
@@ -463,7 +463,7 @@ class _EditorFrame(tk.Frame):
 
         self.x_text_left_marg = self.IntVarSetter(
             self, var_name='x_text_left_marg', start_val=ls.x_text_left_marg,
-            display_name='Left Margin (for tract text below grid)')
+            display_name='Left Margin (for tract text below _grid)')
         self.x_text_left_marg.grid(
             row=next_avail_row, column=1, padx=self.MW_PADX, pady=self.MW_PADY,
             sticky='w')
@@ -471,7 +471,7 @@ class _EditorFrame(tk.Frame):
 
         self.x_text_right_marg = self.IntVarSetter(
             self, var_name='x_text_right_marg', start_val=ls.x_text_right_marg,
-            display_name='Right Margin (for tract text below grid)')
+            display_name='Right Margin (for tract text below _grid)')
         self.x_text_right_marg.grid(
             row=next_avail_row, column=1, padx=self.MW_PADX, pady=self.MW_PADY,
             sticky='w')
@@ -620,8 +620,8 @@ class _EditorFrame(tk.Frame):
         but allows child classes to inherit `.compile_RGBA()` method.
 
         IMPORTANT:
-        Creates `self.rgba_frame` but does NOT place it on the grid;
-        must call `rgba_frame.grid(...)` for every subclass!
+        Creates `self.rgba_frame` but does NOT place it on the _grid;
+        must call `rgba_frame._grid(...)` for every subclass!
         """
 
         def __init__(
@@ -852,7 +852,7 @@ class _EditorFrame(tk.Frame):
             lbl.grid(row=0, column=0)
 
             # This frame is created by the parent class. Only needs to be
-            # placed on grid here.
+            # placed on _grid here.
             self.rgba_frame.grid(row=0, column=1, sticky='w')
 
         def compile(self) -> str:
@@ -906,8 +906,8 @@ class _EditorFrame(tk.Frame):
 
             # RGBA
             # This frame is created by the parent class. Only needs to be
-            # placed on grid here.
-            # TODO: Bugfix: why isn't rgba_frame showing up in grid?
+            # placed on _grid here.
+            # TODO: Bugfix: why isn't rgba_frame showing up in _grid?
             self.rgba_frame.grid(row=0, column=4, sticky='w')
 
         def compile(self) -> str:
@@ -980,7 +980,7 @@ class _EditorFrame(tk.Frame):
 
             # RGBA
             # This frame is created by the parent class. Only needs to be
-            # placed on grid here.
+            # placed on _grid here.
             self.rgba_frame.grid(row=0, column=3)
 
         def compile(self):

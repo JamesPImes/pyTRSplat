@@ -6,7 +6,7 @@ Streamlined queues of 'plattable' objects.
 
 import pytrs
 
-from ..grid import SectionGrid, TownshipGrid
+from .._grid import SectionGrid, TownshipGrid
 
 _UNDEF_TWPRGE = pytrs.MasterConfig._UNDEF_TWPRGE
 _ERR_TWPRGE = pytrs.MasterConfig._ERR_TWPRGE
@@ -55,14 +55,14 @@ class PlatQueue(list):
 
         IMPORTANT: Passing an object in `tracts` does NOT add it to the
         queue to be platted -- only to the tracts whose text will be
-        written at the bottom of the plat(s), if so configured.
+        written at the bottom of the _plat(s), if so configured.
 
         :param plattable: The object to be added to the queue. (Must be
         a type acceptable to PlatQueue -- see docs for those objects.)
         :param tracts: A list of pytrs.Tract objects whose text should
         eventually be written at the bottom of the Plat (assuming the
         Plat is configured in settings to write Tract text).
-        NOTE: Objects added to `tracts` do NOT get drawn on the plat --
+        NOTE: Objects added to `tracts` do NOT get drawn on the _plat --
         only written at the bottom. But pytrs.Tract objects passed here
         as arg `plattable` are automatically added to `tracts`.
         """

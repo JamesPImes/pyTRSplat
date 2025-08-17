@@ -6,7 +6,7 @@ sys.path.append(r'..\..')
 
 import pytrs
 
-from pytrsplat.plat_gen.grid import (
+from pytrsplat.plat_gen._grid import (
     SectionGrid,
     TownshipGrid,
     LotDefinitions,
