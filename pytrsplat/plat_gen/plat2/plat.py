@@ -409,7 +409,7 @@ class PlatSection(SettingsOwned, ImageOwned):
         x_center, y_center = calc_midpt(xy=self.xy, square_dim=self.sec_length_px)
         topleft = x_center - cb_dim // 2, y_center - cb_dim // 2
         centerbox = get_box(xy=topleft, dim=cb_dim)
-        draw.polygon(centerbox, Settings.RGBA_WHITE)
+        draw.polygon(centerbox, (0, 0, 0, 0))
         if not settings.write_section_numbers:
             return None
         font = settings.secfont
@@ -949,7 +949,7 @@ class Plat(IPlatOwner, QueueSingle):
     def configure(self):
         """Configure this plat and its subordinates."""
         self.background = Image.new('RGBA', self.settings.dim, Settings.RGBA_WHITE)
-        self.image = Image.new('RGBA', self.settings.dim, Settings.RGBA_WHITE)
+        self.image = Image.new('RGBA', self.settings.dim, (0, 0, 0, 0))
         self.draw = ImageDraw.Draw(self.image, 'RGBA')
         self.overlay_image = Image.new('RGBA', self.settings.dim, (255, 255, 255, 0))
         self.overlay_draw = ImageDraw.Draw(self.overlay_image, 'RGBA')
@@ -1186,7 +1186,7 @@ class MegaPlat(IPlatOwner, QueueMany):
         Configure this ``MegaPlat`` and subordinates.
         """
         self.background = Image.new('RGBA', self.dim, Settings.RGBA_WHITE)
-        self.image = Image.new('RGBA', self.dim, Settings.RGBA_WHITE)
+        self.image = Image.new('RGBA', self.dim, (0, 0, 0, 0))
         self.draw = ImageDraw.Draw(self.image, 'RGBA')
         self.overlay_image = Image.new('RGBA', self.dim, (255, 255, 255, 0))
         self.overlay_draw = ImageDraw.Draw(self.overlay_image, 'RGBA')
