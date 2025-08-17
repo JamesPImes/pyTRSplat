@@ -1328,18 +1328,18 @@ class MegaPlat(IPlatOwner, QueueMany):
         :return: A ``pytrs.TractList`` containing all tracts that could
          not be platted.
         """
+        unplattable_tracts = pytrs.TractList()
         queue = self.queue
         if subset_twprges is not None:
             queue = queue.filter(key=lambda tract: tract.twprge in subset_twprges)
         # Confirm all tracts are valid.
         queue = self._clean_queue(queue)
         if not queue:
-            return None
+            return unplattable_tracts
 
         # Generate subplats. Also determines the `.dim` of our output.
         subplats = self._gen_subplats(queue)
 
-        unplattable_tracts = pytrs.TractList()
         for tract in queue:
             self.lot_definer.process_tract(tract, commit=True)
             subplat = subplats[tract.twprge]
