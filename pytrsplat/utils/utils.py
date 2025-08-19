@@ -28,7 +28,7 @@ def get_box(xy: tuple[int, int], dim: int) -> list[tuple[int, int]]:
     ]
     return box
 
-def get_box_outline(xy: tuple[int, int], dim: int) -> list(list[tuple[int, int]]):
+def get_box_outline(xy: tuple[int, int], dim: int) -> list[list[tuple[int, int]]]:
     """Get the lines that make up the outline of a box."""
     x, y = xy
     box = [
