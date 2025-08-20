@@ -1,6 +1,9 @@
 *__pycache__/
 testing/
 venv/
+.venv/
 .idea/
 /dev notes/
 /tests/results/
+.egg-info/
+/*.egg-info/
