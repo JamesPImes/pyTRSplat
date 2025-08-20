@@ -12,7 +12,7 @@ except ImportError:
 class LotDefinerTests(unittest.TestCase):
     def test_init(self):
         ld = LotDefiner(allow_defaults=True)
-        self.assertEqual(ld.allow_defaults, True)  # add assertion here
+        self.assertEqual(ld.allow_defaults, True)
 
 
 if __name__ == '__main__':
