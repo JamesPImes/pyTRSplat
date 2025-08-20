@@ -323,31 +323,35 @@ class Settings:
             rgba: tuple[int, int, int, int] = None
     ) -> None:
         """
-        Set the font for the specified ``purpose``.  (Any unspecified
-        parameters will remain unchanged.)
+        Set the font for the specified ``purpose``. Any unspecified
+        parameters will remain unchanged.
 
-        :param purpose: One of ``'header'``, ``'footer'``, ``'sec'``, or
-            ``'lot'``.
-        :param size: Int of font size.
-        :param typeface: A string specifying which typeface to use,
-            specified as one of the following:
+        :param purpose:
+            One of ``'header'``, ``'footer'``, ``'sec'``, or ``'lot'``.
+
+        :param size:
+            Int of font size.
+
+        :param typeface:
+            A string specifying which typeface to use, as one of:
 
             - Relative path (str) to a stock font (with extension
-                ``.ttf``) located in the
-                ``pytrsplat/plat_gen/plat_settings/`` directory.
+              ``.ttf``) located in the
+              ``pytrsplat/plat_gen/plat_settings/_fonts/`` directory.
 
-                Example::
-                    ``'_fonts/LiberationSans-Bold.ttf'``
+              Example::
 
-            - absolute path (str) to a font (with extension ``.ttf``)
-                located anywhere.
+                  '_fonts/LiberationSans-Bold.ttf'
 
-            - A key (str) to the ``Settings.TYPEFACES`` dict (which
-                contains absolute paths to ``.ttf`` fonts)
-                Ex:  ``'Sans-Serif (Bold)'``
+            - Absolute path (str) to a font (with extension ``.ttf``)
+              located anywhere.
 
-        :param rgba: 4-tuple of RGBA color to use for the font (0 to
-            255).
+            - A key (str) in the ``Settings.TYPEFACES`` dict, which
+              maps keys to absolute paths to ``.ttf`` fonts.
+              Example: ``'Sans-Serif (Bold)'``
+
+        :param rgba:
+            4-tuple of RGBA color values (0–255).
         """
         purpose = purpose.lower()
         if purpose not in ('header', 'footer', 'sec', 'lot'):
