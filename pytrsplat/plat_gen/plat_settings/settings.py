@@ -36,33 +36,33 @@ class Settings:
     TYPEFACES = {
         # 'Arial'-like font
         'Sans-Serif':
-            SETTINGS_DIR / r"_fonts\LiberationSans-Regular.ttf",
+            SETTINGS_DIR / "_fonts" / "LiberationSans-Regular.ttf",
         'Sans-Serif (Bold)':
-            SETTINGS_DIR / r"_fonts\LiberationSans-Bold.ttf",
+            SETTINGS_DIR / "_fonts" / "LiberationSans-Bold.ttf",
         'Sans-Serif (Bold-Italic)':
-            SETTINGS_DIR / r"_fonts\LiberationSans-BoldItalic.ttf",
+            SETTINGS_DIR / "_fonts" / "LiberationSans-BoldItalic.ttf",
         'Sans-Serif (Italic)':
-            SETTINGS_DIR / r"_fonts\LiberationSans-Italic.ttf",
+            SETTINGS_DIR / "_fonts" / "LiberationSans-Italic.ttf",
 
         # 'Times New Roman'-like font
         'Serif':
-            SETTINGS_DIR / r"_fonts\LiberationSerif-Regular.ttf",
+            SETTINGS_DIR / "_fonts" / "LiberationSerif-Regular.ttf",
         'Serif (Bold)':
-            SETTINGS_DIR / r"_fonts\LiberationSerif-Bold.ttf",
+            SETTINGS_DIR / "_fonts" / "LiberationSerif-Bold.ttf",
         'Serif (Bold-Italic)':
-            SETTINGS_DIR / r"_fonts\LiberationSerif-BoldItalic.ttf",
+            SETTINGS_DIR / "_fonts" / "LiberationSerif-BoldItalic.ttf",
         'Serif (Italic)':
-            SETTINGS_DIR / r"_fonts\LiberationSerif-Italic.ttf",
+            SETTINGS_DIR / "_fonts" / "LiberationSerif-Italic.ttf",
 
         # 'Courier'-like font
         'Mono':
-            SETTINGS_DIR / r"_fonts\LiberationMono-Regular.ttf",
+            SETTINGS_DIR / "_fonts" / "LiberationMono-Regular.ttf",
         'Mono (Bold)':
-            SETTINGS_DIR / r"_fonts\LiberationMono-Bold.ttf",
+            SETTINGS_DIR / "_fonts" / "LiberationMono-Bold.ttf",
         'Mono (Bold-Italic)':
-            SETTINGS_DIR / r"_fonts\LiberationMono-BoldItalic.ttf",
+            SETTINGS_DIR / "_fonts" / "LiberationMono-BoldItalic.ttf",
         'Mono (Italic)':
-            SETTINGS_DIR / r"_fonts\LiberationMono-Italic.ttf",
+            SETTINGS_DIR / "_fonts" / "LiberationMono-Italic.ttf",
     }
 
     DEFAULT_TYPEFACE = TYPEFACES['Sans-Serif']
