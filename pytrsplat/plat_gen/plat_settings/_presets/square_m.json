@@ -1,0 +1,113 @@
+{
+  "dim": [
+    560,
+    560
+  ],
+  "qq_fill_rgba": [
+    0,
+    0,
+    255,
+    100
+  ],
+  "sec_length_px": 80,
+  "line_stroke": {
+    "-1": 3,
+    "0": 1,
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "null": 1
+  },
+  "line_rgba": {
+    "-1": [
+      0,
+      0,
+      0,
+      255
+    ],
+    "0": [
+      0,
+      0,
+      0,
+      255
+    ],
+    "1": [
+      128,
+      128,
+      128,
+      255
+    ],
+    "2": [
+      230,
+      230,
+      230,
+      255
+    ],
+    "3": [
+      230,
+      230,
+      230,
+      255
+    ],
+    "null": [
+      230,
+      230,
+      230,
+      255
+    ]
+  },
+  "min_depth": 2,
+  "max_depth": null,
+  "centerbox_dim": 24,
+  "lot_num_offset_px": 6,
+  "headerfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
+  "footerfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
+  "secfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
+  "lotfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
+  "headerfont_size": 20,
+  "footerfont_size": 14,
+  "secfont_size": 14,
+  "lotfont_size": 1,
+  "headerfont_rgba": [
+    0,
+    0,
+    0,
+    255
+  ],
+  "footerfont_rgba": [
+    0,
+    0,
+    0,
+    255
+  ],
+  "secfont_rgba": [
+    0,
+    0,
+    0,
+    255
+  ],
+  "lotfont_rgba": [
+    0,
+    0,
+    0,
+    255
+  ],
+  "warningfont_rgba": [
+    255,
+    0,
+    0,
+    255
+  ],
+  "body_marg_top_y": 40,
+  "header_px_above_body": 4,
+  "footer_px_below_body": 40,
+  "footer_marg_left_x": 20,
+  "footer_marg_right_x": 20,
+  "footer_marg_bottom_y": 20,
+  "footer_px_between_lines": 7,
+  "write_header": true,
+  "short_header": false,
+  "write_tracts": false,
+  "write_section_numbers": true,
+  "write_lot_numbers": false
+}

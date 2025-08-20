@@ -331,7 +331,7 @@ class Settings:
         :param typeface: A string specifying which typeface to use,
          specified as one of the following:
           * Relative path (str) to a stock font (with extension ``.ttf``)
-            located in the ``pytrsplat/platsettings/`` directory.
+            located in the ``pytrsplat/plat_gen/plat_settings/`` directory.
             Ex:  ``'_fonts/LiberationSans-Bold.ttf'``
           * absolute path (str) to a font (with extension ``.ttf``)
             located anywhere.
@@ -365,7 +365,8 @@ class Settings:
         setattr(self, f"{purpose}font_typeface", typeface)
         return None
 
-    def _create_set_font(self, purpose: str, size: int, typeface: str | Path) -> ImageFont:
+    def _create_set_font(
+            self, purpose: str, size: int, typeface: str | Path) -> ImageFont:
         """
         Construct an ``ImageFont`` object from the specified ``size``
         and ``typeface`` (a filepath to a ``.ttf`` file), and set it for
@@ -379,7 +380,7 @@ class Settings:
             # Try as absolute path first.
             fnt = ImageFont.truetype(typeface, size)
         except OSError as no_font_error:
-            # Try instead as relative path (within 'pytrsplat/platsettings/'.)
+            # Try instead as relative path (within 'pytrsplat/plat_gen/plat_settings/'.)
             try:
                 fnt = ImageFont.truetype(_rel_path_to_abs(typeface), size)
             except OSError:
@@ -587,14 +588,15 @@ def _abs_path_to_rel(fp: str):
 
     Convert an absolute path that points to a file or directory within
     this module, into a relative path -- i.e. relative to the
-    ``pytrsplat/platsettings/`` dir.
+    ``pytrsplat/plat_gen/plat_settings/`` dir.
 
     If ``fp`` is already a relative filepath, or is an absolute filepath
     to a different directory, this will return the original ``fp``.
 
     :param fp: Filepath to convert to relative filepath.
-    :return: The filepath (str), relative to ``pytrsplat/platsettings/``
-    (i.e. relative to the directory for this module).
+    :return: The filepath (str), relative to
+    ``pytrsplat/plat_gen/plat_settings/`` (i.e. relative to the
+    directory for this module).
     """
     fp = str(fp)
     settings_dir = str(Settings.SETTINGS_DIR)
@@ -607,8 +609,9 @@ def _rel_path_to_abs(fp: str | Path):
     """
     INTERNAL USE:
 
-    Convert a relative path (within ``pytrsplat/platsettings/``) to an
-    absolute path, per the path of this module.
+    Convert a relative path (within
+    ``pytrsplat/plat_gen/plat_settings/``) to an absolute path, per the
+    path of this module.
 
     :param fp: Relative filepath to convert to an absolute path.
     :return: A ``Path`` object for an absolute path.
