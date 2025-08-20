@@ -633,12 +633,17 @@ def _rel_path_to_abs(fp: str | Path):
 
 # Add setting attributes and descriptions to the Settings docstring.
 docstring = Settings.__doc__
-docstring = f"{docstring}\n\n**All configurable settings:**"
+docstring = f"{docstring}\n\nAll configurable settings::\n\n"
+docstring = f"{docstring}```"
+just = 20
 for att, description in Settings._SET_ATTS.items():
-    docstring = f"{docstring}\n\n- ``{att}``: {description}"
+    docstring = f"{docstring}\n.{att.ljust(just, ' ')}-> {description}"
+docstring = f"{docstring}\n```\n\n"
 # Add included typefaces to Settings docstring.
-docstring = f"{docstring}\n\n**All included 'Liberation' typefaces (set with ``.set_font()``)**"
+docstring = f"{docstring}\n\nAll included 'Liberation' typefaces (use with ``.set_font()``)::\n\n"
+docstring = f"{docstring}```"
 for typeface_name in Settings.TYPEFACES.keys():
-    docstring = f"{docstring}\n\n- ``{typeface_name!r}``"
+    docstring = f"{docstring}\n- ``{typeface_name!r}``"
+docstring = f"{docstring}\n```"
 
 Settings.__doc__ = docstring
