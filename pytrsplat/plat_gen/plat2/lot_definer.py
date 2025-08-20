@@ -79,6 +79,11 @@ class LotDefiner:
 
     @standard_lot_size.setter
     def standard_lot_size(self, new_standard: int):
+        if not isinstance(new_standard, int):
+            raise TypeError(
+                f"`standard_lot_size` must be an int (either 40 or 80). "
+                f"Passed type: {type(new_standard)}"
+            )
         if new_standard not in (40, 80):
             raise ValueError(
                 f"`standard_lot_size` must be either 40 or 80. Passed: {new_standard}")
