@@ -67,7 +67,7 @@ class Settings:
 
     DEFAULT_TYPEFACE = TYPEFACES['Sans-Serif']
 
-    # Where we'll look for .txt files of preset data.
+    # Where we'll look for .json files of preset data.
     PRESET_DIRECTORY = SETTINGS_DIR / "_presets"
 
     # Default page-size dimensions.
@@ -617,3 +617,16 @@ def _rel_path_to_abs(fp: str | Path):
     :return: A ``Path`` object for an absolute path.
     """
     return Settings.SETTINGS_DIR / fp
+
+
+# Add setting attributes and descriptions to the Settings docstring.
+docstring = Settings.__doc__
+docstring = f"{docstring}\n\nAll configurable settings:"
+for att, description in Settings._SET_ATTS.items():
+    docstring = f"{docstring}\n * ``{att}``: {description}"
+# Add included typefaces to Settings docstring.
+docstring = f"{docstring}\n\nAll included 'Liberation' typefaces (set with ``.set_font()``):"
+for typeface_name in Settings.TYPEFACES.keys():
+    docstring = f"{docstring}\n * ``{typeface_name!r}``"
+
+Settings.__doc__ = docstring
