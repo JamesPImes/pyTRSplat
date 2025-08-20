@@ -1,12 +1,15 @@
 from __future__ import annotations
+import zipfile
+import io
 from warnings import warn
+from pathlib import Path
 
 from PIL import Image, ImageDraw
 import pytrs
 from pytrs.parser.tract.aliquot_simplify import AliquotNode
 
-from ..plat_settings2 import Settings
-from ...utils2 import calc_midpt, get_box, get_box_outline
+from ..plat_settings import Settings
+from ...utils import calc_midpt, get_box, get_box_outline
 from .lot_definer import LotDefiner
 
 __all__ = [
@@ -16,6 +19,9 @@ __all__ = [
 ]
 
 DEFAULT_SETTINGS = Settings()
+STACKABLE_IMAGE_FORMATS = ('pdf', 'tiff')
+DEFAULT_IMAGE_FORMAT_NONSTACKED = 'png'
+DEFAULT_IMAGE_FORMAT_STACKED = 'pdf'
 
 
 class SettingsOwner:
@@ -50,13 +56,28 @@ class ImageOwner:
     footer_draw: ImageDraw.Draw
     image_layers: tuple[Image]
 
-    def output(self):
-        """Compile and return the merged image of the plat."""
+    def output(self, fp: str | Path = None, image_format: str = None, **_kw) -> Image:
+        """
+        Compile and return the merged image of the plat. Optionally
+        save the results to disk, either as an image or as a .zip file
+        containing the image.
+
+        :param fp: (Optional) If provided, save the output to the
+         specified filepath.
+        :param image_format: (Optional) Override the image format of the
+         file specified in ``fp``. If not provided, will defer to the
+         file extension in ``fp``. (Only relevant if saving to file.)
+        :param _kw: No effect. (Included to mirror ``.output()`` of
+         other classes.)
+        """
         if not self.image_layers:
             return None
         merged = Image.alpha_composite(*self.image_layers[:2])
         for i in range(2, len(self.image_layers)):
             merged = Image.alpha_composite(merged, self.image_layers[i])
+        merged = merged.convert('RGB')
+        if fp is not None:
+            save_output_images([merged], fp, image_format)
         return merged
 
 
@@ -136,11 +157,116 @@ class ImageOwned:
 
 class QueueSingle:
     """
-    Class that can take in a ``pytrs.Tract`` and add it to the
-    ``.queue`` (a ``pytrs.TractList``).
+    Class that can take in one or more ``pytrs.Tract`` objects or a raw
+    PLSS description and add the results to the ``.queue`` (a
+    ``pytrs.TractList``).
+
+    This class mandates that all tracts lie within the same Twp/Rge, and
+    a ``ValueError`` will be raised when encountering a mismatched
+    Twp/Rge.
     """
 
     queue: pytrs.TractList()
+
+    def add_tract(self, tract: pytrs.Tract):
+        """
+        Add a tract to the queue. If there are already tracts in the
+        queue, this tract must match the existing Twp/Rge, or it will
+        raise a ``ValueError``.
+
+        .. note::
+          The tract must already be parsed for lots/QQs. (See ``pyTRS``
+          documentation for details.)
+        """
+
+        twp = None
+        rge = None
+        twprge_defined = False
+        if hasattr(self, 'twp') and hasattr(self, 'rge'):
+            twp = self.twp
+            rge = self.rge
+            if twp is not None and rge is not None:
+                twprge_defined = True
+        elif self.queue:
+            sample_tract: pytrs.Tract = self.queue[0]
+            twp = sample_tract.twp
+            rge = sample_tract.rge
+            twprge_defined = True
+        existing_twprge = pytrs.TRS.from_twprgesec(twp, rge).twprge
+
+        if not twprge_defined or (tract.twprge == existing_twprge):
+            self.queue.append(tract)
+            return None
+
+        msg = (
+            f"Mismatched Twp/Rge: {tract.twprge!r} does not match existing "
+            f"{existing_twprge!r}.\n"
+            "Consider using platting class (e.g., `PlatGroup` or `MegaPlat`) "
+            "that will accept multiple Twp/Rges."
+        )
+        raise ValueError(msg)
+
+    def add_tracts(
+            self, tracts: list[pytrs.Tract] | pytrs.TractList | pytrs.PLSSDesc) -> None:
+        """
+        Add multiple tracts to the queue. All tracts must share the same
+        Twp/Rge as any tracts already existing in the queue.
+
+        .. note::
+          The tracts must already be parsed for lots/QQs. (See ``pyTRS``
+          documentation for details.)
+
+        .. note::
+            All tracts in the queue must share the same Twp/Rge, or a
+            ``ValueError`` will be raised. If there is any doubt about
+            whether the tracts being added include other Twp/Rges,
+            consider using a platting object (e.g., ``PlatGroup`` or
+            ``MegaPlat``) that can process multiple Twp/Rges.
+
+        :param tracts: A collection of ``pytrs.Tract`` objects,
+         such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any other
+         iterable object that contains exclusively ``pytrs.Tract``.
+        """
+        for tract in tracts:
+            self.add_tract(tract)
+        return None
+
+    def add_description(self, txt: str, pytrs_config: str = None) -> pytrs.TractList:
+        """
+        Parse the land description and add the resulting tracts to the
+        queue.
+
+        .. note::
+            All tracts in the queue must share the same Twp/Rge, or a
+            ``ValueError`` will be raised. If there is any doubt about
+            whether the land description being added includes other
+            Twp/Rges, consider using a platting object (e.g.,
+            ``PlatGroup`` or ``MegaPlat``) that can process multiple
+            Twp/Rges.
+
+        :param txt: The land description.
+        :param pytrs_config: The config parameters for parsing. (See
+         pyTRS documentation for details.)
+        :return: A ``pytrs.TractList`` containing the tracts in which
+         the parser could NOT identify any lots or aliquots.
+        """
+        plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=pytrs_config)
+        self.add_tracts(plssdesc)
+        no_lots_qqs = pytrs.TractList()
+        for tract in plssdesc:
+            if not tract.lots_qqs:
+                no_lots_qqs.append(tract)
+        return no_lots_qqs
+
+
+class QueueMany(QueueSingle):
+    """
+    Class that can take in one or more ``pytrs.Tract`` objects or a raw
+    PLSS description and add the results to the ``.queue`` (a
+    ``pytrs.TractList``).
+
+    This class allows any number of unique Twp/Rges.
+    """
 
     def add_tract(self, tract: pytrs.Tract):
         """
@@ -151,19 +277,12 @@ class QueueSingle:
           documentation for details.)
         """
         self.queue.append(tract)
-
-
-class QueueMany(QueueSingle):
-    """
-    Class that can take in multiple tracts or a raw PLSS description and
-    add the results to the ``.queue`` (a ``pytrs.TractList``).
-    """
+        return None
 
     def add_tracts(
             self, tracts: list[pytrs.Tract] | pytrs.TractList | pytrs.PLSSDesc) -> None:
         """
-        Add multiple tracts to the queue. If no plat yet exists for the
-        Twp/Rge of any of these tracts, plats will be created as needed.
+        Add multiple tracts to the queue.
 
         .. note::
           The tracts must already be parsed for lots/QQs. (See ``pyTRS``
@@ -171,7 +290,7 @@ class QueueMany(QueueSingle):
 
         :param tracts: A collection of ``pytrs.Tract`` objects,
          such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any other
-         iterable object that contains ``pytrs.Tract``.
+         iterable object that contains exclusively ``pytrs.Tract``.
         """
         for tract in tracts:
             self.add_tract(tract)
@@ -974,6 +1093,10 @@ class Plat(IPlatOwner, QueueSingle):
             cached = self.lot_definer.get_all_definitions(mandatory_twprges=[twprge])
             self.all_lot_defs_cached = cached
         for tract in self.queue:
+            if self.twp is None:
+                self.twp = tract.twp
+            if self.rge is None:
+                self.rge = tract.rge
             self.lot_definer.process_tract(tract, commit=True)
             sec = tract.sec_num
             plat_sec = self.body.sections[sec]
@@ -1106,17 +1229,73 @@ class PlatGroup(SettingsOwner, QueueMany):
         plat.add_tract(tract)
         return None
 
-    def execute_queue(self):
+    def execute_queue(self, subset_twprges: list[str] = None):
         """
         Execute the queue of tracts to fill in the plats.
         """
         self.all_lot_defs_cached = self.lot_definer.get_all_definitions(
             mandatory_twprges=list(self.plats.keys())
         )
-        for plat in self.plats.values():
+        if subset_twprges is None:
+            subset_twprges = sorted(self.plats.keys())
+        for twprge in subset_twprges:
+            plat = self.plats[twprge]
             plat.execute_queue()
         self.all_lot_defs_cached = {}
         return None
+
+    def output(
+            self,
+            fp: str | Path = None,
+            image_format: str = None,
+            stack=None,
+            subset_twprges: list[str] = None
+    ) -> list[Image]:
+        """
+        Compile and return the merged image of the plats. Optionally
+        save the results to disk, either as one or more images, or as a
+        .zip file containing the image(s).
+
+        .. note::
+            Most image file formats are acceptable. If saving to a
+            ``.pdf`` or ``.tiff`` file extension, this will assume the
+            user wants a single file -- but separate files can be forced
+            with ``stack=False``.
+
+            If multiple files must be created (e.g., if the image format
+            is ``'png'``), then the respective Twp/Rge will be added to
+            each filename, before the file extension. For example, with
+            ``fp='some_file.png'``, it might create
+            ``some_file 154n97w.png``, ``some_file 155n97w.png``, etc.
+
+        :param fp: (Optional) If provided, save the output to the
+         specified filepath. If the path has a ``.zip`` extension, the
+         results will be put into a .zip file at that path. In that
+         case, you may want to specify the ``image_format``.
+        :param image_format: (Optional) Override the file format of the
+         file specified in ``fp``. If not provided, will defer to the
+         file extension in ``fp``. (Only relevant if saving to file.)
+        :param stack: (Optional) Whether to save the images to a single
+         file (assuming an appropriate image format is used). If the
+         file extension or specified ``image_format`` are ``'tiff'`` or
+         ``'pdf'``, then the resulting image will be stacked by default
+         (but can be overridden with ``stack=False``). Any other format
+         will result in separate images.
+        :param subset_twprges: (Optional) Output the plats only for the
+         selected Twp/Rges (formatted as ``['154n97w', '12s58e']``).
+        """
+        results = []
+        written_twprges = []
+        twprges = sorted(self.plats.keys())
+        if subset_twprges is not None:
+            twprges = subset_twprges
+        for twprge in twprges:
+            plat = self.plats[twprge]
+            results.append(plat.output())
+            written_twprges.append(twprge)
+        if fp is not None:
+            save_output_images(results, fp, image_format, stack, written_twprges)
+        return results
 
 
 class MegaPlat(IPlatOwner, QueueMany):
@@ -1351,3 +1530,116 @@ class MegaPlat(IPlatOwner, QueueMany):
                 unplattable = plat_sec.execute_queue()
                 unplattable_tracts.extend(unplattable)
         return unplattable_tracts
+
+
+def zip_output_images(
+        images: list[Image],
+        fp: str | Path = None,
+        image_format: str = None,
+        stack: bool = None,
+        twprges: list[str] = None
+):
+    """
+    INTERNAL USE:
+
+    Save the images to a .zip file, either separately or as a single
+    stacked image.
+
+    :param images: A list of ``Image`` objects, as given by any
+     ``.output()`` method.
+    :param fp: (See docs for ``PlatGroup.output()``.)
+    :param image_format: (See docs for ``PlatGroup.output()``.)
+    :param stack: (See docs for ``PlatGroup.output()``.)
+    :param twprges: (Optional) List of Twp/Rge strings to add to the
+     end of filenames if more than one image is to be written.
+    """
+    if image_format is None:
+        if stack:
+            image_format = DEFAULT_IMAGE_FORMAT_STACKED
+        else:
+            image_format = DEFAULT_IMAGE_FORMAT_NONSTACKED
+
+    if stack:
+        im_bytes = io.BytesIO()
+        im = images[0]
+        im.save(im_bytes, format=image_format, save_all=True, append_images=images[1:])
+        fn = f"{fp.stem}.{image_format}"
+        im_bytes.seek(0)
+        with zipfile.ZipFile(fp, 'w') as zfile:
+            zfile.writestr(fn, im_bytes.getvalue())
+        return None
+
+    just = len(images) % 10
+    with zipfile.ZipFile(fp, 'w') as zfile:
+        for i, im in enumerate(images, start=0):
+            surplus = str(i + 1).rjust(just, '0')
+            if twprges is not None:
+                surplus = twprges[i]
+            fn = f"{fp.stem} {surplus}.{image_format}"
+            im_bytes = io.BytesIO()
+            im.save(im_bytes, format=image_format)
+            im_bytes.seek(0)
+            zfile.writestr(fn, im_bytes.getvalue())
+    return None
+
+
+def save_output_images(
+        images: list[Image],
+        fp: str | Path = None,
+        image_format: str = None,
+        stack: bool = None,
+        twprges: list[str] = None,
+) -> Image:
+    """
+    Save the images to disk as one or more separate image files; or
+    into a .zip file (if the file extension of ``fp`` is ``.zip``).
+
+    :param images: A list of ``Image`` objects, as given by any
+     ``.output()`` method.
+    :param fp: (See docs for ``PlatGroup.output()``.)
+    :param image_format: (See docs for ``PlatGroup.output()``.)
+    :param stack: (See docs for ``PlatGroup.output()``.)
+    :param twprges: (Optional) List of Twp/Rge strings to add to the
+     end of filenames if more than one image is to be written.
+    """
+    fp = Path(fp)
+    sfx = fp.suffix.lower()
+
+    cand_fmt = sfx[1:]
+    if cand_fmt != 'zip':
+        if image_format is None:
+            image_format = cand_fmt
+        if image_format.lower() != cand_fmt:
+            raise ValueError(
+                f"File suffix {cand_fmt!r} "
+                f"does not match image format {image_format!r}")
+    if stack and image_format not in STACKABLE_IMAGE_FORMATS:
+        raise ValueError(
+            f"Cannot stack with image format {image_format!r}. "
+            f"Acceptable formats: {', '.join(STACKABLE_IMAGE_FORMATS)}"
+        )
+    if stack is None and image_format in STACKABLE_IMAGE_FORMATS:
+        # Assume user wants to stack any formats that allow it.
+        stack = True
+    if sfx == '.zip':
+        # Handle .zip files separately.
+        return zip_output_images(images, fp, image_format, stack, twprges)
+
+    n = len(images)
+    just = n % 10
+    if n == 1:
+        im = images[0]
+        im.save(fp, format=image_format)
+        return None
+    elif stack:
+        im = images[0]
+        im.save(fp, format=image_format, save_all=True, append_images=images[1:])
+        return None
+    else:
+        for i, im in enumerate(images, start=0):
+            surplus = str(i + 1).rjust(just, '0')
+            if twprges is not None:
+                surplus = twprges[i]
+            fn = f"{fp.stem} {surplus}.{image_format}"
+            im.save(fp.with_name(fn), format=image_format)
+    return None
