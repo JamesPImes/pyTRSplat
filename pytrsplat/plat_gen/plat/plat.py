@@ -1603,6 +1603,7 @@ def save_output_images(
      end of filenames if more than one image is to be written.
     """
     fp = Path(fp)
+    fp.parent.mkdir(exist_ok=True)
     sfx = fp.suffix.lower()
 
     cand_fmt = sfx[1:]
