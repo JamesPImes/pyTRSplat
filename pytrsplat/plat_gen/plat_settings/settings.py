@@ -637,7 +637,11 @@ docstring = f"{docstring}\n\n**All configurable settings:**"
 for att, description in Settings._SET_ATTS.items():
     docstring = f"{docstring}\n\n- ``{att}``: {description}"
 # Add included typefaces to Settings docstring.
-docstring = f"{docstring}\n\n**All included 'Liberation' typefaces (set with ``.set_font()``)**"
+docstring = f"{docstring}\n\n**All included 'Liberation' typefaces:**\n\n"
+docstring = (
+    f"{docstring}You can use these with ``.set_font(purpose='header', "
+    f"typeface='Mono (Bold)', size=48)``, for example.\n\n"
+)
 for typeface_name in Settings.TYPEFACES.keys():
     docstring = f"{docstring}\n\n- ``{typeface_name!r}``"
 
