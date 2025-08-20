@@ -56,13 +56,13 @@ class LotDefiner:
     def __init__(self, allow_defaults=False, standard_lot_size: int = 40):
         """
         :param allow_defaults: Whether to assume that all sections are
-         'standard', with typical lots (if any) in sections along the
-         north and west township boundaries. Can be changed later in the
-         ``.allow_defaults`` attribute.
+            'standard', with typical lots (if any) in sections along the
+            north and west township boundaries. Can be changed later in
+            the ``.allow_defaults`` attribute.
         :param standard_lot_size: How big we assume a 'standard' lot is
-         in the township(s) being considered. Must be either ``40`` or
-         ``80``. (This determines the default lot definitions.) Can be
-         changed later in the ``.standard_lot_size`` property.
+            in the township(s) being considered. Must be either ``40``
+            or ``80``. (This determines the default lot definitions.)
+            Can be changed later in the ``.standard_lot_size`` property.
         """
         # {twprge:      {sec:   {lot:   definition} } }
         # {'154n97w':   {1:     {'L1':  'NENE', 'L2': 'NWNE', ...} } }
@@ -138,13 +138,13 @@ class LotDefiner:
         :param lot: Header for the Lot.
         :param qq: Header for the lot definition (aliquots).
         :param allow_defaults: Whether to assume that all sections are
-         'standard', with typical lots (if any) in sections along the
-         north and west township boundaries. Can be changed later in the
-         ``.allow_defaults`` attribute.
+            'standard', with typical lots (if any) in sections along the
+            north and west township boundaries. Can be changed later in
+            the ``.allow_defaults`` attribute.
         :param standard_lot_size: How big we assume a 'standard' lot is
-         in the township(s) being considered. Must be either ``40`` or
-         ``80``. (This determines the default lot definitions.) Can be
-         changed later in the ``.standard_lot_size`` property.
+            in the township(s) being considered. Must be either ``40``
+            or ``80``. (This determines the default lot definitions.)
+            Can be changed later in the ``.standard_lot_size`` property.
         """
         out = cls(allow_defaults=allow_defaults, standard_lot_size=standard_lot_size)
         out.load_from_csv(fp, twp, rge, sec, lot, qq)
@@ -195,14 +195,14 @@ class LotDefiner:
         Get all definitions, including any defaults (if so configured or
         requested).
         :param include_defaults: Whether to include defaults in the
-         returned definitions. If not specified here, will use whatever
-         has been configured in ``.allow_defaults``.
+            returned definitions. If not specified here, will use
+            whatever has been configured in ``.allow_defaults``.
         :param mandatory_twprges: (Optional) A list of Twp/Rge's (in the
-         ``pyTRS`` format, ``'154n97w'``) that must be included in the
-         return definitions. Will add any such Twp/Rge that is not
-         already found in this ``LotDefiner``.
+            ``pyTRS`` format, ``'154n97w'``) that must be included in
+            the return definitions. Will add any such Twp/Rge that is
+            not already found in this ``LotDefiner``.
         :return: A nested dict of definitions.
-         ``twprge > sec > lot: definition``
+            ``twprge > sec > lot: definition``
         """
         if include_defaults is None:
             include_defaults = self.allow_defaults
@@ -257,16 +257,16 @@ class LotDefiner:
         respectively.
 
         :param tract: A ``pytrs.Tract`` object that has already been
-         parsed into lots and QQs.
+            parsed into lots and QQs.
         :param allow_defaults: Whether to assume that this section is
-         'standard', with typical lots (if any) in sections along the
-         north and west township boundaries. If not specified here, will
-         use whatever is configured in the ``.allow_defaults``
-         attribute.
+            'standard', with typical lots (if any) in sections along the
+            north and west township boundaries. If not specified here,
+            will use whatever is configured in the ``.allow_defaults``
+            attribute.
         :param commit: (Optional, on by default). Whether to store the
-         results to ``.lots_as_qqs`` and ``undefined_lots``.
+            results to ``.lots_as_qqs`` and ``undefined_lots``.
         :return: Two lists: The first being the converted aliquots, and
-         the second being a list of lots that have not been defined.
+            the second being a list of lots that have not been defined.
         """
         twprge = tract.twprge
         sec_num = tract.sec_num
@@ -286,7 +286,7 @@ class LotDefiner:
         that have not been defined.
 
         :param tracts: A container of ``pytrs.Tract`` objects that have
-         already been parsed into lots and QQs.
+            already been parsed into lots and QQs.
         """
         for tract in tracts:
             self.process_tract(tract, commit=True)
@@ -302,15 +302,15 @@ class LotDefiner:
         defined.
 
         :param tracts: A collection of ``pytrs.Tract`` objects that have
-         been parsed to lots and QQs.
+            been parsed to lots and QQs.
         :param allow_defaults: Whether to assume that all sections are
-         'standard', with typical lots (if any) in sections along the
-         north and west township boundaries. If not specified here, will
-         use whatever is configured in the ``.allow_defaults``
-         attribute.
+            'standard', with typical lots (if any) in sections along the
+            north and west township boundaries. If not specified here,
+            will use whatever is configured in the ``.allow_defaults``
+            attribute.
         :return: A nested dict, keyed by Twp/Rge (``'154n97w'``), then
-         keyed by section number (``1``), and the deep values being a
-         sorted list of lots for that Twp/Rge/Sec.
+            keyed by section number (``1``), and the deep values being a
+            sorted list of lots for that Twp/Rge/Sec.
         """
         output = {}
         for tract in tracts:

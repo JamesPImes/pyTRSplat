@@ -23,11 +23,12 @@ class Settings:
     ``Settings.from_json(some/path/file.json)``.
 
     .. note::
-      To establish a separate directory for custom presets for a
-      specific project, change the class variable of
-      ``Settings.PRESET_DIRECTORY`` for that project before loading any
-      presets. Or presets can be loaded individually from any directory
-      or filepath with ``Settings.from_json()``.
+
+        To establish a separate directory for custom presets for a
+        specific project, change the class variable of
+        ``Settings.PRESET_DIRECTORY`` for that project before loading
+        any presets. Or presets can be loaded individually from any
+        directory or filepath with ``Settings.from_json()``.
 
     To change font size and/or typeface, be sure to use ``.set_font()``.
     """
@@ -326,20 +327,20 @@ class Settings:
         parameters will remain unchanged.)
 
         :param purpose: One of ``'header'``, ``'footer'``, ``'sec'``, or
-         ``'lot'``.
+            ``'lot'``.
         :param size: Int of font size.
         :param typeface: A string specifying which typeface to use,
-         specified as one of the following:
-          * Relative path (str) to a stock font (with extension ``.ttf``)
-            located in the ``pytrsplat/plat_gen/plat_settings/`` directory.
-            Ex:  ``'_fonts/LiberationSans-Bold.ttf'``
-          * absolute path (str) to a font (with extension ``.ttf``)
-            located anywhere.
-          * A key (str) to the ``Settings.TYPEFACES`` dict (which
-            contains absolute paths to ``.ttf`` fonts)
-            Ex:  ``'Sans-Serif (Bold)'``
+            specified as one of the following:
+            - Relative path (str) to a stock font (with extension ``.ttf``)
+              located in the ``pytrsplat/plat_gen/plat_settings/`` directory.
+              Ex:  ``'_fonts/LiberationSans-Bold.ttf'``
+            - absolute path (str) to a font (with extension ``.ttf``)
+              located anywhere.
+            - A key (str) to the ``Settings.TYPEFACES`` dict (which
+              contains absolute paths to ``.ttf`` fonts)
+              Ex:  ``'Sans-Serif (Bold)'``
         :param rgba: 4-tuple of RGBA color to use for the font (0 to
-         255).
+            255).
         """
         purpose = purpose.lower()
         if purpose not in ('header', 'footer', 'sec', 'lot'):
@@ -595,8 +596,8 @@ def _abs_path_to_rel(fp: str):
 
     :param fp: Filepath to convert to relative filepath.
     :return: The filepath (str), relative to
-    ``pytrsplat/plat_gen/plat_settings/`` (i.e. relative to the
-    directory for this module).
+        ``pytrsplat/plat_gen/plat_settings/`` (i.e. relative to the
+        directory for this module).
     """
     fp = str(fp)
     settings_dir = str(Settings.SETTINGS_DIR)
@@ -623,10 +624,10 @@ def _rel_path_to_abs(fp: str | Path):
 docstring = Settings.__doc__
 docstring = f"{docstring}\n\nAll configurable settings:"
 for att, description in Settings._SET_ATTS.items():
-    docstring = f"{docstring}\n * ``{att}``: {description}"
+    docstring = f"{docstring}\n- ``{att}``: {description}"
 # Add included typefaces to Settings docstring.
 docstring = f"{docstring}\n\nAll included 'Liberation' typefaces (set with ``.set_font()``):"
 for typeface_name in Settings.TYPEFACES.keys():
-    docstring = f"{docstring}\n * ``{typeface_name!r}``"
+    docstring = f"{docstring}\n- ``{typeface_name!r}``"
 
 Settings.__doc__ = docstring

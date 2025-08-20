@@ -63,12 +63,12 @@ class ImageOwner:
         containing the image.
 
         :param fp: (Optional) If provided, save the output to the
-         specified filepath.
+            specified filepath.
         :param image_format: (Optional) Override the image format of the
-         file specified in ``fp``. If not provided, will defer to the
-         file extension in ``fp``. (Only relevant if saving to file.)
+            file specified in ``fp``. If not provided, will defer to the
+            file extension in ``fp``. (Only relevant if saving to file.)
         :param _kw: No effect. (Included to mirror ``.output()`` of
-         other classes.)
+            other classes.)
         """
         if not self.image_layers:
             return None
@@ -175,14 +175,15 @@ class QueueSingle:
         raise a ``ValueError``.
 
         .. note::
-          The tract must already be parsed for lots/QQs. (See ``pyTRS``
-          documentation for details.)
+
+            The tract must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
 
         :param tract: A ``pytrs.Tract`` that has been parsed into Lots
-         and QQ's. (Its Twp/Rge must match what is already in the
-         queue.)
+            and QQ's. (Its Twp/Rge must match what is already in the
+            queue.)
         :raise ValueError: If a Twp/Rge is added that does not share the
-         same Twp/Rge of every other tract in the queue.
+            same Twp/Rge of every other tract in the queue.
         """
 
         twp = None
@@ -219,10 +220,12 @@ class QueueSingle:
         Twp/Rge as any tracts already existing in the queue.
 
         .. note::
-          The tracts must already be parsed for lots/QQs. (See ``pyTRS``
-          documentation for details.)
+
+            The tracts must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
 
         .. note::
+
             All tracts in the queue must share the same Twp/Rge, or a
             ``ValueError`` will be raised. If there is any doubt about
             whether the tracts being added include other Twp/Rges,
@@ -230,10 +233,11 @@ class QueueSingle:
             ``MegaPlat``) that can process multiple Twp/Rges.
 
         :param tracts: A collection of ``pytrs.Tract`` objects,
-         such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any other
-         iterable object that contains exclusively ``pytrs.Tract``.
+            such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any
+            other iterable object that contains exclusively
+            ``pytrs.Tract``.
         :raise ValueError: If a Twp/Rge is added that does not share the
-         same Twp/Rge of every other tract in the queue.
+            same Twp/Rge of every other tract in the queue.
         """
         for tract in tracts:
             self.add_tract(tract)
@@ -245,6 +249,7 @@ class QueueSingle:
         queue.
 
         .. note::
+
             All tracts in the queue must share the same Twp/Rge, or a
             ``ValueError`` will be raised. If there is any doubt about
             whether the land description being added includes other
@@ -254,11 +259,11 @@ class QueueSingle:
 
         :param txt: The land description.
         :param pytrs_config: The config parameters for parsing. (See
-         pyTRS documentation for details.)
+            pyTRS documentation for details.)
         :return: A ``pytrs.TractList`` containing the tracts in which
-         the parser could NOT identify any lots or aliquots.
+            the parser could NOT identify any lots or aliquots.
         :raise ValueError: If a Twp/Rge is added that does not share the
-         same Twp/Rge of every other tract in the queue.
+            same Twp/Rge of every other tract in the queue.
         """
         plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=pytrs_config)
         self.add_tracts(plssdesc)
@@ -283,8 +288,9 @@ class QueueMany(QueueSingle):
         Add a tract to the queue.
 
         .. note::
-          The tract must already be parsed for lots/QQs. (See ``pyTRS``
-          documentation for details.)
+
+            The tract must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
         """
         self.queue.append(tract)
         return None
@@ -295,12 +301,14 @@ class QueueMany(QueueSingle):
         Add multiple tracts to the queue.
 
         .. note::
-          The tracts must already be parsed for lots/QQs. (See ``pyTRS``
-          documentation for details.)
+
+            The tracts must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
 
         :param tracts: A collection of ``pytrs.Tract`` objects,
-         such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any other
-         iterable object that contains exclusively ``pytrs.Tract``.
+            such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any
+            other iterable object that contains exclusively
+            ``pytrs.Tract``.
         """
         for tract in tracts:
             self.add_tract(tract)
@@ -314,9 +322,9 @@ class QueueMany(QueueSingle):
 
         :param txt: The land description.
         :param pytrs_config: The config parameters for parsing. (See
-         pyTRS documentation for details.)
+            pyTRS documentation for details.)
         :return: A ``pytrs.TractList`` containing the tracts in which
-         the parser could not identify any lots or aliquots.
+            the parser could not identify any lots or aliquots.
         """
         plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=pytrs_config)
         self.add_tracts(plssdesc)
@@ -337,9 +345,9 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
     def __init__(self, parent=None, label=None, owner: IPlatOwner = None):
         """
         :param owner: The ``Plat`` object that is the ultimate owner of
-         this node. (Controls the settings that dictate platting
-         behavior and appearance, and contains the image objects that
-         will be drawn on.)
+            this node. (Controls the settings that dictate platting
+            behavior and appearance, and contains the image objects that
+            will be drawn on.)
         """
         super().__init__(parent=parent, label=label)
         # Coord of top-left of this square.
@@ -369,7 +377,7 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
         specified configurations.
 
         :param parent_xy: The top-left coord of the parent node (or for
-         the root node, the section's top-left coord).
+            the root node, the section's top-left coord).
         """
         stn = self.settings
         if parent_xy is None:
@@ -397,7 +405,7 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
         """
         Fill in this aliquot on the plat.
         :param rgba: The RGBA value to use. If not passed, will use what
-         is configured in the owner's settings.
+            is configured in the owner's settings.
         """
         if rgba is None:
             cf = self.settings
@@ -414,9 +422,9 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
         Write lot numbers to the plat.
 
         :param at_depth: Depth at which to write the lots. MUST match
-         the depth at which the lot definitions have been parsed.
-         Default is 2 (i.e., quarter-quarters), specified above in the
-         stack.
+            the depth at which the lot definitions have been parsed.
+            Default is 2 (i.e., quarter-quarters), specified above in
+            the stack.
         """
         if self.depth == at_depth:
             lot_txt = ', '.join(str(l) for l in sorted(self.sources))
@@ -444,16 +452,16 @@ class PlatSection(SettingsOwned, ImageOwned):
     ):
         """
         :param trs: The Twp/Rge/Sec (a ``pytrs.TRS`` object) of this
-         section.
+            section.
         :param grid_offset: How many sections down and right from the
-         top-left of the township. (The offset of Section 6 is (0, 0);
-         whereas the offset of Section 36 is (6, 6).)
+            top-left of the township. (The offset of Section 6 is
+            (0, 0); whereas the offset of Section 36 is (6, 6).)
         :param owner: The ``Plat`` object that is the ultimate owner of
-         this section. (Controls the settings that dictate platting
-         behavior and appearance, and contains the image objects that
-         will be drawn on.)
+            this section. (Controls the settings that dictate platting
+            behavior and appearance, and contains the image objects that
+            will be drawn on.)
         :param is_lot_writer: If True, this is only intended for writing
-         lot numbers to the plat.
+            lot numbers to the plat.
         """
         if trs is not None:
             trs = pytrs.TRS(trs)
@@ -474,7 +482,7 @@ class PlatSection(SettingsOwned, ImageOwned):
         Configure this section and its subordinates.
 
         :param grid_xy: The top-left coord of the township to which this
-         section belongs.
+            section belongs.
         """
         settings = self.settings
         sec_length_px = settings.sec_length_px
@@ -585,7 +593,7 @@ class PlatSection(SettingsOwned, ImageOwned):
         Write the lot numbers in the section.
 
         :param at_depth: At which depth to write the numbers. Defaults
-         to 2 (i.e., quarter-quarters).
+            to 2 (i.e., quarter-quarters).
         """
         ld = self.owner.all_lot_defs_cached
         lots_definitions = ld.get(self.trs.twprge, {}).get(self.trs.sec_num, {})
@@ -633,13 +641,13 @@ class PlatBody(SettingsOwned, ImageOwned):
         :param twp: The Twp of the Twp/Rge represented by this body.
         :param rge: The Rge of the Twp/Rge represented by this body.
         :param owner: The ``Plat`` object that is the ultimate owner of
-         this body. (Controls the settings that dictate platting
-         behavior and appearance, and contains the image objects that
-         will be drawn on.)
+            this body. (Controls the settings that dictate platting
+            behavior and appearance, and contains the image objects that
+            will be drawn on.)
         :param is_lot_writer: Tell this ``PlatBody`` that it will only
-         be used to write lots onto the plat. (If ``True``, prevents
-         redrawing section lines, quarter lines, etc.; and enables the
-         writing of lot numbers in the respective QQs.)
+            be used to write lots onto the plat. (If ``True``, prevents
+            redrawing section lines, quarter lines, etc.; and enables
+            the writing of lot numbers in the respective QQs.)
         """
         self.owner: IPlatOwner = owner
         self.twp = twp
@@ -676,7 +684,7 @@ class PlatBody(SettingsOwned, ImageOwned):
         Enact the settings to configure this plat body.
 
         :param xy: The top-left coord of the area of the plat containing
-         the grid.
+            the grid.
         """
         if xy is None:
             xy = self.settings.grid_xy
@@ -690,7 +698,7 @@ class PlatBody(SettingsOwned, ImageOwned):
         Write the lot numbers into the respective squares.
 
         :param at_depth: At which depth to write the numbers. Defaults
-         to 2 (i.e., quarter-quarters).
+            to 2 (i.e., quarter-quarters).
         """
         if not self.is_lot_writer:
             raise ValueError(
@@ -730,7 +738,8 @@ class PlatHeader(SettingsOwned, ImageOwned):
         """
         Write the header to the plat.
 
-         .. note::
+        .. note::
+
             The default header is the Twp/Rge, styled as follows
             ``Township 154 North, Range 97 West``.
             if ``short_header=True`` in the settings, the resulting
@@ -743,16 +752,16 @@ class PlatHeader(SettingsOwned, ImageOwned):
         :param twp: The Twp of this plat (e.g., ``'154n'``)
         :param rge: The Rge of this plat (e.g., ``'97w'``)
         :param xy: The anchor point at which to write. (Defaults to
-         above the plat, as configured by margins in settings.)
+            above the plat, as configured by margins in settings.)
         :param custom_header: (Optional) Override the default header and
-         use this text instead. If used, any other keyword arguments
-         will be ignored.
+            use this text instead. If used, any other keyword arguments
+            will be ignored.
         :param align: Either ``'default'`` (to aligned horizontally
-         centered) or ``'center_center'`` (to center both horizontally
-         and vertically).
+            centered) or ``'center_center'`` (to center both
+            horizontally and vertically).
         :param kw: (Optional) keyword arguments to pass to
-         ``pytrs.TRS.pretty_twprge()`` to control how the Twp/Rge header
-         should be spelled out.
+            ``pytrs.TRS.pretty_twprge()`` to control how the Twp/Rge
+            header should be spelled out.
         """
         if align not in ('default', 'center_center'):
             raise ValueError(
@@ -798,9 +807,9 @@ class PlatFooter(SettingsOwned, ImageOwned):
     def __init__(self, owner: IPlatOwner = None):
         """
         :param owner: The ``Plat`` object (or other appropriate type)
-         that is the ultimate owner of this footer. (Controls the
-         settings that dictate platting behavior and appearance, and
-         contains the image objects that will be drawn on.)
+            that is the ultimate owner of this footer. (Controls the
+            settings that dictate platting behavior and appearance, and
+            contains the image objects that will be drawn on.)
         """
         self.owner: IPlatOwner = owner
         self._x = None
@@ -896,11 +905,11 @@ class PlatFooter(SettingsOwned, ImageOwned):
         successfully written or at least partially written).
 
         :param write_partial: (Optional, on by default) If there is not
-         space to write a tract's entire description, write whatever
-         will fit. (A partially written tract will NOT be included in
-         the returned unwritten tracts.)
+            space to write a tract's entire description, write whatever
+            will fit. (A partially written tract will NOT be included in
+            the returned unwritten tracts.)
         :return: A list of tracts that could not be written in the space
-         available.
+            available.
         """
         unwritten = []
         for tract in tracts:
@@ -919,15 +928,15 @@ class PlatFooter(SettingsOwned, ImageOwned):
         Write a single tract in the footer.
 
         :param write_partial: (Optional, on by default) If there is not
-         space to write the tract's entire description, write whatever
-         will fit. (A partially written tract will NOT be returned as
-         unwritten.)
+            space to write the tract's entire description, write
+            whatever will fit. (A partially written tract will NOT be
+            returned as unwritten.)
         :param font_rgba: (Optional) Specify the RGBA code to use for
-         this tract. If not specified, will use the ``.footerfont_rgba``
-         specified in the settings.
+            this tract. If not specified, will use the ``.footerfont_rgba``
+            specified in the settings.
         :return: If the tract is successfully written (or partially
-         written), this will return None. If it could not be written,
-         the original tract will be returned.
+            written), this will return None. If it could not be written,
+            the original tract will be returned.
         """
         stn = self.settings
         draw = self.footer_draw
@@ -962,12 +971,12 @@ class PlatFooter(SettingsOwned, ImageOwned):
         Write a block of text in the footer.
 
         :param write_partial: (Optional, off by default) If there is not
-         space to write the entire block of text, write whatever will
-         fit.
+            space to write the entire block of text, write whatever will
+            fit.
         :return: If the entire block is successfully written, this will
-         return None. If not, the portion of the text that could not be
-         written will be returned (and if ``write_partial=False``, then
-         the whole text block will be returned as unwritten).
+            return None. If not, the portion of the text that could not
+            be written will be returned (and if ``write_partial=False``,
+            then the whole text block will be returned as unwritten).
         """
         writable_lines, unwritable_txt = self.check_text(txt, xy_0=(self._x, self._y))
         if unwritable_txt is not None:
@@ -992,11 +1001,11 @@ class Plat(IPlatOwner, QueueSingle):
         :param twp: The Twp of the Twp/Rge represented by this Plat.
         :param rge: The Rge of the Twp/Rge represented by this Plut.
         :param settings: The ``Settings`` object to control the behavior
-         and appearance of this plat. (Will be overridden by the
-         settings in ``owner``, if that is passed.)
+            and appearance of this plat. (Will be overridden by the
+            settings in ``owner``, if that is passed.)
         :param owner: (Optional) The ``PlatGroup`` object (or other)
-         that this ``Plat`` belongs to. (If used, the ``owner`` will
-         control the settings of this ``Plat``.)
+            that this ``Plat`` belongs to. (If used, the ``owner`` will
+            control the settings of this ``Plat``.)
         """
         self.twp = twp
         self.rge = rge
@@ -1093,8 +1102,9 @@ class Plat(IPlatOwner, QueueSingle):
     def execute_queue(self) -> pytrs.TractList:
         """
         Execute the queue of tracts to fill in the plat.
+
         :return: A ``pytrs.TractList`` containing all tracts that could
-         not be platted (no lots or aliquots identified).
+            not be platted (no lots or aliquots identified).
         """
         twprge = f"{self.twp}{self.rge}"
         unplattable_tracts = pytrs.TractList()
@@ -1132,7 +1142,8 @@ class Plat(IPlatOwner, QueueSingle):
         """
         Write the header to the top of the plat.
 
-         .. note::
+        .. note::
+
             The default header is the Twp/Rge, styled as follows
             ``Township 154 North, Range 97 West``.
             if ``short_header=True`` in the settings, the resulting
@@ -1143,15 +1154,16 @@ class Plat(IPlatOwner, QueueSingle):
             else.
 
         :param custom_header: (Optional) Override the default header and
-         use this text instead. If used, any other keyword arguments
-         will be ignored.
+            use this text instead. If used, any other keyword arguments
+            will be ignored.
         :param kw: (Optional) keyword arguments to pass to
-         ``pytrs.TRS.pretty_twprge()`` to control how the Twp/Rge header
-         should be spelled out.
+            ``pytrs.TRS.pretty_twprge()`` to control how the Twp/Rge
+            header should be spelled out.
         """
         self.header.write_header(custom_header=custom_header, **kw)
 
     def write_lot_numbers(self, at_depth=2):
+        """Write the lot numbers to the plat."""
         lotwriter = PlatBody(twp=self.twp, rge=self.rge, owner=self, is_lot_writer=True)
         lotwriter.configure(xy=self.settings.grid_xy)
         lotwriter.write_lot_numbers(at_depth)
@@ -1180,10 +1192,11 @@ class PlatGroup(SettingsOwner, QueueMany):
     def __init__(self, settings: Settings = None, lot_definer: LotDefiner = None):
         """
         :param settings: The ``Settings`` object to control the behavior
-         and appearance of the subordinate plats.
+            and appearance of the subordinate plats.
         :param lot_definer: A ``LotDefiner`` object to use for defining
-         lots in tracts that are added to the queue. (Can also be
-         modified or replaced in the ``.lot_definer`` attribute later.)
+            lots in tracts that are added to the queue. (Can also be
+            modified or replaced in the ``.lot_definer`` attribute
+            later.)
         """
         if settings is None:
             settings = Settings.preset('default')
@@ -1230,8 +1243,9 @@ class PlatGroup(SettingsOwner, QueueMany):
         of this tract, one will be created.
 
         .. note::
-          The tract must already be parsed for lots/QQs. (See ``pyTRS``
-          documentation for details.)
+
+            The tract must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
         """
         plat = self.plats.get(tract.twprge)
         if plat is None:
@@ -1267,6 +1281,7 @@ class PlatGroup(SettingsOwner, QueueMany):
         .zip file containing the image(s).
 
         .. note::
+
             Most image file formats are acceptable. If saving to a
             ``.pdf`` or ``.tiff`` file extension, this will assume the
             user wants a single file -- but separate files can be forced
@@ -1279,20 +1294,20 @@ class PlatGroup(SettingsOwner, QueueMany):
             ``some_file 154n97w.png``, ``some_file 155n97w.png``, etc.
 
         :param fp: (Optional) If provided, save the output to the
-         specified filepath. If the path has a ``.zip`` extension, the
-         results will be put into a .zip file at that path. In that
-         case, you may want to specify the ``image_format``.
+            specified filepath. If the path has a ``.zip`` extension,
+            the results will be put into a .zip file at that path. In
+            that case, you may want to specify the ``image_format``.
         :param image_format: (Optional) Override the file format of the
-         file specified in ``fp``. If not provided, will defer to the
-         file extension in ``fp``. (Only relevant if saving to file.)
+            file specified in ``fp``. If not provided, will defer to the
+            file extension in ``fp``. (Only relevant if saving to file.)
         :param stack: (Optional) Whether to save the images to a single
-         file (assuming an appropriate image format is used). If the
-         file extension or specified ``image_format`` are ``'tiff'`` or
-         ``'pdf'``, then the resulting image will be stacked by default
-         (but can be overridden with ``stack=False``). Any other format
-         will result in separate images.
+            file (assuming an appropriate image format is used). If the
+            file extension or specified ``image_format`` are ``'tiff'``
+            or ``'pdf'``, then the resulting image will be stacked by
+            default (but can be overridden with ``stack=False``). Any
+            other format will result in separate images.
         :param subset_twprges: (Optional) Output the plats only for the
-         selected Twp/Rges (formatted as ``['154n97w', '12s58e']``).
+            selected Twp/Rges (formatted as ``['154n97w', '12s58e']``).
         """
         results = []
         written_twprges = []
@@ -1317,6 +1332,7 @@ class MegaPlat(IPlatOwner, QueueMany):
     the settings that is faint, to avoid obfuscating section lines, etc.
 
     .. warning::
+
         The dimensions of a ``MegaPlat`` output are determined by the
         number and spread of the townships in the tracts added to the
         queue. The resulting images can probably be extremely large. As
@@ -1325,12 +1341,14 @@ class MegaPlat(IPlatOwner, QueueMany):
         dimensions is violated, it will raise a ``RuntimeError``.
 
     .. note::
+
         The size of each component plat (one for each township) is
         controlled by ``.sec_length_px``. And ``.body_marg_top_y``
         serves as the margins on all four sides of the resulting group
         of plats.
 
     .. note::
+
         This will not allow Townships in the queue to be both North and
         South (i.e., ``'154n'`` and ``'27s'`` cannot coexist in the
         queue). Similarly, Ranges may not be both East and West
@@ -1346,13 +1364,14 @@ class MegaPlat(IPlatOwner, QueueMany):
     ):
         """
         :param settings: The ``Settings`` object to control the behavior
-         and appearance of this plat.
+            and appearance of this plat.
         :param lot_definer: A ``LotDefiner`` object to use for defining
-         lots in tracts that are added to the queue. (Can also be
-         modified or replaced in the ``.lot_definer`` attribute later.)
+            lots in tracts that are added to the queue. (Can also be
+            modified or replaced in the ``.lot_definer`` attribute
+            later.)
         :param max_dim: (Optional) Specify the largest dimensions that
-         may be generated. If exceeded, a ``RuntimeError`` will be
-         raised prior to plat generation.
+            may be generated. If exceeded, a ``RuntimeError`` will be
+            raised prior to plat generation.
         """
         self.queue = pytrs.TractList()
         if settings is None:
@@ -1410,14 +1429,17 @@ class MegaPlat(IPlatOwner, QueueMany):
         """
         Get a list of Twp numbers and a list of Rge numbers that
         encompass the entirety of the tracts in the ``queue``.
+
         If the townships are "North", they will be sorted largest to
         smallest (so that the highest number appears at the top of the
         eventual plat); and vice versa for "South".
+
         If the ranges are "West", they will be sorted largest to
         smallest (so that the highest number appears at the left of the
         eventual plat); and vice versa for "East".
+
         :return: Two lists: One of Twp numbers, and another for Rge
-         numbers.
+            numbers.
         """
         if not queue:
             return [], []
@@ -1514,8 +1536,9 @@ class MegaPlat(IPlatOwner, QueueMany):
     def execute_queue(self, subset_twprges: list[str] = None) -> pytrs.TractList:
         """
         Execute the queue of tracts, and generate the plat.
+
         :return: A ``pytrs.TractList`` containing all tracts that could
-         not be platted.
+            not be platted.
         """
         unplattable_tracts = pytrs.TractList()
         queue = self.queue
@@ -1556,12 +1579,12 @@ def zip_output_images(
     stacked image.
 
     :param images: A list of ``Image`` objects, as given by any
-     ``.output()`` method.
+        ``.output()`` method.
     :param fp: (See docs for ``PlatGroup.output()``.)
     :param image_format: (See docs for ``PlatGroup.output()``.)
     :param stack: (See docs for ``PlatGroup.output()``.)
     :param twprges: (Optional) List of Twp/Rge strings to add to the
-     end of filenames if more than one image is to be written.
+        end of filenames if more than one image is to be written.
     """
     if image_format is None:
         if stack:
@@ -1605,12 +1628,12 @@ def save_output_images(
     into a .zip file (if the file extension of ``fp`` is ``.zip``).
 
     :param images: A list of ``Image`` objects, as given by any
-     ``.output()`` method.
+        ``.output()`` method.
     :param fp: (See docs for ``PlatGroup.output()``.)
     :param image_format: (See docs for ``PlatGroup.output()``.)
     :param stack: (See docs for ``PlatGroup.output()``.)
     :param twprges: (Optional) List of Twp/Rge strings to add to the
-     end of filenames if more than one image is to be written.
+        end of filenames if more than one image is to be written.
     """
     fp = Path(fp)
     fp.parent.mkdir(exist_ok=True)
