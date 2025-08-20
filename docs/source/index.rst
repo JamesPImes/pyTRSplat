@@ -22,4 +22,7 @@ config parameters.
 
 .. toctree::
     modules/plat
+    modules/megaplat
+    modules/platgroup
+    modules/settings
 
