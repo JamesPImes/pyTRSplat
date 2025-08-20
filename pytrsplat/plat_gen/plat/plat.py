@@ -207,8 +207,8 @@ class QueueSingle:
         msg = (
             f"Mismatched Twp/Rge: {tract.twprge!r} does not match existing "
             f"{existing_twprge!r}.\n"
-            "Consider using platting class (e.g., `PlatGroup` or `MegaPlat`) "
-            "that will accept multiple Twp/Rges."
+            "Consider using platting class that will accept multiple Twp/Rges "
+            " (e.g., `PlatGroup` or `MegaPlat`)."
         )
         raise ValueError(msg)
 
