@@ -1,7 +1,7 @@
 __all__ = [
     'calc_midpt',
     'get_box',
-    'get_box_outline'
+    'get_box_outline',
 ]
 
 
@@ -21,12 +21,13 @@ def get_box(xy: tuple[int, int], dim: int) -> list[tuple[int, int]]:
     """
     x, y = xy
     box = [
-        (x, y),
-        (x + dim, y),
-        (x + dim, y + dim),
-        (x, y + dim),
+        (x, y),                 # top-left
+        (x + dim, y),           # top-right
+        (x + dim, y + dim),     # bottom-right
+        (x, y + dim),           # bottom-left
     ]
     return box
+
 
 def get_box_outline(xy: tuple[int, int], dim: int) -> list[list[tuple[int, int]]]:
     """Get the lines that make up the outline of a box."""
