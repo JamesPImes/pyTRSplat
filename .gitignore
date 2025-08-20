@@ -7,3 +7,5 @@ venv/
 /tests/results/
 .egg-info/
 /*.egg-info/
+/build/
+scratch*
