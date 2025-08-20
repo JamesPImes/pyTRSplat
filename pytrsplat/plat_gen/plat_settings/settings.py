@@ -331,14 +331,21 @@ class Settings:
         :param size: Int of font size.
         :param typeface: A string specifying which typeface to use,
             specified as one of the following:
-            - Relative path (str) to a stock font (with extension ``.ttf``)
-              located in the ``pytrsplat/plat_gen/plat_settings/`` directory.
-              Ex:  ``'_fonts/LiberationSans-Bold.ttf'``
+
+            - Relative path (str) to a stock font (with extension
+                ``.ttf``) located in the
+                ``pytrsplat/plat_gen/plat_settings/`` directory.
+
+                Example::
+                    ``'_fonts/LiberationSans-Bold.ttf'``
+
             - absolute path (str) to a font (with extension ``.ttf``)
-              located anywhere.
+                located anywhere.
+
             - A key (str) to the ``Settings.TYPEFACES`` dict (which
-              contains absolute paths to ``.ttf`` fonts)
-              Ex:  ``'Sans-Serif (Bold)'``
+                contains absolute paths to ``.ttf`` fonts)
+                Ex:  ``'Sans-Serif (Bold)'``
+
         :param rgba: 4-tuple of RGBA color to use for the font (0 to
             255).
         """
