@@ -177,6 +177,12 @@ class QueueSingle:
         .. note::
           The tract must already be parsed for lots/QQs. (See ``pyTRS``
           documentation for details.)
+
+        :param tract: A ``pytrs.Tract`` that has been parsed into Lots
+         and QQ's. (Its Twp/Rge must match what is already in the
+         queue.)
+        :raise ValueError: If a Twp/Rge is added that does not share the
+         same Twp/Rge of every other tract in the queue.
         """
 
         twp = None
@@ -226,6 +232,8 @@ class QueueSingle:
         :param tracts: A collection of ``pytrs.Tract`` objects,
          such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any other
          iterable object that contains exclusively ``pytrs.Tract``.
+        :raise ValueError: If a Twp/Rge is added that does not share the
+         same Twp/Rge of every other tract in the queue.
         """
         for tract in tracts:
             self.add_tract(tract)
@@ -249,6 +257,8 @@ class QueueSingle:
          pyTRS documentation for details.)
         :return: A ``pytrs.TractList`` containing the tracts in which
          the parser could NOT identify any lots or aliquots.
+        :raise ValueError: If a Twp/Rge is added that does not share the
+         same Twp/Rge of every other tract in the queue.
         """
         plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=pytrs_config)
         self.add_tracts(plssdesc)
