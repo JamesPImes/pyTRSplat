@@ -28,7 +28,7 @@ plat_group.lot_definer.allow_defaults = True
 plat_group.lot_definer.standard_lot_size = 40
 
 # Add the above land description, using the specified pytrs config string.
-plat_group.add_description(land_description, pytrs_config='default_ns.n,default_ew.w')
+plat_group.add_description(land_description, config='n,w')
 plat_group.execute_queue()
 # Output the results, and save them to a PDF.
 all_images = plat_group.output(

@@ -15,7 +15,7 @@ plat.lot_definer.standard_lot_size = 80
 # Add the above land description, using the specified pytrs config string.
 # NOTE: If we tried to add lands outside of T8S-R58W, this would raise a ValueError.
 # If we need to plat lands across township boundaries, use a PlatGroup or MegaPlat instead.
-plat.add_description(land_description, pytrs_config='default_ns.s,default_ew.w')
+plat.add_description(land_description, config='n,w')
 
 plat.execute_queue()
 # Output the results, and save them to a PNG. (Could also create .PDF, .TIFF, etc.).

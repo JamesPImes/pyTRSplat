@@ -28,7 +28,7 @@ mega_plat.lot_definer.allow_defaults = True
 mega_plat.lot_definer.standard_lot_size = 40
 
 # Add the above land description, using the specified pytrs config string.
-mega_plat.add_description(land_description, pytrs_config='default_ns.n,default_ew.w')
+mega_plat.add_description(land_description, config='n,w')
 mega_plat.execute_queue()
 # Output the results, and save them to a PNG.
 only_image = mega_plat.output(
