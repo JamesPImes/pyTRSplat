@@ -8,7 +8,7 @@ except ImportError:
     sys.path.append('../')
     from pytrsplat import PlatGroup
 
-class PlatTests(unittest.TestCase):
+class PlatGroupTests(unittest.TestCase):
     def test_init(self):
         plat_group = PlatGroup()
         self.assertTrue(len(plat_group.queue) == 0)

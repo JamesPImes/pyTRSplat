@@ -8,7 +8,7 @@ except ImportError:
     sys.path.append('../')
     from pytrsplat import Settings
 
-class PlatTests(unittest.TestCase):
+class SettingsTests(unittest.TestCase):
     def test_init(self):
         settings = Settings()
         # Default fill, transparent blue.
