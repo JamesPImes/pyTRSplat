@@ -1,18 +1,34 @@
 # pyTRSplat
 
-Imported as `pytrsplat`, this is a Python library and extension of the
+Imported as `pytrsplat`, this Python library is an extension of the
 [pyTRS library](https://github.com/JamesPImes/pyTRS)
 that generates customizable plats from
 [Public Land Survey System (PLSS)](https://en.wikipedia.org/wiki/Public_Land_Survey_System)
 land descriptions (or "legal descriptions").
+
 
 ## To install
 
 Directly from the GitHub repo:
 
 ```
-pip install git+https://github.com/JamesPImes/pyTRSplat@master
+pip install git+https://github.com/JamesPImes/pyTRSplat
 ```
+
+
+## Requires
+
+Python 3.9 or newer
+
+
+## Quickstart Guide and Docs
+
+A quickstart guide is provided
+[here](https://pytrsplat.readthedocs.io/en/latest/docs/modules/quickstart.html).
+
+Documentation is provided
+on [ReadTheDocs](https://pytrsplat.readthedocs.io/en/latest/docs/modules/quickstart.html).
+
 
 ## Sample Outputs
 
@@ -27,29 +43,31 @@ Section 13: That portion of the E/2 lying north of the river and west of the pri
 Section 14: NE/4, NE/4NW/4, S/2NW/4NW/4
 ```
 
-...results in the following square plat (using one custom setting):
+...results in the following square plat:
 
-![sample_plat_01](documentation/sample_plat_02.png)
+![sample_plat_01](_readme_images/sample_plat_02.png)
 
-...or the following letter-sized plat, with tracts written at the end (using a different setting):
+...or the following letter-sized page, with tracts written at the end (click for full size):
 
-![sample_plat_01](documentation/sample_plat_01.png)
+![sample_plat_01](_readme_images/sample_plat_01.png)
 
 ...or could be configured any number of ways for different sizes, fonts, colors, page size/shape, etc.
 
-## GUI Application
 
-See [this archived repo](https://github.com/JamesPImes/pyTRSplat-archived) for a full-featured GUI application.
+## Desktop Application
+
+See [this archived repo](https://github.com/JamesPImes/pyTRSplat-archived) for the desktop application.
 
 *(No longer maintained as part of this library as of v0.5.0.)*
 
-![plat_gui_01](documentation/plat_gui_01.gif)
+![plat_gui_01](_readme_images/plat_gui_01.gif)
 
-## Quick demonstration
 
-The following code generates the larger plat shown in the examples above.
-It assumes that there are 'standard' approximately 40-acre lots in the
-sections along the north and west boundaries of the township.
+## Demonstration
+
+The following code generates the letter-size plat shown in the examples
+above. It assumes that there are 'standard' approximately 40-acre lots
+in the sections along the north and west boundaries of the township.
 
 ```
 import pytrsplat
@@ -66,7 +84,7 @@ plat_group.settings = pytrsplat.Settings.preset('letter')
 plat_group.lot_definer.allow_defaults = True
 plat_group.lot_definer.standard_lot_size = 40
 # `config` gets passed along to the pytrs library.
-plat_group.add_description(land_description, config='default_ns.n,default_ew.w')
+plat_group.add_description(land_description, config='n,w')
 plat_group.execute_queue()
 plat_group.output(fp=r'C:\land plats\sample_plats.zip', filetype='png')
 ```
@@ -74,12 +92,7 @@ plat_group.output(fp=r'C:\land plats\sample_plats.zip', filetype='png')
 If there were multiple townships in our plat group, we could put the
 resulting plats in a single PDF:
 
-```commandline
+```
 # `stack=True` tells the output to add them all to the same image file.
 plat_group.output(fp=r'C:\land plats\sample_plats.PDF', stack=True)
 ```
-
-## "How-To"
-
-For additional functionality, including customization of the plats, and defining where lots lie within a given section,
-see [the more in-depth guide](documentation/guide.md).
