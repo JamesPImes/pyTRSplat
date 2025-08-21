@@ -1,11 +1,10 @@
 # Copyright (c) 2020-2025, James P. Imes. All rights reserved.
 
 """
-``pyTRSplat`` -- A module to generate customizable land plat images from
-PLSS land descriptions (or 'legal descriptions'), using the ``pyTRS``
-parsing library.
+pyTRSplat (imported as ``pytrsplat``) is a library for generating
+customizable land plat images from PLSS land descriptions (or
+'legal descriptions'), using the pyTRS parsing library.
 """
-
 
 from . import _constants
 from .plat_gen import *
