@@ -6,6 +6,7 @@ that generates customizable plats from
 [Public Land Survey System (PLSS)](https://en.wikipedia.org/wiki/Public_Land_Survey_System)
 land descriptions (or "legal descriptions").
 
+![tiny_example_plat](_readme_images/tiny_example_plat.png)
 
 ## To install
 
