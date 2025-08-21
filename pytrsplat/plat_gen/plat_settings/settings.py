@@ -313,6 +313,15 @@ class Settings:
             if isinstance(v, list):
                 v = tuple(v)
             d[k] = v
+        # Ensure typeface paths are appropriate for current OS.
+        for att in Settings._TYPEFACE_ATTS:
+            v = d[att]
+            v = v.replace('\\', '/')
+            path_components = [v]
+            if '/' in v:
+                path_components = v.split('/')
+            v = os.path.join(*path_components)
+            d[att] = v
         return cls.from_dict(d)
 
     def set_font(
