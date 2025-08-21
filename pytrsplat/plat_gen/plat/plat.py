@@ -24,6 +24,254 @@ DEFAULT_IMAGE_FORMAT_NONSTACKED = 'png'
 DEFAULT_IMAGE_FORMAT_STACKED = 'pdf'
 
 
+class QueueSingle:
+    """
+    Class that can take in one or more ``pytrs.Tract`` objects or a raw
+    PLSS description and add the results to the ``.queue`` (a
+    ``pytrs.TractList``).
+
+    This class mandates that all tracts lie within the same Twp/Rge, and
+    a ``ValueError`` will be raised when encountering a mismatched
+    Twp/Rge.
+    """
+
+    queue: pytrs.TractList()
+
+    def add_tract(self, tract: pytrs.Tract):
+        """
+        Add a tract to the queue. If there are already tracts in the
+        queue, this tract must match the existing Twp/Rge, or it will
+        raise a ``ValueError``.
+
+        .. note::
+
+            The tract must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
+
+        :param tract: A ``pytrs.Tract`` that has been parsed into Lots
+            and QQ's. (Its Twp/Rge must match what is already in the
+            queue.)
+        :raise ValueError: If a Twp/Rge is added that does not share the
+            same Twp/Rge of every other tract in the queue.
+        """
+
+        twp = None
+        rge = None
+        twprge_defined = False
+        if hasattr(self, 'twp') and hasattr(self, 'rge'):
+            twp = self.twp
+            rge = self.rge
+            if twp is not None and rge is not None:
+                twprge_defined = True
+        elif self.queue:
+            sample_tract: pytrs.Tract = self.queue[0]
+            twp = sample_tract.twp
+            rge = sample_tract.rge
+            twprge_defined = True
+        existing_twprge = pytrs.TRS.from_twprgesec(twp, rge).twprge
+
+        if not twprge_defined or (tract.twprge == existing_twprge):
+            self.queue.append(tract)
+            if hasattr(self, 'twp') and hasattr(self, 'rge'):
+                self.twp = tract.twp
+                self.rge = tract.rge
+            return None
+
+        msg = (
+            f"Mismatched Twp/Rge: {tract.twprge!r} does not match existing "
+            f"{existing_twprge!r}.\n"
+            "Consider using platting class that will accept multiple Twp/Rges "
+            " (e.g., `PlatGroup` or `MegaPlat`)."
+        )
+        raise ValueError(msg)
+
+    def add_tracts(
+            self, tracts: list[pytrs.Tract] | pytrs.TractList | pytrs.PLSSDesc) -> None:
+        """
+        Add multiple tracts to the queue. All tracts must share the same
+        Twp/Rge as any tracts already existing in the queue.
+
+        .. note::
+
+            The tracts must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
+
+        .. note::
+
+            All tracts in the queue must share the same Twp/Rge, or a
+            ``ValueError`` will be raised. If there is any doubt about
+            whether the tracts being added include other Twp/Rges,
+            consider using a platting object (e.g., ``PlatGroup`` or
+            ``MegaPlat``) that can process multiple Twp/Rges.
+
+        :param tracts: A collection of ``pytrs.Tract`` objects,
+            such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any
+            other iterable object that contains exclusively
+            ``pytrs.Tract``.
+        :raise ValueError: If a Twp/Rge is added that does not share the
+            same Twp/Rge of every other tract in the queue.
+        """
+        for tract in tracts:
+            self.add_tract(tract)
+        return None
+
+    def add_description(self, txt: str, config: str = None) -> pytrs.TractList:
+        """
+        Parse the land description and add the resulting tracts to the
+        queue.
+
+        .. note::
+
+            All tracts in the queue must share the same Twp/Rge, or a
+            ``ValueError`` will be raised. If there is any doubt about
+            whether the land description being added includes other
+            Twp/Rges, consider using a platting object (e.g.,
+            ``PlatGroup`` or ``MegaPlat``) that can process multiple
+            Twp/Rges.
+
+        :param txt: The land description.
+        :param config: The config parameters for parsing, to be passed
+            through to the ``pytrs`` library. (See pyTRS documentation
+            for details.)
+        :return: A ``pytrs.TractList`` containing the tracts in which
+            the parser could NOT identify any lots or aliquots.
+        :raise ValueError: If a Twp/Rge is added that does not share the
+            same Twp/Rge of every other tract in the queue.
+        """
+        plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=config)
+        self.add_tracts(plssdesc)
+        no_lots_qqs = pytrs.TractList()
+        for tract in plssdesc:
+            if not tract.lots_qqs:
+                no_lots_qqs.append(tract)
+        return no_lots_qqs
+
+
+class QueueMany(QueueSingle):
+    """
+    Class that can take in one or more ``pytrs.Tract`` objects or a raw
+    PLSS description and add the results to the ``.queue`` (a
+    ``pytrs.TractList``).
+
+    This class allows any number of unique Twp/Rges.
+    """
+
+    def add_tract(self, tract: pytrs.Tract):
+        """
+        Add a tract to the queue.
+
+        .. note::
+
+            The tract must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
+        """
+        self.queue.append(tract)
+        return None
+
+    def add_tracts(
+            self, tracts: list[pytrs.Tract] | pytrs.TractList | pytrs.PLSSDesc) -> None:
+        """
+        Add multiple tracts to the queue.
+
+        .. note::
+
+            The tracts must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
+
+        :param tracts: A collection of ``pytrs.Tract`` objects,
+            such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any
+            other iterable object that contains exclusively
+            ``pytrs.Tract``.
+        """
+        for tract in tracts:
+            self.add_tract(tract)
+        return None
+
+    def add_description(self, txt: str, config: str = None) -> pytrs.TractList:
+        """
+        Parse the land description and add the resulting tracts to the
+        plat group. If one or more Twp/Rge's are newly identified, plats
+        will be created as needed.
+
+        :param txt: The land description.
+        :param config: The config parameters for parsing, to be passed
+            through to the ``pytrs`` library. (See pyTRS documentation
+            for details.)
+        :return: A ``pytrs.TractList`` containing the tracts in which
+            the parser could not identify any lots or aliquots.
+        """
+        plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=config)
+        self.add_tracts(plssdesc)
+        no_lots_qqs = pytrs.TractList()
+        for tract in plssdesc:
+            if not tract.lots_qqs:
+                no_lots_qqs.append(tract)
+        return no_lots_qqs
+
+
+class LotDefinerOwner(QueueSingle):
+    """
+    Class that has a ``LotDefiner`` object in its ``.lot_definer``
+    attribute, and appropriate methods for passing through methods that
+    affect its queue.
+    """
+    lot_definer: LotDefiner
+    # Cache of lot definitions (including defaults). Gets used while
+    # executing queue, then cleared.
+    all_lot_defs_cached: dict
+
+    def find_undefined_lots(
+            self,
+            allow_defaults: bool = None
+    ) -> dict[str, dict[str, list[str]]]:
+        """
+        Find all tracts in the queue that have one or more lots that
+        have not been defined.
+
+        :param allow_defaults: Whether to assume that all sections are
+            'standard', with typical lots (if any) in sections along the
+            north and west township boundaries. If not specified here,
+            will use whatever is configured in the
+            ``lot_definer.allow_defaults`` attribute.
+        :return: A nested dict, keyed by Twp/Rge (``'154n97w'``), then
+            keyed by section number (``1``), and the deep values being a
+            sorted list of lots for that Twp/Rge/Sec.
+        """
+        return self.lot_definer.find_undefined_lots(
+            tracts=self.queue, allow_defaults=allow_defaults)
+
+    def find_unplattable_tracts(self, allow_defaults: bool = None) -> pytrs.TractList:
+        """
+        Get a ``pytrs.TractList`` containing all tracts that cannot be
+        platted with the currently provided lot definitions (optionally
+        accounting for default lots, if so configured).
+
+        .. note::
+            If a tract has any aliquots and/or any lots that have been
+            defined, it will be considered plattable, even if some of
+            its lots have NOT been defined. To check for undefined lots,
+            use the ``.find_undefined_lots()`` method.
+
+        :param allow_defaults: Whether to assume that all sections are
+            'standard', with typical lots (if any) in sections along the
+            north and west township boundaries. If not specified here,
+            will use whatever is configured in the
+            ``lot_definer.allow_defaults`` attribute.
+        """
+        unplattable_tracts = pytrs.TractList()
+        if not self.queue:
+            return unplattable_tracts
+        for tract in self.queue:
+            converted_aliquots, undefined_lots = self.lot_definer.process_tract(
+                tract,
+                allow_defaults=allow_defaults,
+                commit=False
+            )
+            if not tract.qqs and not converted_aliquots:
+                unplattable_tracts.append(tract)
+        return unplattable_tracts
+
+
 class SettingsOwner:
     """
     Interface for a class that has a ``Settings`` object in its
@@ -47,16 +295,16 @@ class ImageOwner:
 
     And an ``.output()`` method.
     """
-    background: Image
-    image: Image
+    background: Image.Image
+    image: Image.Image
     draw: ImageDraw.Draw
-    overlay_image: Image
+    overlay_image: Image.Image
     overlay_draw: ImageDraw.Draw
-    footer_image: Image
+    footer_image: Image.Image
     footer_draw: ImageDraw.Draw
-    image_layers: tuple[Image]
+    image_layers: tuple[Image.Image]
 
-    def output(self, fp: str | Path = None, image_format: str = None, **_kw) -> Image:
+    def output(self, fp: str | Path = None, image_format: str = None, **_kw) -> Image.Image | None:
         """
         Compile and return the merged image of the plat. Optionally
         save the results to disk, either as an image or as a .zip file
@@ -69,6 +317,8 @@ class ImageOwner:
             file extension in ``fp``. (Only relevant if saving to file.)
         :param _kw: No effect. (Included to mirror ``.output()`` of
             other classes.)
+        :return: The generated image. If ``.image_layers`` contains no
+            images, will return ``None`` instead.
         """
         if not self.image_layers:
             return None
@@ -81,18 +331,7 @@ class ImageOwner:
         return merged
 
 
-class ILotDefinerOwner:
-    """
-    Interface for a class that has a ``LotDefiner`` object in its
-    ``.lot_definer`` attribute.
-    """
-    lot_definer: LotDefiner
-    # Cache of lot definitions (including defaults). Gets used while
-    # executing queue, then cleared.
-    all_lot_defs_cached: dict
-
-
-class IPlatOwner(SettingsOwner, ImageOwner, ILotDefinerOwner):
+class IPlatOwner(SettingsOwner, ImageOwner, LotDefinerOwner):
     """
     Composite interface for a class that incorporates all necessary
     interfaces necessary for platting.
@@ -100,10 +339,10 @@ class IPlatOwner(SettingsOwner, ImageOwner, ILotDefinerOwner):
     pass
 
 
-class ISettingsLotDefinerOwner(SettingsOwner, ILotDefinerOwner):
+class ISettingsLotDefinerOwner(SettingsOwner, LotDefinerOwner):
     """
     Composite interface for a class that incorporates ``SettingsOwner``
-    and ``ILotDefinerOwner``.
+    and ``LotDefinerOwner``.
     """
     pass
 
@@ -153,186 +392,6 @@ class ImageOwned:
     @property
     def footer_draw(self):
         return self.owner.footer_draw
-
-
-class QueueSingle:
-    """
-    Class that can take in one or more ``pytrs.Tract`` objects or a raw
-    PLSS description and add the results to the ``.queue`` (a
-    ``pytrs.TractList``).
-
-    This class mandates that all tracts lie within the same Twp/Rge, and
-    a ``ValueError`` will be raised when encountering a mismatched
-    Twp/Rge.
-    """
-
-    queue: pytrs.TractList()
-
-    def add_tract(self, tract: pytrs.Tract):
-        """
-        Add a tract to the queue. If there are already tracts in the
-        queue, this tract must match the existing Twp/Rge, or it will
-        raise a ``ValueError``.
-
-        .. note::
-
-            The tract must already be parsed for lots/QQs. (See
-            ``pyTRS`` documentation for details.)
-
-        :param tract: A ``pytrs.Tract`` that has been parsed into Lots
-            and QQ's. (Its Twp/Rge must match what is already in the
-            queue.)
-        :raise ValueError: If a Twp/Rge is added that does not share the
-            same Twp/Rge of every other tract in the queue.
-        """
-
-        twp = None
-        rge = None
-        twprge_defined = False
-        if hasattr(self, 'twp') and hasattr(self, 'rge'):
-            twp = self.twp
-            rge = self.rge
-            if twp is not None and rge is not None:
-                twprge_defined = True
-        elif self.queue:
-            sample_tract: pytrs.Tract = self.queue[0]
-            twp = sample_tract.twp
-            rge = sample_tract.rge
-            twprge_defined = True
-        existing_twprge = pytrs.TRS.from_twprgesec(twp, rge).twprge
-
-        if not twprge_defined or (tract.twprge == existing_twprge):
-            self.queue.append(tract)
-            return None
-
-        msg = (
-            f"Mismatched Twp/Rge: {tract.twprge!r} does not match existing "
-            f"{existing_twprge!r}.\n"
-            "Consider using platting class that will accept multiple Twp/Rges "
-            " (e.g., `PlatGroup` or `MegaPlat`)."
-        )
-        raise ValueError(msg)
-
-    def add_tracts(
-            self, tracts: list[pytrs.Tract] | pytrs.TractList | pytrs.PLSSDesc) -> None:
-        """
-        Add multiple tracts to the queue. All tracts must share the same
-        Twp/Rge as any tracts already existing in the queue.
-
-        .. note::
-
-            The tracts must already be parsed for lots/QQs. (See
-            ``pyTRS`` documentation for details.)
-
-        .. note::
-
-            All tracts in the queue must share the same Twp/Rge, or a
-            ``ValueError`` will be raised. If there is any doubt about
-            whether the tracts being added include other Twp/Rges,
-            consider using a platting object (e.g., ``PlatGroup`` or
-            ``MegaPlat``) that can process multiple Twp/Rges.
-
-        :param tracts: A collection of ``pytrs.Tract`` objects,
-            such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any
-            other iterable object that contains exclusively
-            ``pytrs.Tract``.
-        :raise ValueError: If a Twp/Rge is added that does not share the
-            same Twp/Rge of every other tract in the queue.
-        """
-        for tract in tracts:
-            self.add_tract(tract)
-        return None
-
-    def add_description(self, txt: str, pytrs_config: str = None) -> pytrs.TractList:
-        """
-        Parse the land description and add the resulting tracts to the
-        queue.
-
-        .. note::
-
-            All tracts in the queue must share the same Twp/Rge, or a
-            ``ValueError`` will be raised. If there is any doubt about
-            whether the land description being added includes other
-            Twp/Rges, consider using a platting object (e.g.,
-            ``PlatGroup`` or ``MegaPlat``) that can process multiple
-            Twp/Rges.
-
-        :param txt: The land description.
-        :param pytrs_config: The config parameters for parsing. (See
-            pyTRS documentation for details.)
-        :return: A ``pytrs.TractList`` containing the tracts in which
-            the parser could NOT identify any lots or aliquots.
-        :raise ValueError: If a Twp/Rge is added that does not share the
-            same Twp/Rge of every other tract in the queue.
-        """
-        plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=pytrs_config)
-        self.add_tracts(plssdesc)
-        no_lots_qqs = pytrs.TractList()
-        for tract in plssdesc:
-            if not tract.lots_qqs:
-                no_lots_qqs.append(tract)
-        return no_lots_qqs
-
-
-class QueueMany(QueueSingle):
-    """
-    Class that can take in one or more ``pytrs.Tract`` objects or a raw
-    PLSS description and add the results to the ``.queue`` (a
-    ``pytrs.TractList``).
-
-    This class allows any number of unique Twp/Rges.
-    """
-
-    def add_tract(self, tract: pytrs.Tract):
-        """
-        Add a tract to the queue.
-
-        .. note::
-
-            The tract must already be parsed for lots/QQs. (See
-            ``pyTRS`` documentation for details.)
-        """
-        self.queue.append(tract)
-        return None
-
-    def add_tracts(
-            self, tracts: list[pytrs.Tract] | pytrs.TractList | pytrs.PLSSDesc) -> None:
-        """
-        Add multiple tracts to the queue.
-
-        .. note::
-
-            The tracts must already be parsed for lots/QQs. (See
-            ``pyTRS`` documentation for details.)
-
-        :param tracts: A collection of ``pytrs.Tract`` objects,
-            such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any
-            other iterable object that contains exclusively
-            ``pytrs.Tract``.
-        """
-        for tract in tracts:
-            self.add_tract(tract)
-        return None
-
-    def add_description(self, txt: str, pytrs_config: str = None) -> pytrs.TractList:
-        """
-        Parse the land description and add the resulting tracts to the
-        plat group. If one or more Twp/Rge's are newly identified, plats
-        will be created as needed.
-
-        :param txt: The land description.
-        :param pytrs_config: The config parameters for parsing. (See
-            pyTRS documentation for details.)
-        :return: A ``pytrs.TractList`` containing the tracts in which
-            the parser could not identify any lots or aliquots.
-        """
-        plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=pytrs_config)
-        self.add_tracts(plssdesc)
-        no_lots_qqs = pytrs.TractList()
-        for tract in plssdesc:
-            if not tract.lots_qqs:
-                no_lots_qqs.append(tract)
-        return no_lots_qqs
 
 
 class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
@@ -879,7 +938,10 @@ class PlatFooter(SettingsOwned, ImageOwned):
         writable_lines = []
         line = ""
         for i, word in enumerate(words):
-            cand_line = f"{line} {word}"
+            if line:
+                cand_line = f"{line} {word}"
+            else:
+                cand_line = word
             c_width = stn.footerfont.getlength(cand_line)
             if c_width <= avail_w:
                 line = cand_line
@@ -1010,15 +1072,15 @@ class Plat(IPlatOwner, QueueSingle):
         self.twp = twp
         self.rge = rge
         self.queue = pytrs.TractList()
-        self.background: Image = None
+        self.background: Image.Image = None
         # Main image and draw object.
-        self.image: Image = None
+        self.image: Image.Image = None
         self.draw: ImageDraw.Draw = None
         # Overlays the main image with QQs, etc.
-        self.overlay_image: Image = None
+        self.overlay_image: Image.Image = None
         self.overlay_draw: ImageDraw.Draw = None
         # Footer image and draw object.
-        self.footer_image: Image = None
+        self.footer_image: Image.Image = None
         self.footer_draw: ImageDraw.Draw = None
         self.image_layers: list[Image] = []
         self.header = PlatHeader(owner=self)
@@ -1037,7 +1099,6 @@ class Plat(IPlatOwner, QueueSingle):
         # It's a cache of lot definitions (including defaults). Gets used while
         # executing queue, then cleared.
         self._all_lot_defs_cached = {}
-        self.configure()
 
     @property
     def settings(self):
@@ -1106,6 +1167,7 @@ class Plat(IPlatOwner, QueueSingle):
         :return: A ``pytrs.TractList`` containing all tracts that could
             not be platted (no lots or aliquots identified).
         """
+        self.configure()
         twprge = f"{self.twp}{self.rge}"
         unplattable_tracts = pytrs.TractList()
         self.queue.custom_sort()
@@ -1136,7 +1198,7 @@ class Plat(IPlatOwner, QueueSingle):
             self.write_lot_numbers(at_depth=2)
         if self.owner is None:
             self.all_lot_defs_cached = None
-        return None
+        return unplattable_tracts
 
     def write_header(self, custom_header: str = None, **kw) -> None:
         """
@@ -1204,6 +1266,7 @@ class PlatGroup(SettingsOwner, QueueMany):
         if lot_definer is None:
             lot_definer = LotDefiner()
         self.lot_definer: LotDefiner = lot_definer
+        self.queue = pytrs.TractList()
         self.plats: dict[str, Plat] = {}
         # Cache of lot definitions (including defaults). Gets used while
         # executing queue, then cleared.
@@ -1253,20 +1316,29 @@ class PlatGroup(SettingsOwner, QueueMany):
         plat.add_tract(tract)
         return None
 
-    def execute_queue(self, subset_twprges: list[str] = None):
+    def execute_queue(self, subset_twprges: list[str] = None) -> pytrs.TractList:
         """
         Execute the queue of tracts to fill in the plats.
+
+        :param subset_twprges: (Optional) Limit the generated image to
+            this list of Twp/Rges (in the pyTRS format -- e.g.,
+            ``['154n97w', '155n97w']``).
+
+        :return: A ``pytrs.TractList`` containing all tracts that could
+            not be platted (no lots or aliquots identified).
         """
         self.all_lot_defs_cached = self.lot_definer.get_all_definitions(
             mandatory_twprges=list(self.plats.keys())
         )
+        all_unplattable = pytrs.TractList()
         if subset_twprges is None:
             subset_twprges = sorted(self.plats.keys())
         for twprge in subset_twprges:
             plat = self.plats[twprge]
-            plat.execute_queue()
+            unplattable = plat.execute_queue()
+            all_unplattable.extend(unplattable)
         self.all_lot_defs_cached = {}
-        return None
+        return all_unplattable
 
     def output(
             self,
@@ -1274,7 +1346,7 @@ class PlatGroup(SettingsOwner, QueueMany):
             image_format: str = None,
             stack=None,
             subset_twprges: list[str] = None
-    ) -> list[Image]:
+    ) -> list[Image.Image]:
         """
         Compile and return the merged image of the plats. Optionally
         save the results to disk, either as one or more images, or as a
@@ -1537,6 +1609,9 @@ class MegaPlat(IPlatOwner, QueueMany):
         """
         Execute the queue of tracts, and generate the plat.
 
+        :param subset_twprges: (Optional) Limit the generated images to
+            this list of Twp/Rges (in the pyTRS format -- e.g.,
+            ``['154n97w', '155n97w']``).
         :return: A ``pytrs.TractList`` containing all tracts that could
             not be platted.
         """
@@ -1571,7 +1646,7 @@ def zip_output_images(
         image_format: str = None,
         stack: bool = None,
         twprges: list[str] = None
-):
+) -> None:
     """
     INTERNAL USE:
 
@@ -1622,7 +1697,7 @@ def save_output_images(
         image_format: str = None,
         stack: bool = None,
         twprges: list[str] = None,
-) -> Image:
+) -> None:
     """
     Save the images to disk as one or more separate image files; or
     into a .zip file (if the file extension of ``fp`` is ``.zip``).
