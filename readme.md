@@ -24,10 +24,10 @@ Python 3.9 or newer
 ## Quickstart Guide and Docs
 
 A quickstart guide is provided
-[here](https://pytrsplat.readthedocs.io/en/latest/docs/modules/quickstart.html).
+[here](https://pytrsplat.readthedocs.io/en/latest/modules/quickstart.html).
 
 Documentation is provided
-on [ReadTheDocs](https://pytrsplat.readthedocs.io/en/latest/docs/modules/quickstart.html).
+on [ReadTheDocs](https://pytrsplat.readthedocs.io/).
 
 
 ## Sample Outputs
