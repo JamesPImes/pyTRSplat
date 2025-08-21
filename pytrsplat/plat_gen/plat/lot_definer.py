@@ -110,6 +110,24 @@ class LotDefiner:
                 output[sec_num] = self.DEF_07_18_19_30_31_80AC.copy()
         return output
 
+    def define_lot(self, trs: str | pytrs.TRS, lot: int | str, definition: str):
+        """
+        :param trs: The Twp/Rge/Sec in the pyTRS format (e.g.,
+            ``'154n97w01'``).
+        :param lot: The lot number, either as ``'L1'`` or as int.
+        :param definition: The aliquots that make up this lot, separated
+            by comma if necessary. (Be sure to use ``'clean_qq'``
+            compatible definitions, such as ``'NENE'`` or
+            ``'N2NW,SENW'``. (Reference the pyTRS documentation for more
+            info.)
+        """
+        trs = pytrs.TRS(trs)
+        self.definitions.setdefault(trs.twprge, {})
+        self.definitions[trs.twprge].setdefault(trs.sec_num, {})
+        if isinstance(lot, int):
+            lot = f"L{lot}"
+        self.definitions[trs.twprge][trs.sec_num][lot] = definition
+
     @classmethod
     def from_csv(
             cls,
@@ -124,19 +142,33 @@ class LotDefiner:
     ) -> LotDefiner:
         """
         Create a ``LotDefiner`` from csv file. The data should be
-        compatible with ``pyTRS`` formatting. E.g:
-         * ``twp``: ``'154n'``
-         * ``rge``: ``'97w'``
-         * ``sec``: ``'01'`` (with or without leading ``'0'`` for single digits)
-         * ``lot``: ``'L1'``
-         * ``qq``: ``'NENE'``
+        compatible with ``pyTRS`` formatting.
+
+        Example .csv formatting:
+
+        +------+-----+-----+-----+-----------+
+        | twp  | rge | sec | lot | qq        |
+        +======+=====+=====+=====+===========+
+        | 154n | 97w | 1   | L1  | NENE      |
+        +------+-----+-----+-----+-----------+
+        | 12s  | 58e | 04  | 1   | N2NE,SENE |
+        +------+-----+-----+-----+-----------+
+
+        ``sec`` may optionally have a leading ``0`` (e.g., ``4`` or
+        ``'04'``).
+
+        ``lot`` may optionally have a leading ``L`` (e.g., ``1`` or
+        ``'L1'``).
+
+        ``qq`` can be one or more aliquots. Be sure to use 'clean' QQ
+        definitions, such as the above.
 
         :param fp: Path to the .csv file to load.
-        :param twp: Header for the Twp.
-        :param rge: Header for the Rge.
-        :param sec: Header for the Sec.
-        :param lot: Header for the Lot.
-        :param qq: Header for the lot definition (aliquots).
+        :param twp: Header for the Twp column.
+        :param rge: Header for the Rge column.
+        :param sec: Header for the Sec column.
+        :param lot: Header for the Lot column.
+        :param qq: Header for the lot definition (aliquots) column.
         :param allow_defaults: Whether to assume that all sections are
             'standard', with typical lots (if any) in sections along the
             north and west township boundaries. Can be changed later in
@@ -154,19 +186,33 @@ class LotDefiner:
             self, fp: Path | str, twp='twp', rge='rge', sec='sec', lot='lot', qq='qq'):
         """
         Load lot definitions from csv file. The data should be
-        compatible with ``pyTRS`` formatting. E.g:
-         * ``twp``: ``'154n'``
-         * ``rge``: ``'97w'``
-         * ``sec``: ``'01'`` (with or without leading ``'0'`` for single digits)
-         * ``lot``: ``'L1'``
-         * ``qq``: ``'NENE'``
+        compatible with ``pyTRS`` formatting.
+
+        Example .csv formatting:
+
+        +------+-----+-----+-----+-----------+
+        | twp  | rge | sec | lot | qq        |
+        +======+=====+=====+=====+===========+
+        | 154n | 97w | 1   | L1  | NENE      |
+        +------+-----+-----+-----+-----------+
+        | 12s  | 58e | 04  | 1   | N2NE,SENE |
+        +------+-----+-----+-----+-----------+
+
+        ``sec`` may optionally have a leading ``0`` (e.g., ``4`` or
+        ``'04'``).
+
+        ``lot`` may optionally have a leading ``L`` (e.g., ``1`` or
+        ``'L1'``).
+
+        ``qq`` can be one or more aliquots. Be sure to use 'clean' QQ
+        definitions, such as the above.
 
         :param fp: Path to the .csv file to load.
-        :param twp: Header for the Twp.
-        :param rge: Header for the Rge.
-        :param sec: Header for the Sec.
-        :param lot: Header for the Lot.
-        :param qq: Header for the lot definition (aliquots).
+        :param twp: Header for the Twp column.
+        :param rge: Header for the Rge column.
+        :param sec: Header for the Sec column.
+        :param lot: Header for the Lot column.
+        :param qq: Header for the lot definition (aliquots) column.
         """
         with open(fp, 'r') as f:
             reader = csv.DictReader(f)
@@ -194,13 +240,16 @@ class LotDefiner:
         """
         Get all definitions, including any defaults (if so configured or
         requested).
+
         :param include_defaults: Whether to include defaults in the
             returned definitions. If not specified here, will use
             whatever has been configured in ``.allow_defaults``.
+
         :param mandatory_twprges: (Optional) A list of Twp/Rge's (in the
             ``pyTRS`` format, ``'154n97w'``) that must be included in
             the return definitions. Will add any such Twp/Rge that is
             not already found in this ``LotDefiner``.
+
         :return: A nested dict of definitions.
             ``twprge > sec > lot: definition``
         """
