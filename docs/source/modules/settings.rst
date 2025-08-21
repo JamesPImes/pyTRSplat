@@ -3,6 +3,9 @@
 
 This class controls the appearance and behavior of a plat.
 
+Example Code
+------------
+
 .. code-block:: python
 
     import pytrsplat
@@ -22,10 +25,10 @@ initializing one.
 
     import pytrsplat
     plat_group = pytrsplat.PlatGroup()
-    plat_group.settings.preset('square_s')
+    plat_group.settings = pytrsplat.Settings.preset('square_s')
 
-    mega_plat = pytrsplat.MegaPlat()
-    mega_plat.settings.preset('megaplat_default')
+    mp_default_settings = pytrsplat.Settings.preset('megaplat_default')
+    mega_plat = pytrsplat.MegaPlat(settings=mp_default_settings)
 
 
 .. important::
@@ -35,5 +38,4 @@ initializing one.
 
 .. autoclass:: pytrsplat.Settings
     :members:
-    :special-members: __init__
 
