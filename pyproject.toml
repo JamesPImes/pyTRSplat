@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyTRSplat"
+version = "0.5.0dev"
+description = "A library for generating plats from Public Land Survey System (PLSS) land descriptions."
+authors = [
+  {name = "James P. Imes", email = "jamesimes@gmail.com"},
+]
+readme = {file = "readme.md", content-type = "text/markdown"}
+license = {file = "LICENSE.txt"}
+keywords = ["PLSS", "survey", "land", "water", "gis", "plat", "platting"]
+
+dependencies = [
+    "Pillow",
+    "pyTRS @ git+https://github.com/JamesPImes/pyTRS",
+]
+
+[project.urls]
+Homepage = "https://github.com/JamesPImes/pyTRSplat"
+Repository = "https://github.com/JamesPImes/pyTRSplat.git"
+Documentation = "https://pytrsplat.readthedocs.io/en/latest/index.html"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["pytrsplat"]
+
+[tool.hatch.build]
+include = [
+    "pytrsplat/plat_gen/plat_settings/_fonts/*.ttf",
+    "pytrsplat/plat_gen/plat_settings/_fonts/*.txt",
+    "pytrsplat/plat_gen/plat_settings/_presets/*.json"
+]

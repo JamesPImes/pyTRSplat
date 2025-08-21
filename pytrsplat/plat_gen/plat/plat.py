@@ -1,1751 +1,1754 @@
-# Copyright (c) 2020, James P. Imes. All rights reserved.
-
-"""
-pytrsplat -- A module to generate land plat images of full townships
-(6x6 grid) or single sections from PLSS land descriptions ('legal
-descriptions'), using the pytrs parsing module.
-"""
-
-# TODO: Give the option to depict `.unhandled_lots` on plats somewhere.
-#  i.e. warn users that certain lots were not incorporated onto the plat
-
+from __future__ import annotations
+import zipfile
+import io
+from warnings import warn
 from pathlib import Path
-import os
 
-from ...utils import confirm_file_ext, cull_list, break_trs
-from ..grid import TownshipGrid, SectionGrid
-from ..grid import LotDefinitions, TwpLotDefinitions, LotDefDB
-from ..grid import plssdesc_to_twp_grids
-from ..platsettings import Settings
-from ..platsettings.platsettings import _rel_path_to_abs
-from ..platqueue import PlatQueue, MultiPlatQueue
-
-# For drawing the plat images, and coloring / writing on them.
-from PIL import Image, ImageDraw, ImageFont
-
-# piltextbox.TextBox gets customized into TractTextBox class here, for
-# optionally writing pytrs.Tract info at the bottom of each Plat.
-# More info at <https://github.com/JamesPImes/piltextbox>
-from piltextbox import TextBox
-
-# For parsing text of PLSS land descriptions into its component parts.
-# More info at <https://github.com/JamesPImes/pyTRS>
+from PIL import Image, ImageDraw
 import pytrs
-from pytrs import version as pytrs_version
-_ERR_SEC = pytrs.MasterConfig._ERR_SEC
-_UNDEF_SEC = pytrs.MasterConfig._UNDEF_SEC
+from pytrs.parser.tract.aliquot_simplify import AliquotNode
+
+from ..plat_settings import Settings
+from ...utils import calc_midpt, get_box, get_box_outline
+from .lot_definer import LotDefiner
+
+__all__ = [
+    'Plat',
+    'PlatGroup',
+    'MegaPlat',
+]
+
+DEFAULT_SETTINGS = Settings()
+STACKABLE_IMAGE_FORMATS = ('pdf', 'tiff')
+DEFAULT_IMAGE_FORMAT_NONSTACKED = 'png'
+DEFAULT_IMAGE_FORMAT_STACKED = 'pdf'
 
 
-########################################################################
-# Plat Objects
-########################################################################
-
-class Plat:
+class QueueSingle:
     """
-    A configurable projection of land within a single PLSS 'township'
-    (i.e. a standard 6x6 grid of 'sections', which in turn are a 4x4
-    grid of aliquot quarter-quarters or 'QQs'). Can be output as a
-    PIL.Image object or saved as a .png or .pdf file.
+    Class that can take in one or more ``pytrs.Tract`` objects or a raw
+    PLSS description and add the results to the ``.queue`` (a
+    ``pytrs.TractList``).
 
-    NOTE: Optionally plat a single section (rather than the defafult 6x6
-    grid of sections), with init parameter `only_section=<int>`.
-    (Be sure to choose settings that are appropriate for a single-
-    section plat. See pytrsplat.platsettings docs for more info.)
-
-    Plat objects can be configured (size, font, colors, margins, etc.)
-    at init, thus:
-        -- Plat init parameter `settings=` takes either of these types:
-            -- any `pytrsplat.Settings` object
-            -- the name (i.e. a string) of a saved preset
-                -- Get a current list of available presets:
-                    `pytrsplat.Settings.list_presets()`
-                -- View / edit / create presets with this GUI tool:
-                    `pytrsplat.settingseditor.launch_settings_editor()`
-    NOTE: Changes to settings after a Plat has been initialized will not
-    necessarily have any effect. It is therefore best practice to
-    configure a Settings object prior to initializing a Plat object.
-
-    Plat objects can incorporate and/or be created from these objects::
-
-        -- pytrs.Tract (created externally via the pytrs module)
-            `.plat_tract()` -- to project a pytrs.Tract object onto an
-                existing Plat object
-            `Plat.from_tract()` -- to create a new Plat object from an
-                an existing pytrs.Tract object
-        -- pytrsplat.SectionGrid
-            `.plat_section_grid()` -- to project a SectionGrid onto an
-                existing Plat.
-            `Plat.from_section_grid()` -- to create a new Plat object
-                from an existing SectionGrid object.
-        -- pytrsplat.TownshipGrid
-            `.plat_township_grid()` -- to project a TownshipGrid onto an
-                existing Plat.
-            `Plat.from_township_grid()` -- to create a new Plat object
-                from an existing TownshipGrid object.
-        -- pytrsplat.PlatQueue
-            `.process_queue()` -- to project each of the objects in a
-                PlatQueue object onto an existing Plat.
-            `.queue_add()` -- to add an object to an existing PlatQueue
-                (stored in the Plat's `.pq` attribute)
-            `Plat.from_queue()` -- to create a new Plat object from an
-                existing PlatQueue object
-
-    Plat objects can be output with this method::
-
-        `.output()` -- Return a flattened PIL.Image.Image object of the
-            plat, and optionally saves to file (currently supports .png
-            and .pdf formats)
-
-    For better results, pass an optional pytrsplat.TwpLotDefinition
-    object (usually abbreviated 'tld') at init with parameter `tld=`, to
-    specify which lots correspond with which QQ(s) in each respective
-    section. (See more info in `pytrsplat.TwpLotDefinition` docs and
-    `pytrsplat.LotDefDB` docs.)
-    Also specify at init (parameter `allow_ld_defaults=<bool>`) whether
-    'default' lot definitions are allowed as a fall-back option, when
-    lots have not been explicitly defined for a given section.
-    (Default lots are the 'usual' lots in Sections 1 - 7, 18, 19, 30,
-    and 31 of a 'standard' township -- i.e. along the northern and
-    western boundaries of a township. Potentially useful as a 'better-
-    than-nothing' option, but not as reliable as user-specified lot
-    definitions.)
-    NOTE: All lots that were not defined but which the user tried to
-    plat get added to a dict stored as the `.unhandled_lots_by_sec`
-    attribute (keyed by section number integers).
-
-    A pytrsplat.PlatQueue object is initialized for each Plat as `.pq`
-    attribute. It can be added to with `.queue_add()` and processed with
-    `.process_queue()`.
+    This class mandates that all tracts lie within the same Twp/Rge, and
+    a ``ValueError`` will be raised when encountering a mismatched
+    Twp/Rge.
     """
 
-    # TODO: Wherever TLD or LD is referenced in a kwarg, allow it
-    #   to pull from self.tld or self.ld.
+    queue: pytrs.TractList()
 
-    def __init__(self, twp='', rge='', only_section=None, settings=None,
-                 tld=None, allow_ld_defaults=False):
+    def add_tract(self, tract: pytrs.Tract):
         """
-        A 6x6 grid of sections (which are a 4x4 grid of QQs). Limit to
-        only a 1x1 grid of a single section with init parameter
-        `only_section=<int>`.
+        Add a tract to the queue. If there are already tracts in the
+        queue, this tract must match the existing Twp/Rge, or it will
+        raise a ``ValueError``.
 
-        :param twp: Township number and N/S (ex: '154n' or '7s')
-        :param rge: Range number and E/W (ex: '97w' or '8e')
-        :param only_section: To plat only a single section rather than
-        the standard 6x6 grid, pass an integer (representing section
-        number) here. Defaults to None.
-        :param settings: How the Plat should be configured. May be
-        passed as either:
-            -- any `pytrsplat.Settings` object
-            -- the name (i.e. a string) of a saved preset
-                -- Get a current list of available presets:
-                    `pytrsplat.Settings.list_presets()`
-                -- View / edit / create presets with this GUI tool:
-                    `pytrsplat.settingseditor.launch_settings_editor()`
-        :param tld: A `pytrsplat.TwpLotDefinitions` object, which
-        defines how each lot should be interpreted (in terms of its
-        corresponding QQ or QQs).
-        NOTE: If param `only_section=<int>` was passed (i.e. platting
-        a single section, rather than the standard 6x6 grid), this will
-        alternatively accept a `pytrsplat.LotDefinitions` object (which
-        defines lots for a single section).
-        :param allow_ld_defaults: Whether 'default' lot definitions are
-        allowed as a fall-back option, when lots have not been
-        explicitly defined for a given section. (Default lots are the
-        'usual' lots in Sections 1 - 7, 18, 19, 30, and 31 of a
-        'standard' township -- i.e. along the northern and western
-        boundaries of a township. Potentially useful as a 'better-than-
-        nothing' option, but not as reliable as user-specified lot
-        definitions.)
+        .. note::
+
+            The tract must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
+
+        :param tract: A ``pytrs.Tract`` that has been parsed into Lots
+            and QQ's. (Its Twp/Rge must match what is already in the
+            queue.)
+        :raise ValueError: If a Twp/Rge is added that does not share the
+            same Twp/Rge of every other tract in the queue.
+        """
+
+        twp = None
+        rge = None
+        twprge_defined = False
+        if hasattr(self, 'twp') and hasattr(self, 'rge'):
+            twp = self.twp
+            rge = self.rge
+            if twp is not None and rge is not None:
+                twprge_defined = True
+        elif self.queue:
+            sample_tract: pytrs.Tract = self.queue[0]
+            twp = sample_tract.twp
+            rge = sample_tract.rge
+            twprge_defined = True
+        existing_twprge = pytrs.TRS.from_twprgesec(twp, rge).twprge
+
+        if not twprge_defined or (tract.twprge == existing_twprge):
+            self.queue.append(tract)
+            if hasattr(self, 'twp') and hasattr(self, 'rge'):
+                self.twp = tract.twp
+                self.rge = tract.rge
+            return None
+
+        msg = (
+            f"Mismatched Twp/Rge: {tract.twprge!r} does not match existing "
+            f"{existing_twprge!r}.\n"
+            "Consider using platting class that will accept multiple Twp/Rges "
+            " (e.g., `PlatGroup` or `MegaPlat`)."
+        )
+        raise ValueError(msg)
+
+    def add_tracts(
+            self, tracts: list[pytrs.Tract] | pytrs.TractList | pytrs.PLSSDesc) -> None:
+        """
+        Add multiple tracts to the queue. All tracts must share the same
+        Twp/Rge as any tracts already existing in the queue.
+
+        .. note::
+
+            The tracts must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
+
+        .. note::
+
+            All tracts in the queue must share the same Twp/Rge, or a
+            ``ValueError`` will be raised. If there is any doubt about
+            whether the tracts being added include other Twp/Rges,
+            consider using a platting object (e.g., ``PlatGroup`` or
+            ``MegaPlat``) that can process multiple Twp/Rges.
+
+        :param tracts: A collection of ``pytrs.Tract`` objects,
+            such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any
+            other iterable object that contains exclusively
+            ``pytrs.Tract``.
+        :raise ValueError: If a Twp/Rge is added that does not share the
+            same Twp/Rge of every other tract in the queue.
+        """
+        for tract in tracts:
+            self.add_tract(tract)
+        return None
+
+    def add_description(self, txt: str, config: str = None) -> pytrs.TractList:
+        """
+        Parse the land description and add the resulting tracts to the
+        queue.
+
+        .. note::
+
+            All tracts in the queue must share the same Twp/Rge, or a
+            ``ValueError`` will be raised. If there is any doubt about
+            whether the land description being added includes other
+            Twp/Rges, consider using a platting object (e.g.,
+            ``PlatGroup`` or ``MegaPlat``) that can process multiple
+            Twp/Rges.
+
+        :param txt: The land description.
+        :param config: The config parameters for parsing, to be passed
+            through to the ``pytrs`` library. (See pyTRS documentation
+            for details.)
+        :return: A ``pytrs.TractList`` containing the tracts in which
+            the parser could NOT identify any lots or aliquots.
+        :raise ValueError: If a Twp/Rge is added that does not share the
+            same Twp/Rge of every other tract in the queue.
+        """
+        plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=config)
+        self.add_tracts(plssdesc)
+        no_lots_qqs = pytrs.TractList()
+        for tract in plssdesc:
+            if not tract.lots_qqs:
+                no_lots_qqs.append(tract)
+        return no_lots_qqs
+
+
+class QueueMany(QueueSingle):
+    """
+    Class that can take in one or more ``pytrs.Tract`` objects or a raw
+    PLSS description and add the results to the ``.queue`` (a
+    ``pytrs.TractList``).
+
+    This class allows any number of unique Twp/Rges.
+    """
+
+    def add_tract(self, tract: pytrs.Tract):
+        """
+        Add a tract to the queue.
+
+        .. note::
+
+            The tract must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
+        """
+        self.queue.append(tract)
+        return None
+
+    def add_tracts(
+            self, tracts: list[pytrs.Tract] | pytrs.TractList | pytrs.PLSSDesc) -> None:
+        """
+        Add multiple tracts to the queue.
+
+        .. note::
+
+            The tracts must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
+
+        :param tracts: A collection of ``pytrs.Tract`` objects,
+            such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any
+            other iterable object that contains exclusively
+            ``pytrs.Tract``.
+        """
+        for tract in tracts:
+            self.add_tract(tract)
+        return None
+
+    def add_description(self, txt: str, config: str = None) -> pytrs.TractList:
+        """
+        Parse the land description and add the resulting tracts to the
+        plat group. If one or more Twp/Rge's are newly identified, plats
+        will be created as needed.
+
+        :param txt: The land description.
+        :param config: The config parameters for parsing, to be passed
+            through to the ``pytrs`` library. (See pyTRS documentation
+            for details.)
+        :return: A ``pytrs.TractList`` containing the tracts in which
+            the parser could not identify any lots or aliquots.
+        """
+        plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=config)
+        self.add_tracts(plssdesc)
+        no_lots_qqs = pytrs.TractList()
+        for tract in plssdesc:
+            if not tract.lots_qqs:
+                no_lots_qqs.append(tract)
+        return no_lots_qqs
+
+
+class LotDefinerOwner(QueueSingle):
+    """
+    Class that has a ``LotDefiner`` object in its ``.lot_definer``
+    attribute, and appropriate methods for passing through methods that
+    affect its queue.
+    """
+    lot_definer: LotDefiner
+    # Cache of lot definitions (including defaults). Gets used while
+    # executing queue, then cleared.
+    all_lot_defs_cached: dict
+
+    def find_undefined_lots(
+            self,
+            allow_defaults: bool = None
+    ) -> dict[str, dict[str, list[str]]]:
+        """
+        Find all tracts in the queue that have one or more lots that
+        have not been defined.
+
+        :param allow_defaults: Whether to assume that all sections are
+            'standard', with typical lots (if any) in sections along the
+            north and west township boundaries. If not specified here,
+            will use whatever is configured in the
+            ``lot_definer.allow_defaults`` attribute.
+        :return: A nested dict, keyed by Twp/Rge (``'154n97w'``), then
+            keyed by section number (``1``), and the deep values being a
+            sorted list of lots for that Twp/Rge/Sec.
+        """
+        return self.lot_definer.find_undefined_lots(
+            tracts=self.queue, allow_defaults=allow_defaults)
+
+    def find_unplattable_tracts(self, allow_defaults: bool = None) -> pytrs.TractList:
+        """
+        Get a ``pytrs.TractList`` containing all tracts that cannot be
+        platted with the currently provided lot definitions (optionally
+        accounting for default lots, if so configured).
+
+        .. note::
+            If a tract has any aliquots and/or any lots that have been
+            defined, it will be considered plattable, even if some of
+            its lots have NOT been defined. To check for undefined lots,
+            use the ``.find_undefined_lots()`` method.
+
+        :param allow_defaults: Whether to assume that all sections are
+            'standard', with typical lots (if any) in sections along the
+            north and west township boundaries. If not specified here,
+            will use whatever is configured in the
+            ``lot_definer.allow_defaults`` attribute.
+        """
+        unplattable_tracts = pytrs.TractList()
+        if not self.queue:
+            return unplattable_tracts
+        for tract in self.queue:
+            converted_aliquots, undefined_lots = self.lot_definer.process_tract(
+                tract,
+                allow_defaults=allow_defaults,
+                commit=False
+            )
+            if not tract.qqs and not converted_aliquots:
+                unplattable_tracts.append(tract)
+        return unplattable_tracts
+
+
+class SettingsOwner:
+    """
+    Interface for a class that has a ``Settings`` object in its
+    ``.settings`` attribute.
+    """
+    settings: Settings
+
+
+class ImageOwner:
+    """
+    Interface for a class that has the following attributes:
+
+    ``.background``  (``Image``)
+    ``.image``  (``Image``)
+    ``.draw``  (``ImageDraw.Draw``)
+    ``.overlay_image``  (``Image``)
+    ``.overlay_draw``  (``ImageDraw.Draw``)
+    ``.footer_image``  (``Image``)
+    ``.footer_draw``  (``ImageDraw.Draw``)
+    ``.image_layers``  (list of ``Image`` objects)
+
+    And an ``.output()`` method.
+    """
+    background: Image.Image
+    image: Image.Image
+    draw: ImageDraw.Draw
+    overlay_image: Image.Image
+    overlay_draw: ImageDraw.Draw
+    footer_image: Image.Image
+    footer_draw: ImageDraw.Draw
+    image_layers: tuple[Image.Image]
+
+    def output(self, fp: str | Path = None, image_format: str = None, **_kw) -> Image.Image | None:
+        """
+        Compile and return the merged image of the plat. Optionally
+        save the results to disk, either as an image or as a .zip file
+        containing the image.
+
+        :param fp: (Optional) If provided, save the output to the
+            specified filepath.
+        :param image_format: (Optional) Override the image format of the
+            file specified in ``fp``. If not provided, will defer to the
+            file extension in ``fp``. (Only relevant if saving to file.)
+        :param _kw: No effect. (Included to mirror ``.output()`` of
+            other classes.)
+        :return: The generated image. If ``.image_layers`` contains no
+            images, will return ``None`` instead.
+        """
+        if not self.image_layers:
+            return None
+        merged = Image.alpha_composite(*self.image_layers[:2])
+        for i in range(2, len(self.image_layers)):
+            merged = Image.alpha_composite(merged, self.image_layers[i])
+        merged = merged.convert('RGB')
+        if fp is not None:
+            save_output_images([merged], fp, image_format)
+        return merged
+
+
+class IPlatOwner(SettingsOwner, ImageOwner, LotDefinerOwner):
+    """
+    Composite interface for a class that incorporates all necessary
+    interfaces necessary for platting.
+    """
+    pass
+
+
+class ISettingsLotDefinerOwner(SettingsOwner, LotDefinerOwner):
+    """
+    Composite interface for a class that incorporates ``SettingsOwner``
+    and ``LotDefinerOwner``.
+    """
+    pass
+
+
+class SettingsOwned:
+    """
+    Class with an ``owner`` (``SettingsOwner``) that has a
+    ``.settings`` attribute to be passed down as a ``.settings``
+    property.
+    """
+    owner: SettingsOwner
+
+    @property
+    def settings(self):
+        if self.owner is not None:
+            return self.owner.settings
+        return DEFAULT_SETTINGS
+
+
+class ImageOwned:
+    """
+    Class with an ``owner`` (``ImageOwner``) with the various image and
+    draw properties needed for platting.
+    """
+    owner: ImageOwner
+
+    @property
+    def image(self):
+        return self.owner.image
+
+    @property
+    def draw(self):
+        return self.owner.draw
+
+    @property
+    def overlay_image(self):
+        return self.owner.overlay_image
+
+    @property
+    def overlay_draw(self):
+        return self.owner.overlay_draw
+
+    @property
+    def footer_image(self):
+        return self.owner.footer_image
+
+    @property
+    def footer_draw(self):
+        return self.owner.footer_draw
+
+
+class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
+    """
+    INTERNAL USE:
+
+    Subclass to extend pytrs's ``AliquotNode`` for platting.
+    """
+
+    def __init__(self, parent=None, label=None, owner: IPlatOwner = None):
+        """
+        :param owner: The ``Plat`` object that is the ultimate owner of
+            this node. (Controls the settings that dictate platting
+            behavior and appearance, and contains the image objects that
+            will be drawn on.)
+        """
+        super().__init__(parent=parent, label=label)
+        # Coord of top-left of this square.
+        self.xy: tuple[int, int] = None
+        # `.owner` must have .settings, .image, .draw, .overlay_image, .overlay_draw
+        self.owner: IPlatOwner = owner
+
+    @property
+    def sec_length_px(self):
+        """Get the configured length of a section line, in pixels."""
+        return self.settings.sec_length_px
+
+    @property
+    def square_dim(self):
+        """
+        Calculate the length of this aliquot division's line, in pixels,
+        based on the configured length of a section line.
+        """
+        return self.sec_length_px // (2 ** self.depth)
+
+    def configure(
+            self,
+            parent_xy: tuple[int, int] = None
+    ):
+        """
+        Retrofit this node and all its children for platting, using the
+        specified configurations.
+
+        :param parent_xy: The top-left coord of the parent node (or for
+            the root node, the section's top-left coord).
+        """
+        stn = self.settings
+        if parent_xy is None:
+            parent_xy = self.xy
+        x, y = parent_xy
+        if self.label is not None:
+            # Offset this subdivided square from the top-left of parent square.
+            # 'NW' (the top-left) remains at parent's (x, y).
+            if self.label in ('NE', 'SE'):
+                x += self.square_dim
+            if self.label in ('SE', 'SW'):
+                y += self.square_dim
+        self.xy = (x, y)
+        if stn.max_depth is not None and self.depth >= stn.max_depth:
+            # Discard nodes beyond the specified ``max_depth``. (Destroys
+            # all granularity in aliquots beyond that depth.)
+            self.children = {}
+            return None
+        for label, child_node in self.children.items():
+            child_node.owner = self.owner
+            child_node.configure(parent_xy=self.xy)
+        return None
+
+    def fill(self, rgba: tuple[int, int, int, int] = None):
+        """
+        Fill in this aliquot on the plat.
+        :param rgba: The RGBA value to use. If not passed, will use what
+            is configured in the owner's settings.
+        """
+        if rgba is None:
+            cf = self.settings
+            rgba = cf.qq_fill_rgba
+        if self.is_leaf():
+            box = get_box(self.xy, dim=self.square_dim)
+            self.overlay_draw.polygon(box, rgba)
+        for child in self.children.values():
+            child.fill(rgba)
+        return None
+
+    def write_lot_numbers(self, at_depth):
+        """
+        Write lot numbers to the plat.
+
+        :param at_depth: Depth at which to write the lots. MUST match
+            the depth at which the lot definitions have been parsed.
+            Default is 2 (i.e., quarter-quarters), specified above in
+            the stack.
+        """
+        if self.depth == at_depth:
+            lot_txt = ', '.join(str(l) for l in sorted(self.sources))
+            stn = self.settings
+            draw = self.draw
+            font = stn.lotfont
+            fill = stn.lotfont_rgba
+            offset = stn.lot_num_offset_px
+            x, y = self.xy
+            draw.text(xy=(x + offset, y + offset), text=lot_txt, font=font, fill=fill)
+            return None
+        for child in self.children.values():
+            child.write_lot_numbers(at_depth)
+
+
+class PlatSection(SettingsOwned, ImageOwned):
+    """A section of land, as represented in the plat."""
+
+    def __init__(
+            self,
+            trs: pytrs.TRS = None,
+            grid_offset: tuple[int, int] = None,
+            owner: IPlatOwner = None,
+            is_lot_writer: bool = False,
+    ):
+        """
+        :param trs: The Twp/Rge/Sec (a ``pytrs.TRS`` object) of this
+            section.
+        :param grid_offset: How many sections down and right from the
+            top-left of the township. (The offset of Section 6 is
+            (0, 0); whereas the offset of Section 36 is (6, 6).)
+        :param owner: The ``Plat`` object that is the ultimate owner of
+            this section. (Controls the settings that dictate platting
+            behavior and appearance, and contains the image objects that
+            will be drawn on.)
+        :param is_lot_writer: If True, this is only intended for writing
+            lot numbers to the plat.
+        """
+        if trs is not None:
+            trs = pytrs.TRS(trs)
+        self.trs: pytrs.TRS = trs
+        self.aliquot_tree = PlatAliquotNode(owner=owner)
+        self.queue = pytrs.TractList()
+        self.square_dim: int = None
+        # Coord of top-left of this square.
+        self.xy: tuple[int, int] = None
+        self.sec_length_px: int = None
+        self.grid_offset: tuple[int, int] = grid_offset
+        # `.owner` must have .settings, .image, .draw, .overlay_image, .overlay_draw
+        self.owner: IPlatOwner = owner
+        self.is_lot_writer = is_lot_writer
+
+    def configure(self, grid_xy):
+        """
+        Configure this section and its subordinates.
+
+        :param grid_xy: The top-left coord of the township to which this
+            section belongs.
+        """
+        settings = self.settings
+        sec_length_px = settings.sec_length_px
+        x, y = grid_xy
+        i, j = self.grid_offset
+        x += j * sec_length_px
+        y += i * sec_length_px
+        self.sec_length_px = sec_length_px
+        self.square_dim = sec_length_px
+        self.xy = (x, y)
+        if not self.is_lot_writer:
+            self.draw_lines()
+            self.clear_center()
+        self.aliquot_tree.configure(parent_xy=self.xy)
+
+    def draw_lines(self):
+        """
+        Draw section lines, and aliquot division lines (halves,
+        quarters, quarter-quarters, etc.).
+
+        The number of aliquot divisions that are drawn is controlled by
+        ``.min_depth`` in the settings.
+        """
+        settings = self.settings
+        min_depth: int = settings.min_depth
+        # Top-left of this section.
+        x, y = self.xy
+        sec_len = settings.sec_length_px
+        sec_lines = get_box_outline(xy=(x, y), dim=sec_len)
+        # Calculate coords for desired lines.
+        # ... Outer lines are section boundaries.
+        depth_lines: dict[int, list[tuple[int, int]]] = {0: sec_lines}
+        # ... Lines for halves (depth=1), quarters (depth=2), quarter-quarters, etc.
+        for depth in range(1, min_depth + 1):
+            depth_lines[depth] = []
+            div_sec_len = sec_len // (2 ** depth)
+            for i in range(1, (2 ** depth) + 1, 2):
+                ns = ((x + div_sec_len * i, y), (x + div_sec_len * i, y + sec_len))
+                depth_lines[depth].append(ns)
+                ew = ((x, y + div_sec_len * i), (x + sec_len, y + div_sec_len * i))
+                depth_lines[depth].append(ew)
+
+        draw = self.draw
+        for depth in reversed(depth_lines.keys()):
+            lines = depth_lines[depth]
+            width = settings.line_stroke.get(depth, settings.line_stroke[None])
+            fill = settings.line_rgba.get(depth, settings.line_rgba[None])
+            for line in lines:
+                draw.line(line, fill=fill, width=width)
+        return None
+
+    def clear_center(self):
+        """
+        Clear the center of the section. If so configured, write the
+        section number there.
+        """
+        settings = self.settings
+        draw = self.draw
+        # Draw middle white space.
+        cb_dim = settings.centerbox_dim
+        x_center, y_center = calc_midpt(xy=self.xy, square_dim=self.sec_length_px)
+        topleft = x_center - cb_dim // 2, y_center - cb_dim // 2
+        centerbox = get_box(xy=topleft, dim=cb_dim)
+        draw.polygon(centerbox, (0, 0, 0, 0))
+        if not settings.write_section_numbers:
+            return None
+        font = settings.secfont
+        fill = settings.secfont_rgba
+        txt = str(self.trs.sec_num)
+        _, _, w, h = draw.textbbox(xy=(0, 0), text=txt, font=font)
+        # Force a slight upward shift of the section text. Looks wrong otherwise.
+        horizontal_tweak_pct = 1.2
+        sec_topleft = (x_center - w // 2, y_center - int((h // 2) * horizontal_tweak_pct))
+        draw.text(xy=sec_topleft, text=txt, font=font, fill=fill)
+        return None
+
+    def execute_queue(self) -> pytrs.TractList:
+        """
+        Execute the queue of tracts to fill in the plat.
+        """
+        unplattable_tracts = pytrs.TractList()
+        if not self.queue:
+            return unplattable_tracts
+        for tract in self.queue:
+            self.owner.lot_definer.process_tract(tract, commit=True)
+            if not tract.qqs and not tract.lots_as_qqs and not tract.undefined_lots:
+                message = (
+                    "No lots or aliquots could be identified for tract: "
+                    f"<{tract.quick_desc_short()}>"
+                )
+                warn(message, UserWarning)
+                unplattable_tracts.append(tract)
+            self.aliquot_tree.register_all_aliquots(tract.qqs)
+            self.aliquot_tree.register_all_aliquots(tract.lots_as_qqs)
+            if tract.undefined_lots:
+                message = (
+                    "Undefined lots that could not be shown on the plat: "
+                    f"<{tract.trs}: {', '.join(tract.undefined_lots)}>"
+                )
+                warn(message, UserWarning)
+        if len(self.queue) != len(unplattable_tracts):
+            self.aliquot_tree.configure()
+            self.aliquot_tree.fill()
+        return unplattable_tracts
+
+    def write_lot_numbers(self, at_depth=2):
+        """
+        Write the lot numbers in the section.
+
+        :param at_depth: At which depth to write the numbers. Defaults
+            to 2 (i.e., quarter-quarters).
+        """
+        ld = self.owner.all_lot_defs_cached
+        lots_definitions = ld.get(self.trs.twprge, {}).get(self.trs.sec_num, {})
+        for lot, definitions in lots_definitions.items():
+            tract = pytrs.Tract(
+                definitions, parse_qq=True, config=f"clean_qq,qq_depth.{at_depth}")
+            ilot = int(lot.split('L')[-1])
+            self.aliquot_tree.register_all_aliquots(tract.qqs, ilot)
+        self.aliquot_tree.configure(parent_xy=self.xy)
+        self.aliquot_tree.write_lot_numbers(at_depth)
+        return None
+
+
+class PlatBody(SettingsOwned, ImageOwned):
+    """
+    The part of a ``Plat`` that contains the township grid (36
+    sections).
+    """
+
+    # PLSS sections "snake" from the NE corner of the township west
+    # then down, then they cut back east, then down and west again,
+    # etc., thus:
+    #           6   5   4   3   2   1
+    #           7   8   9   10  11  12
+    #           18  17  16  15  14  13
+    #           19  20  21  22  23  24
+    #           30  29  28  27  26  25
+    #           31  32  33  34  35  36
+    SEC_NUMS = list(range(6, 0, -1))
+    SEC_NUMS.extend(list(range(7, 13)))
+    SEC_NUMS.extend(list(range(18, 12, -1)))
+    SEC_NUMS.extend(list(range(19, 25)))
+    SEC_NUMS.extend(list(range(30, 24, -1)))
+    SEC_NUMS.extend(list(range(31, 37)))
+    SEC_NUMS = tuple(SEC_NUMS)
+
+    def __init__(
+            self,
+            twp: str = None,
+            rge: str = None,
+            owner: IPlatOwner = None,
+            is_lot_writer=False
+    ):
+        """
+        :param twp: The Twp of the Twp/Rge represented by this body.
+        :param rge: The Rge of the Twp/Rge represented by this body.
+        :param owner: The ``Plat`` object that is the ultimate owner of
+            this body. (Controls the settings that dictate platting
+            behavior and appearance, and contains the image objects that
+            will be drawn on.)
+        :param is_lot_writer: Tell this ``PlatBody`` that it will only
+            be used to write lots onto the plat. (If ``True``, prevents
+            redrawing section lines, quarter lines, etc.; and enables
+            the writing of lot numbers in the respective QQs.)
+        """
+        self.owner: IPlatOwner = owner
+        self.twp = twp
+        self.rge = rge
+        self.sections: dict[int, PlatSection] = {}
+        sections_per_side = 6
+        k = 0
+        # Store each section's "offset" from the top-left of the grid.
+        for i in range(sections_per_side):
+            for j in range(sections_per_side):
+                sec_num = self.SEC_NUMS[k]
+                trs = pytrs.TRS.from_twprgesec(twp, rge, sec_num)
+                plat_sec = PlatSection(
+                    trs,
+                    grid_offset=(i, j),
+                    owner=self.owner,
+                    is_lot_writer=is_lot_writer)
+                self.sections[sec_num] = plat_sec
+                k += 1
+        # Coord of top-left of the grid.
+        self.xy: tuple[int, int] = None
+        self.is_lot_writer = is_lot_writer
+
+    def nonempty_sections(self):
+        """Get a list of any sections that have aliquots to be platted."""
+        output = []
+        for sec_num, plat_sec in self.sections.items():
+            if not plat_sec.aliquot_tree.is_leaf():
+                output.append(sec_num)
+        return output
+
+    def configure(self, xy: tuple[int, int] = None):
+        """
+        Enact the settings to configure this plat body.
+
+        :param xy: The top-left coord of the area of the plat containing
+            the grid.
+        """
+        if xy is None:
+            xy = self.settings.grid_xy
+        self.xy = xy
+        for plat_sec in self.sections.values():
+            plat_sec.configure(grid_xy=xy)
+        return None
+
+    def write_lot_numbers(self, at_depth=2):
+        """
+        Write the lot numbers into the respective squares.
+
+        :param at_depth: At which depth to write the numbers. Defaults
+            to 2 (i.e., quarter-quarters).
+        """
+        if not self.is_lot_writer:
+            raise ValueError(
+                'This `PlatBody` is not a lot writer. '
+                'Pass `is_lot_writer=True` at init.'
+            )
+        for sec_plat in self.sections.values():
+            sec_plat.write_lot_numbers(at_depth)
+        return None
+
+    def draw_outline(self):
+        """
+        Draw the boundary around the township.
+        """
+        stn = self.settings
+        lines = get_box_outline(xy=self.xy, dim=stn.sec_length_px * 6)
+        width = stn.line_stroke[-1]
+        fill = stn.line_rgba[-1]
+        for line in lines:
+            self.draw.line(line, fill=fill, width=width)
+
+
+class PlatHeader(SettingsOwned, ImageOwned):
+
+    def __init__(self, owner: IPlatOwner):
+        self.owner = owner
+
+    def write_header(
+            self,
+            twp=None,
+            rge=None,
+            xy: tuple[int, int] = None,
+            custom_header: str = None,
+            align='default',
+            **kw
+    ) -> None:
+        """
+        Write the header to the plat.
+
+        .. note::
+
+            The default header is the Twp/Rge, styled as follows
+            ``Township 154 North, Range 97 West``.
+            if ``short_header=True`` in the settings, the resulting
+            header will be styled as ``T154N-R97W``. The header can be
+            styled differently if appropriate keyword arguments are
+            passed as ``kw``. Further, the exact header text can be
+            passed as ``custom_header``, which will override everything
+            else.
+
+        :param twp: The Twp of this plat (e.g., ``'154n'``)
+        :param rge: The Rge of this plat (e.g., ``'97w'``)
+        :param xy: The anchor point at which to write. (Defaults to
+            above the plat, as configured by margins in settings.)
+        :param custom_header: (Optional) Override the default header and
+            use this text instead. If used, any other keyword arguments
+            will be ignored.
+        :param align: Either ``'default'`` (to aligned horizontally
+            centered) or ``'center_center'`` (to center both
+            horizontally and vertically).
+        :param kw: (Optional) keyword arguments to pass to
+            ``pytrs.TRS.pretty_twprge()`` to control how the Twp/Rge
+            header should be spelled out.
+        """
+        if align not in ('default', 'center_center'):
+            raise ValueError(
+                f"`align` must be one of ('default', 'center_center'). "
+                f"Passed: {align!r}"
+            )
+        header = custom_header
+        if not kw and not self.settings.short_header:
+            kw = {
+                't': 'Township ',
+                'n': ' North',
+                's': ' South',
+                'r': 'Range ',
+                'e': ' East',
+                'w': ' West',
+                'delim': ', '
+            }
+        if header is None:
+            trs = pytrs.TRS.from_twprgesec(twp, rge, 0)
+            header = trs.pretty_twprge(**kw)
+        font = self.settings.headerfont
+        fill = self.settings.headerfont_rgba
+        draw = self.draw
+        _, _, w, h = draw.textbbox(xy=(0, 0), text=header, font=font)
+        if xy is None and align == 'default':
+            x = (self.image.width - w) // 2
+            y = self.settings.body_marg_top_y - h - self.settings.header_px_above_body
+        else:
+            x, y = xy
+        if align == 'center_center':
+            x -= w // 2
+            y -= h // 2
+        draw.text(xy=(x, y), text=header, font=font, fill=fill)
+        return None
+
+
+class PlatFooter(SettingsOwned, ImageOwned):
+    """
+    The part of a ``Plat`` that will contain written text, such as the
+    tract descriptions.
+    """
+
+    def __init__(self, owner: IPlatOwner = None):
+        """
+        :param owner: The ``Plat`` object (or other appropriate type)
+            that is the ultimate owner of this footer. (Controls the
+            settings that dictate platting behavior and appearance, and
+            contains the image objects that will be drawn on.)
+        """
+        self.owner: IPlatOwner = owner
+        self._x = None
+        self._y = None
+        self._text_line_height = None
+        self._trs_indent = None
+
+    def configure(self):
+        """
+        Enact the settings to configure this plat footer.
+        """
+        stn = self.settings
+        x = stn.footer_marg_left_x
+        y = (stn.body_marg_top_y + stn.sec_length_px * 6 + stn.footer_px_below_body)
+        self._x, self._y = (x, y)
+        sample_trs = 'XXXzXXXzXX:'
+        font = stn.footerfont
+        _, _, w, h = self.draw.textbbox(xy=(0, 0), text=sample_trs, font=font)
+        self._text_line_height = h
+        self._trs_indent = x + w
+
+    def _write_line(
+            self, x: int, text: str, fill: tuple[int, int, int, int] = None) -> None:
+        """
+        INTERNAL USE:
+
+        Write an already-verified line of text, with no linebreaks.
+
+        :param x: Left-most position at which to write text.
+        :param text: The line to write.
+        """
+        stn = self.settings
+        font = stn.footerfont
+        if fill is None:
+            fill = stn.footerfont_rgba
+        draw = self.footer_draw
+        draw.text(xy=(x, self._y), text=text, font=font, fill=fill)
+        self._y += self._text_line_height + stn.footer_px_between_lines
+        return None
+
+    def check_text(
+            self,
+            text,
+            xy_0: tuple[int, int],
+            xy_limit: tuple[int, int] = None
+    ) -> (list[str], str | None):
+        """
+        Check if the ``text`` can be written within the confines of this
+        footer. Returns two parts: (1) the reformatted text (broken onto
+        a list of writable lines) and (2) any text that can't fit (a
+        string). If all text can be written, the second returned value
+        will be ``None``.
+        """
+        x0, y0 = xy_0
+        if xy_limit is None:
+            stn = self.settings
+            xy_limit = (
+                stn.dim[0] - stn.footer_marg_right_x,
+                stn.dim[1] - stn.footer_marg_bottom_y
+            )
+        x_lim, y_lim = xy_limit
+        avail_w = x_lim - x0
+        avail_h = y_lim - y0
+        stn = self.settings
+        unwritable = None
+        words = text.split()
+        writable_lines = []
+        line = ""
+        for i, word in enumerate(words):
+            if line:
+                cand_line = f"{line} {word}"
+            else:
+                cand_line = word
+            c_width = stn.footerfont.getlength(cand_line)
+            if c_width <= avail_w:
+                line = cand_line
+            else:
+                writable_lines.append(line)
+                line = word
+                avail_h -= (self._text_line_height + stn.footer_px_between_lines)
+                if avail_h <= self._text_line_height:
+                    unwritable = ' '.join(words[i:])
+                    break
+        if line:
+            writable_lines.append(line)
+        return writable_lines, unwritable
+
+    def write_tracts(
+            self,
+            tracts: pytrs.TractList | pytrs.PLSSDesc,
+            write_partial=True,
+    ) -> list[pytrs.Tract]:
+        """
+        Write multiple tracts in the footer. Will return a list of
+        tracts that could not be written (or an empty list if all were
+        successfully written or at least partially written).
+
+        :param write_partial: (Optional, on by default) If there is not
+            space to write a tract's entire description, write whatever
+            will fit. (A partially written tract will NOT be included in
+            the returned unwritten tracts.)
+        :return: A list of tracts that could not be written in the space
+            available.
+        """
+        unwritten = []
+        for tract in tracts:
+            unwritten_tract = self.write_tract(tract, write_partial)
+            if unwritten_tract is not None:
+                unwritten.append(tract)
+        return unwritten
+
+    def write_tract(
+            self,
+            tract: pytrs.Tract,
+            write_partial=True,
+            font_rgba: tuple[int, int, int, int] = None,
+    ) -> pytrs.Tract | None:
+        """
+        Write a single tract in the footer.
+
+        :param write_partial: (Optional, on by default) If there is not
+            space to write the tract's entire description, write
+            whatever will fit. (A partially written tract will NOT be
+            returned as unwritten.)
+        :param font_rgba: (Optional) Specify the RGBA code to use for
+            this tract. If not specified, will use the ``.footerfont_rgba``
+            specified in the settings.
+        :return: If the tract is successfully written (or partially
+            written), this will return None. If it could not be written,
+            the original tract will be returned.
+        """
+        stn = self.settings
+        draw = self.footer_draw
+        font = stn.footerfont
+        fill = stn.footerfont_rgba
+        if font_rgba is not None:
+            fill = font_rgba
+        trs = tract.trs
+        desc = tract.desc
+        writable_lines, unwritable_txt = self.check_text(desc, xy_0=(self._trs_indent, self._y))
+        if unwritable_txt is not None:
+            if not write_partial or len(writable_lines) == 0:
+                return tract
+            if len(writable_lines) > 0 and len(writable_lines[-1]) >= 3:
+                # Ellide the text in the final writable line.
+                writable_lines[-1] = writable_lines[-1][:-3] + '...'
+        if not writable_lines:
+            # If no description for this tract, we still want to move the cursor down.
+            writable_lines.append('')
+        # TRS is written separately.
+        draw.text(xy=(self._x, self._y), text=f"{trs}:", font=font, fill=fill)
+        # If any undefined lots, use the warning color for the desc of this tract.
+        if hasattr(tract, 'undefined_lots') and len(tract.undefined_lots) > 0:
+            fill = stn.warningfont_rgba
+        for line in writable_lines:
+            # This moves the y cursor down appropriately.
+            self._write_line(x=self._trs_indent, text=line, fill=fill)
+        return None
+
+    def write_text(self, txt, write_partial=False) -> str | None:
+        """
+        Write a block of text in the footer.
+
+        :param write_partial: (Optional, off by default) If there is not
+            space to write the entire block of text, write whatever will
+            fit.
+        :return: If the entire block is successfully written, this will
+            return None. If not, the portion of the text that could not
+            be written will be returned (and if ``write_partial=False``,
+            then the whole text block will be returned as unwritten).
+        """
+        writable_lines, unwritable_txt = self.check_text(txt, xy_0=(self._x, self._y))
+        if unwritable_txt is not None:
+            if not write_partial:
+                return txt
+        for line in writable_lines:
+            self._write_line(x=self._x, text=line)
+        return unwritable_txt
+
+
+class Plat(IPlatOwner, QueueSingle):
+    """A plat of a single Twp/Rge."""
+
+    def __init__(
+            self,
+            twp: str = None,
+            rge: str = None,
+            settings: Settings = None,
+            lot_definer: LotDefiner = None,
+            owner: SettingsOwner | None = None):
+        """
+        :param twp: The Twp of the Twp/Rge represented by this Plat.
+        :param rge: The Rge of the Twp/Rge represented by this Plut.
+        :param settings: The ``Settings`` object to control the behavior
+            and appearance of this plat. (Will be overridden by the
+            settings in ``owner``, if that is passed.)
+        :param owner: (Optional) The ``PlatGroup`` object (or other)
+            that this ``Plat`` belongs to. (If used, the ``owner`` will
+            control the settings of this ``Plat``.)
         """
         self.twp = twp
         self.rge = rge
-        self.twprge = twp + rge
-
-        # NOTE: settings can be specified as a Settings object, or by
-        # passing the name of an already saved preset (as a string).
-        # Alternatively, to load settings data from a DIFFERENT source
-        # (i.e. a '.txt' file saved somewhere OTHER than the presets
-        # directory), first use the `Settings.from_file()` method, or
-        # something like:
-        #      `... settings=Settings.from_file(<whatever filepath>)...`
-        if isinstance(settings, str):
-            settings = Settings(preset=settings)
-
-        # If settings was not specified, create a default Settings object.
-        if settings is None:
-            settings = Settings()
-        elif isinstance(settings, str):
-            # If passed as a string, it may be a preset or filepath to a
-            # file that can be imported as a Settings object. Create
-            # that Settings object now. (If that fails, it will be a
-            # defualt Settings object anyway.)
-            settings = Settings(settings)
-        self.settings = settings
-
-        # The main Image of the plat, and an ImageDraw object for it.
-        self.image = Image.new('RGBA', settings.dim, Settings.RGBA_WHITE)
-        self.draw = ImageDraw.Draw(self.image, 'RGBA')
-
-        # Overlay on which we'll plat QQ's, and an ImageDraw object for it
-        self.overlay = Image.new('RGBA', settings.dim, (255, 255, 255, 0))
-        self.overlay_draw = ImageDraw.Draw(self.overlay, 'RGBA')
-
-        # A dict of the sections and the (x,y) coords of their NWNW corner:
-        self.sec_coords = {}
-
-        # Draw the standard 36 sections, or the `only_section` (an int).
-        # (If `only_section` is None, then will draw all 36 in 6x6 grid.
-        # If specified, will draw only that section.)
-        self._draw_all_sections(only_section=only_section)
-        self.header = self._gen_header(only_section=only_section)
-
-        if self.settings.write_header:
-            self._write_header()
-
-        # Text box for writing tract info (or other custom text)
-        self.text_box = None
-        # Create the TractTextBox (if possible with the provided
-        # settings)
-        # NOTE: `.text_box` might remain None, depending on settings!
-        self.new_textbox()
-
-        # A PlatQueue object holding elements/tracts that will be platted.
-        self.pq = PlatQueue()
-
-        # LotDefinitions and/or TwpLotDefinitions, in case we want to
-        # call `.plat_tract()`.  The appropriate one will be set
-        # shortly, depending on whether `only_section` was specified
-        # (LD's apply to single sections, whereas TLD's apply to whole
-        # townships).
-        self.ld = None
-        self.tld = None
-
-        # If a LotDefDB object was passed instead of a TLD or LD object,
-        # get the appropriate TLD from it (per twp+rge key); and if none
-        # exists, then use the init-specified `allow_ld_defaults` to
-        # determine whether to get a default TLD object, or an empty TLD
-        # object.  Also then get the LD from it if `only_section` was
-        # init-specified; and if no LD exists, also rely on
-        # `allow_ld_defaults` to determine whether we get back a default
-        # LD object, or an empty LD object.
-        # (`force_tld_return=True` and `force_ld_return=True` ensure
-        # that the returned objects are not None, but will be at least
-        # an empty version of the respective TLD or LD objects.)
-        if isinstance(tld, LotDefDB):
-            tld = tld.get_tld(
-                twp + rge, allow_ld_defaults=allow_ld_defaults,
-                force_tld_return=True)
-            if only_section is not None:
-                ld = tld.get_ld(
-                    only_section, allow_ld_defaults=allow_ld_defaults,
-                    force_ld_return=True)
-            else:
-                ld = None
-        elif isinstance(tld, LotDefinitions):
-            ld = tld
-            tld = None
-        elif isinstance(tld, TwpLotDefinitions):
-            ld = None
-        else:
-            # Fall back on default LD and TLD objects.
-            ld = LotDefinitions()
-            tld = TwpLotDefinitions()
-
-        # And finally set the appropriate ld or tld.
-        if only_section is not None:
-            self.ld = ld
-        else:
-            self.tld = tld
-
-        # Whether or not to pull default TLD's (and LD's) when undefined
-        self.allow_ld_defaults = allow_ld_defaults
-
-        # A dict to track all unhandled lots, keyed by section number (int)
-        self.unhandled_lots_by_sec = {}
-
-    @staticmethod
-    def from_twprge(
-            twprge='', only_section=None, settings=None, tld=None,
-            allow_ld_defaults=False):
-        """
-        Generate a Plat object by specifying `twprge` as a single
-        string, rather than as `twp` and `rge` separately.
-
-        All other parameters have the same effect as vanilla __init__().
-        """
-        twp, rge, _ = break_trs(twprge)
-
-        return Plat(
-            twp=twp, rge=rge, only_section=only_section, settings=settings,
-            tld=tld, allow_ld_defaults=allow_ld_defaults)
-
-    @staticmethod
-    def from_queue(
-            pq, twp='', rge='', only_section=None, settings=None, tld=None,
-            allow_ld_defaults=False):
-        """
-        Generate and return a filled-in Plat object from a PlatQueue
-        object (see: pytrsplat.queue.PlatQueue).
-
-
-        All parameters have the same effect as vanilla __init__(),
-        except arg `pq`.
-        :arg pq: pytrsplat.queue.PlatQueue object to process at init.
-        """
-        sp_obj = Plat(
-            twp=twp, rge=rge, only_section=only_section, settings=settings,
-            tld=tld, allow_ld_defaults=allow_ld_defaults)
-        sp_obj.process_queue(pq)
-        return sp_obj
-
-    def queue_add(self, plattable, tracts=None):
-        """
-        Queue up an object for platting in the PlatQueue stored in this
-        Plat's `.pq` attribute -- i.e. pass through the arguments to the
-        `.queue_add()` method of the PlatQueue object.
-
-        NOTE: A PlatQueue can contain any number of plattable objects,
-        but only one may be added via this method at a time. However,
-        the list passed as `tracts=` (if any) can contain any number of
-        pytrs.Tract objects.
-
-        IMPORTANT: Passing an object in `tracts` does NOT add it to the
-        queue to be platted -- only to the tracts whose text will be
-        written at the bottom of the plat(s), if so configured.
-
-        :param plattable: The object to be added to the queue. (Must be
-        a type acceptable to PlatQueue -- see docs for those objects.)
-        :param tracts: A list of pytrs.Tract objects whose text should
-        eventually be written at the bottom of the Plat (assuming the
-        Plat is configured in settings to write Tract text).
-        NOTE: Objects added to `tracts` do NOT get drawn on the plat --
-        only written at the bottom. But pytrs.Tract objects passed here
-        as arg `plattable` are automatically added to `tracts`.
-        :return: None
-        """
-        self.pq.queue_add(plattable, tracts)
-
-    def process_queue(self, queue=None, allow_ld_defaults=None):
-        """
-        Process all objects in a PlatQueue object. If `queue=None` (the
-        default), the PlatQueue object that will be processed is the one
-        stored in this Plat's `.pq` attribute.
-        """
-
-        if allow_ld_defaults is None:
-            allow_ld_defaults = self.allow_ld_defaults
-
-        # If a different PlatQueue isn't otherwise specified, use the
-        # Plat's own `.pq` from init.
-        if queue is None:
-            queue = self.pq
-
-        for itm in queue:
-            if isinstance(itm, pytrs.PLSSDesc):
-                raise TypeError(
-                    f"Cannot process pytrs.PLSSDesc objects in a PlatQueue "
-                    f"object into a Plat object. "
-                    f"Use MultiPlatQueue and MultiPlat objects instead.")
-            elif not isinstance(itm, PlatQueue.SINGLE_PLATTABLES):
-                raise TypeError(f"Cannot process type in PlatQueue: "
-                                f"{type(itm)}")
-            if isinstance(itm, SectionGrid):
-                self.plat_section_grid(itm)
-            elif isinstance(itm, TownshipGrid):
-                self.plat_township_grid(itm)
-            elif isinstance(itm, pytrs.Tract):
-                self.plat_tract(
-                    itm, write_tract=False, allow_ld_defaults=allow_ld_defaults)
-
-        if self.settings.write_tracts and self.text_box is not None:
-            self.text_box.write_all_tracts(queue.tracts)
-
-    def _gen_header(self, only_section=None):
-        """
-        INTERNAL USE:
-        Generate the text of a header containing the T&R and/or
-        Section number.
-        :param only_section: Specify with the appropriate integer when
-         platting only a single section (rather than the usual 6x6
-         grid).
-        """
-        trs_ = pytrs.TRS.from_twprgesec(twp=self.twp, rge=self.rge)
-        twptxt = trs_.pretty_twprge(
-            t='Township ',
-            delim=', ',
-            r='Range ',
-            e=' East',
-            w=' West',
-            n=' North',
-            s=' South'
-        )
-        if trs_.is_undef(sec=False):
-            # If neither twp nor rge have been set, we will not write T&R in header.
-            twptxt = ''
-        elif trs_.is_error(sec=False):
-            twptxt = '{Township/Range Error}'
-        if only_section is not None:
-            # If we're platting a single section.
-            twptxt = f"{twptxt}{', ' * (len(twptxt) > 0)}Section {only_section}"
-        return twptxt
-
-    def _draw_all_sections(self, only_section=None):
-        """
-        INTERNAL USE:
-        Draw the lines for 36 sections in the standard 6x6 grid; or draw
-        a single section if `only_section=<int>` is specified.
-        """
-
-        # Saving some line space shortly by setting this variable:
-        settings = self.settings
-
-        w, h = settings.dim
-
-        # Our township (a square) will either be a 6x6 grid of sections,
-        # or a single section (i.e. 1x1).
-        sections_per_side = 6
-        if only_section is not None:
-            sections_per_side = 1
-
-        # Number of QQ divisions per section -- i.e. a 4x4 grid of QQ's,
-        # or a square of 4 units (QQ's) by 4 units.
-        qqs_per_sec_side = 4
-
-        # Multiplying `settings.qq_side` (an int representing how long
-        # we draw a QQ side) by `qq_per_sec_side` (an int representing
-        # how many QQ's per section side) gets us the number of px per
-        # section side.
-        section_length = settings.qq_side * qqs_per_sec_side
-
-        # We'll horizontally center our plat on the page. (4 is the number
-        # of QQ's drawn per section)
-        x_start = (w - (section_length * sections_per_side)) // 2
-
-        # The plat will start this many px below the top of the page.
-        y_start = settings.y_top_marg
-
-        # PLSS sections "snake" from the NE corner of the township west
-        # then down, then they cut back east, then down and west again,
-        # etc., thus:
-        #           6   5   4   3   2   1
-        #           7   8   9   10  11  12
-        #           18  17  16  15  14  13
-        #           19  20  21  22  23  24
-        #           30  29  28  27  26  25
-        #           31  32  33  34  35  36
-        #
-        # ...so accounting for this is a little trickier:
-        sec_nums = list(range(6, 0, -1))
-        sec_nums.extend(list(range(7, 13)))
-        sec_nums.extend(list(range(18, 12, -1)))
-        sec_nums.extend(list(range(19, 25)))
-        sec_nums.extend(list(range(30, 24, -1)))
-        sec_nums.extend(list(range(31, 37)))
-
-        # If drawing only one section, override that list with a
-        # single-element list.
-        if only_section is not None:
-            sec_nums = [int(only_section)]
-
-        # Generate section(s) on the plat, and number them.
-        #
-        # For each section, we start at (x_start, y_start) and move
-        # `j` section-lengths over, and `i` section-lengths down,
-        # at which point we are at the NW corner of the section,
-        # from which we'll draw our 4x4 grid for that section and
-        # mark the coord in the `.sec_coords` dict.
-        #
-        # Remember that sections_per_side is `1` if we're platting only
-        # a single section, in which case i and j will only be 0.
-        for i in range(sections_per_side):
-            for j in range(sections_per_side):
-                sec_num = sec_nums.pop(0)
-                cur_x = x_start + section_length * j
-                cur_y = y_start + section_length * i
-                self._draw_sec((cur_x, cur_y), sec_num=sec_num)
-                self.sec_coords[sec_num] = (cur_x, cur_y)
-
-    def _write_header(self, text=None):
-        """
-        Write the header at the top of the page.
-        :param text: The text to write as header. If not specified, will
-        use the text stored in `self.header`.
-        """
-
-        if text is None:
-            text = self.header
-
-        W = self.image.width
-        w, h = self.draw.textsize(text, font=self.settings.headerfont)
-
-        # Center horizontally and write `settings.y_header_marg` px
-        # above top section
-        text_x = (W - w) / 2
-        text_y = self.settings.y_top_marg - h - self.settings.y_header_marg
-        self.draw.text(
-            (text_x, text_y),
-            text,
-            font=self.settings.headerfont,
-            fill=self.settings.headerfont_RGBA)
-
-    def write_all_tracts(self, tracts):
-        """
-        Pass the list of pytrs.Tract objects onto the TractTextBox (if
-        it exists), where they will be written.
-        :param tracts: A list of pytrs.Tract objects that should be
-        written to the TractTextBox (i.e. at the bottom of the Plat).
-        :return: None
-        """
-        if self.text_box is not None:
-            self.text_box.write_all_tracts(tracts)
-
-    def write_tract(self, tract):
-        """
-        Pass the pytrs.Tract object onto the TractTextBox (if it
-        exists), where they will be written.
-        :param tract: A pytrs.Tract object that should be written to the
-        TractTextBox (i.e. at the bottom of the Plat)
-        :return: None
-        """
-        if self.text_box is not None:
-            self.text_box.write_all_tracts([tract])
-
-    def new_textbox(self):
-        """
-        INTERNAL USE:
-        Create a TractTextBox object per the Plat's settings, for
-        writing text at the bottom of the Plat.
-        """
-
-        x0, y0 = self.first_text_xy()
-        # Bottom / right-most available x and y
-        y1 = self.settings.dim[1] - self.settings.y_bottom_marg
-        x1 = self.settings.dim[0] - self.settings.x_text_right_marg
-
-        if x0 >= x1 or y0 >= y1:
-            self.text_box = None
-        else:
-            self.text_box = TractTextBox(
-                size=(x1 - x0, y1 - y0),
-                bg_RGBA=(255, 255, 255, 255),
-                typeface=self.settings.tractfont_typeface,
-                font_size=self.settings.tractfont_size,
-                font_RGBA=self.settings.tractfont_RGBA,
-                settings=self.settings)
-
-    def first_text_xy(self, settings=None):
-        """
-        INTERNAL USE:
-        Get the top/left-most pixel available for writing text (i.e.
-        top/left corner of where we can create and place a textbox), per
-        Plat settings.
-        """
-
-        if settings is None:
-            settings = self.settings
-
-        # Number of QQ divisions per section -- i.e. a 4x4 grid of QQ's,
-        # or a square of 4 units (QQ's) by 4 units.
-        qqs_per_sec_side = 4
-
-        # Multiplying `settings.qq_side` (an int representing how long
-        # we draw a QQ side) by `qq_per_sec_side` (an int representing
-        # how many QQ's per section side) gets us the number of px per
-        # section side.
-        sec_len = settings.qq_side * qqs_per_sec_side
-
-        # If we platted all 36 sections, there are 6 per side (6x6 grid)
-        secs_per_twp_side = 6
-        if len(self.sec_coords.keys()) == 1:
-            # But if we only platted one, it's a 1x1 grid.
-            secs_per_twp_side = 1
-
-        # First available x (i.e. the left margin)
-        x0 = settings.x_text_left_marg
-
-        # First available y below the plat...
-        #   Starting at the top of the image, move down to the top of
-        #   the plat itself...
-        y0 = settings.y_top_marg
-        #   Then go to the bottom of the plat...
-        y0 += sec_len * secs_per_twp_side
-        #   And then finally add the settings-specified buffer between
-        #   the plat and the first line of text
-        y0 += settings.y_px_before_tracts
-
-        return (x0, y0)
-
-    def output(self, filepath=None):
-        """
-        Merge the drawn overlay (i.e. filled QQ's) onto the base
-        township plat image and return an Image object. Also include
-        TractTextBox if it exists. Optionally save the image to file if
-        `filepath=<filepath>` is specified (must be either '.png' or
-        '.pdf' file).
-        """
-        merged = Image.alpha_composite(self.image, self.overlay)
-
-        if self.text_box is not None:
-            merged.paste(self.text_box.im, self.first_text_xy())
-
-        # TODO: Add the option with *args to specify which layers get
-        #   included in the output. That also will require me to have
-        #   separate layers for QQ's, the grid, labels, etc.
-        #   And that, in turn, will require me to change methods to
-        #   /plat/ onto multiple layers.
-
-        if filepath is not None:
-            merged.save(filepath)
-
-        return merged
-
-    def show(self):
-        """
-        Flatten and display the plat PIL.Image.Image object (WARNING:
-        will hang the program until the image is closed).
-        """
-        self.output().show()
-
-    def plat_section_grid(
-            self, sec_grid: SectionGrid, tracts=None, qq_fill_RGBA=None):
-        """
-        Project a pytrsplat.SectionGrid object onto an existing Plat
-        object (i.e. fill any QQ hits per the `SectionGrid.qq_grid`
-        values). Add any lot names in the `.unhandled_lots` list of the
-        SectionGrid object to the Plat's `.unhandled_lots_by_sec` dict.
-
-        :param sec_grid: The SectionGrid object whose `.qq_grid` values
-        should be projected onto the Plat.
-        :param tracts: A list of pytrs.Tract objects whose text should
-        be written at the bottom of the Plat (if the Plat settings are
-        configured to write Tract text).
-        :param qq_fill_RGBA: The color with which to fill the QQs. (If
-        not specified, uses whatever is configured in Plat's `.settings`
-        attribute.)
-        """
-        sec_num = int(sec_grid.sec)
-        if sec_num not in self.sec_coords.keys():
-            # Direct section numbers that are not yet keys into 'section
-            # 0', i.e. the meaningless 'junk drawer' section. (This
-            # should only happen to section numbers > 36 or < 0.)
-            sec_num = 0
-
-        for coord in sec_grid.filled_coords():
-            self.fill_qq(sec_num, coord, qq_fill_RGBA=qq_fill_RGBA)
-        if self.settings.write_lot_numbers:
-            self.write_lots(sec_grid)
-        self.unhandled_lots_by_sec[sec_num] = sec_grid.unhandled_lots
-
-        # Write the Tract data to the bottom of the plat (or not, per settings).
-        if self.settings.write_tracts and self.text_box is not None:
-            self.text_box.write_all_tracts(tracts)
-
-    @staticmethod
-    def from_section_grid(
-            sec_grid: SectionGrid, single_sec=False, tracts=None,
-            settings=None, tld=None, allow_ld_defaults=False):
-        """
-        Generate and return a new Plat object from a
-        pytrsplat.SectionGrid object.
-
-        All parameters have the same effect as vanilla __init__(),
-        except:
-        :arg sec_grid: pytrsplat.SectionGrid object to project at init.
-        NOTE: `twp` and `rge` are pulled from the SectionGrid object,
-        rather than specified as parameter.
-        :param single_sec: Replaces `only_section=<int>` from __init__()
-        in that it takes a bool, rather than an integer -- i.e. specify
-        `single_sec=True` to plat a single section (with the section
-        number pulled from the `.sec` attribute of the SectionGrid obj),
-        or `False` (the default) to plat the full 6x6 grid of sections.
-        :param tracts: A list of pytrs.Tract objects whose text should
-        be written at the bottom of the Plat (if the Plat settings are
-        configured to write Tract text).
-        """
-
-        only_section = None
-        if single_sec:
-            only_section = sec_grid.sec
-
-        plat_obj = Plat(
-            twp=sec_grid.twp, rge=sec_grid.rge, settings=settings, tld=tld,
-            allow_ld_defaults=allow_ld_defaults, only_section=only_section)
-        plat_obj.plat_section_grid(sec_grid)
-        if plat_obj.settings.write_tracts:
-            plat_obj.write_all_tracts(tracts)
-        return plat_obj
-
-    @staticmethod
-    def from_township_grid(twp_grid, tracts=None, settings=None, tld=None,
-            allow_ld_defaults=False):
-        """
-        Generate and return a new Plat object from a
-        pytrsplat.TownshipGrid object.
-        NOTE: `only_section` parameter is NOT allowed with this method.
-
-        All parameters have the same effect as vanilla __init__(),
-        except:
-        :arg twp_grid: pytrsplat.TownshipGrid object to project at init.
-        NOTE: `twp` and `rge` are pulled from the TownshipGrid object,
-        rather than specified as parameter.
-        :param tracts: A list of pytrs.Tract objects whose text should
-        be written at the bottom of the Plat (if the Plat settings are
-        configured to write Tract text).
-        """
-        twp = twp_grid.twp
-        rge = twp_grid.rge
-        plat_obj = Plat(
-            twp=twp, rge=rge, settings=settings, tld=tld,
-            allow_ld_defaults=allow_ld_defaults)
-        plat_obj.plat_township_grid(twp_grid=twp_grid, tracts=tracts)
-        return plat_obj
-
-    def plat_township_grid(self, twp_grid, tracts=None, qq_fill_RGBA=None):
-        """
-        Project a pytrsplat.TownshipGrid object onto an existing Plat
-        object (i.e. fill any QQ hits per all `SectionGrid.qq_grid`
-        values in the TownshipGrid). Add any lot names in the
-        `.unhandled_lots` list of each SectionGrid to the Plat's
-        `.unhandled_lots_by_sec` dict.
-
-        :param twp_grid: The TownshipGrid object whose subordinate
-        SectionGrid objects should be projected onto the Plat (i.e.
-        their `.qq_grid` attributes).
-        :param tracts: A list of pytrs.Tract objects whose text should
-        be written at the bottom of the Plat (if the Plat settings are
-        configured to write Tract text).
-        :param qq_fill_RGBA: The color with which to fill the QQs. (If
-        not specified, uses whatever is configured in Plat's `.settings`
-        attribute.)
-        """
-
-        # Generate the list of SectionGrid objs that have anything in them.
-        # We use `include_pinged=True` to also include any sections
-        # that were 'pinged' by a setter method, but may not have had
-        # any values actually set (e.g., perhaps for a Tract object that
-        # failed to generate any lots/QQ's when parsed by pytrs).
-        sec_grid_list = twp_grid.filled_section_grids(include_pinged=True)
-
-        # Plat each SectionGrid's filled QQ's onto our new overlay.
-        for sec_grid in sec_grid_list:
-            if self.settings.write_lot_numbers:
-                # If so configured in settings, write lot numbers onto QQ's
-                self.write_lots(sec_grid)
-            self.plat_section_grid(sec_grid, qq_fill_RGBA=qq_fill_RGBA)
-
-        # Write the Tract data to the bottom of the plat (or not, per settings).
-        if self.settings.write_tracts and self.text_box is not None:
-            self.text_box.write_all_tracts(tracts)
-
-    @staticmethod
-    def from_tract(
-            tract: pytrs.Tract, settings=None, single_sec=False, ld=None,
-            allow_ld_defaults=False):
-        """
-        Generate and return a new Plat object from a parsed pytrs.Tract
-        object.
-
-        :arg tract: pytrs.Tract object to project at init.
-        NOTE: `twp` and `rge` are pulled from the Tract object, rather
-        than specified as parameter.
-        :param single_sec: Replaces `only_section=<int>` from __init__()
-        in that it takes a bool, rather than an integer -- i.e. specify
-        `single_sec=True` to plat a single section (with the section
-        number pulled from the `.sec` attribute of the Tract obj), or
-        `False` (the default) to plat the full 6x6 grid of sections.
-        """
-        twp = tract.twp
-        rge = tract.rge
-
-        only_sec = None
-        if single_sec:
-            sec = tract.sec
-            if sec in [_ERR_SEC, _UNDEF_SEC]:
-                sec = 0
-            only_sec = str(int(sec))
-
-        plat_obj = Plat(
-            twp=twp, rge=rge, settings=settings, only_section=only_sec,
-            allow_ld_defaults=allow_ld_defaults)
-        plat_obj.plat_tract(tract, ld=ld)
-        return plat_obj
-
-    def plat_tract(
-            self, tract: pytrs.Tract, write_tract=None, ld=None,
-            allow_ld_defaults=None):
-        """
-        Project a parsed pytrs.Tract object onto an existing Plat.
-
-        :arg tract: pytrs.Tract object to project.
-        :parameter write_tract: Whether to write the Tract text at the
-        bottom of the Plat. If not specified, defaults to whatever the
-        Plat settings are (in `.settings.write_tracts` attribute).
-        :param ld: A pytrsplat.LotDefinitions object, for defining how
-        each lot should be interpreted in terms of QQ's (i.e. 'L1'
-        corresponds with 'NENE' in Sec 1, T154N-R97W).
-        :param allow_ld_defaults: Whether to allow 'default' lot
-        definitions where lots have not been explicitly defined for this
-        section.
-        """
-
-        if allow_ld_defaults is None:
-            allow_ld_defaults = self.allow_ld_defaults
-
-        twp, rge = tract.twp, tract.rge
-        sec = tract.sec_num
-        if sec is None:
-            sec = 0
-        sec = str(sec).rjust(2, '0')
-
-        # If the user fed in a LDDB or TwpLD, rather than a LotDefinitions
-        # object, get the appropriate LD from the LDDB or TLD.
-        if isinstance(ld, LotDefDB):
-            ld = ld.trs(
-                f"{twp}{rge}{sec}", allow_ld_defaults=allow_ld_defaults)
-        elif isinstance(ld, TwpLotDefinitions):
-            ld = ld.get_ld(
-                int(sec), allow_ld_defaults=allow_ld_defaults,
-                force_ld_return=True)
-
-        # TODO: Check this block, maybe delete:
-        # If the user requested default LotDefs (based on a 'standard'
-        # township) by passing 'default' for `ld`, create that LD obj.
-        if ld == 'default':
-            ld = LotDefinitions(int(sec))
-
-        # Or if not specified when `.plat_tract()` was called, pull from
-        # the Plat object's attributes, as long as they were set.
-        if ld is None:
-            if self.ld is not None:
-                ld = self.ld
-            elif self.tld is not None:
-                ld = self.tld.get_ld(
-                    int(sec), allow_ld_defaults=allow_ld_defaults,
-                    force_ld_return=True)
-            else:
-                # Otherwise, fall back to an empty LD.
-                ld = LotDefinitions()
-
-        # Generate a SectionGrid from the Tract, and plat it.
-        sec_grid = SectionGrid.from_tract(tract, ld=ld)
-        self.plat_section_grid(sec_grid)
-
-        # If not specified whether to write tract, default to settings
-        if write_tract is None:
-            write_tract = self.settings.write_tracts
-
-        if write_tract and self.text_box is not None:
-            self.text_box.write_all_tracts([tract])
-
-    def write_lots(self, sec_grid: SectionGrid):
-        """
-        Write lot numbers in the top-left corner of the respective QQs,
-        according to the lots defined (or assumed) in a
-        pytrsplat.SectionGrid object.
-
-        (Location of the lot text, and font typeface, color, and size
-        are all as dictated in this Plat's `.settings` attributes.)
-        :param sec_grid: a pytrsplat.SectionGrid object whose lot
-        numbers should be written into the Plat (regardless whether any
-        of the lots are actually filled).
-        """
-
-        def write_lot(lots_within_this_QQ: list, grid_location: tuple):
-
-            # Get the pixel location of the NWNW corner of the section:
-            xy_start = self.sec_coords[int(sec_grid.sec)]
-            x_start, y_start = xy_start
-
-            # Break out the grid location of the QQ into x, y
-            x_grid, y_grid = grid_location
-
-            # Calculate the pixel location of the NWNW corner of the QQ.
-            # (Remember that qq_side is the length of each side of a QQ square.)
-            x_start = x_start + self.settings.qq_side * x_grid
-            y_start = y_start + self.settings.qq_side * y_grid
-
-            # Offset x and y, as configured in settings.
-            x_start += self.settings.lot_num_offset_px
-            y_start += self.settings.lot_num_offset_px
-
-            # And lastly, join the lots into a string, and write the text.
-            self.draw.text(
-                (x_start, y_start),
-                text=', '.join(lots_within_this_QQ),
-                font=self.settings.lotfont,
-                fill=self.settings.lotfont_RGBA
-            )
-
-        # Each qq_coords[y][x] contains a list of which lot(s) are at
-        # (x,y) in this particular section.  For example, 'L1' thru 'L4'
-        # in a standard Section 1 correspond to the N2N2 QQ's,
-        # respectively -- so...
-        #       qq_coords[0][0] -> ['L4']    # i.e. (0, 0), or the NWNW
-        #       qq_coords[0][1] -> ['L3']    # i.e. (1, 0), or the NENW
-        #       qq_coords[0][2] -> ['L2']    # i.e. (2, 0), or the NWNE
-        #       qq_coords[0][3] -> ['L1']    # i.e. (3, 0), or the NENE
-        # ... and all other coords would be an empty list...
-        #       qq_coords[2][1] -> []    # i.e. (1,2), or the NESW
-        #       qq_coords[3][3] -> []    # i.e. (3,3), or the SESE
-        #       ...etc.
-        qq_coords = sec_grid.lots_by_grid()
-
-        for y in range(len(qq_coords)):
-            for x in range(len(qq_coords[y])):
-                lots = qq_coords[y][x]
-                if not lots:
-                    continue
-                clean_lots = []
-                for lot in lots:
-                    # Delete leading 'L' from each lot, leaving only the digit,
-                    # and append to clean_lots
-                    clean_lots.append(lot.replace('L', ''))
-                write_lot(clean_lots, (x, y))
-
-    def fill_qq(self, sec_num: int, grid_location: tuple, qq_fill_RGBA=None):
-        """
-        Fill in a single QQ on the plat.
-
-        :param sec_num: An integer, being the number of a section that
-        is already depicted on the plat (i.e. 1 - 36 for a standard 6x6
-        plat; or the only section, if only one section is platted).
-        NOTE: When 0 is passed as `sec_num`, this method returns
-        immediately without filling any QQ's and without raising any
-        errors. This is to handle flawed parses where the section number
-        could not be identified in the original text (by the pytrs
-        module), which typically sets the section number to 'secError'.
-        Where this method gets called by other methods/functions in this
-        module, 'secError' should first get converted to int 0 prior to
-        passing it as `sec_num` in this method.
-        :param grid_location: A coord value (0, 0) to (3, 3), which
-        represents the QQ to be filled in the 4x4 grid -- i.e. the same
-        coord system as SectionGrid objects, where (0, 0) is the NWNW
-        and (3, 3) is the SESE.
-            ex:  (0, 0) -> 'NWNW'
-                 (1, 0) -> 'NENW'
-                 (2, 2) -> 'NWSE'
-        :param qq_fill_RGBA: The color with which to fill the QQs. (If
-        not specified, uses whatever is configured in Plat's `.settings`
-        attribute.)
-        :return: None
-        """
-
-        if sec_num == 0:
-            return
-
-        if qq_fill_RGBA is None:
-            # If not specified, pull from plat settings.
-            qq_fill_RGBA = self.settings.qq_fill_RGBA
-
-        # Get the pixel location of the NWNW corner of the sec_num:
-        xy_start = self.sec_coords[sec_num]
-        x_start, y_start = xy_start
-
-        # Break out the grid location of the QQ into x, y
-        x_grid, y_grid = grid_location
-
-        # Calculate the pixel location of the NWNW corner of the QQ. (Remember
-        # that qq_side is the length of each side of a QQ square.)
-        x_start = x_start + self.settings.qq_side * x_grid
-        y_start = y_start + self.settings.qq_side * y_grid
-
-        # Draw the QQ
-        self.overlay_draw.polygon(
-            [(x_start, y_start),
-             (x_start + self.settings.qq_side, y_start),
-             (x_start + self.settings.qq_side, y_start + self.settings.qq_side),
-             (x_start, y_start + self.settings.qq_side)],
-            qq_fill_RGBA
-        )
-
-    def _draw_sec(self, top_left_corner, sec_num=None):
-        """
-        INTERNAL USE:
-        Draw the 4x4 grid of a section with an ImageDraw object, at the
-        specified `top_left_corner` (i.e. px coord). Optionally specify
-        the section number with `sec_num=<int>`.
-        (Pulls sizes, lengths, etc. from this Plat's `.settings`)
-        """
-
-        x_start, y_start = top_left_corner
-
-        settings = self.settings
-
-        # Set this attribute to a shorter-named variable, just to save line space.
-        qqs = settings.qq_side
-
-        # We'll draw QQ lines, then Q lines, then Section boundary -- in
-        # that order, so that the color of the higher-order lines overrules
-        # the lower-order lines.
-
-        # Draw the quarter-quarter lines.
-        qq_lines = [
-            [(x_start + qqs * 1, y_start), (x_start + qqs * 1, y_start + qqs * 4)],
-            [(x_start + qqs * 3, y_start), (x_start + qqs * 3, y_start + qqs * 4)],
-            [(x_start, y_start + qqs * 1), (x_start + qqs * 4, y_start + qqs * 1)],
-            [(x_start, y_start + qqs * 3), (x_start + qqs * 4, y_start + qqs * 3)]
-        ]
-
-        for qq_line in qq_lines:
-            self.draw.line(
-                qq_line,
-                fill=settings.qql_RGBA,
-                width=settings.qql_stroke)
-
-        # Draw the quarter lines (which divide the section in half).
-        q_lines = [
-            [(x_start + qqs * 2, y_start), (x_start + qqs * 2, y_start + qqs * 4)],
-            [(x_start, y_start + qqs * 2), (x_start + qqs * 4, y_start + qqs * 2)]
-        ]
-
-        for q_line in q_lines:
-            self.draw.line(
-                q_line,
-                fill=settings.ql_RGBA,
-                width=settings.ql_stroke)
-
-        # Draw a white box in the center of the section.
-        x_center, y_center = (x_start + qqs * 2, y_start + qqs * 2)
-        cbwh = settings.centerbox_wh
-        centerbox = [
-            (x_center - (cbwh // 2), y_center - (cbwh // 2)),
-            (x_center - (cbwh // 2), y_center + (cbwh // 2) + 3),
-            (x_center + (cbwh // 2), y_center + (cbwh // 2)),
-            (x_center + (cbwh // 2), y_center - (cbwh // 2)),
-        ]
-        self.draw.polygon(centerbox, Settings.RGBA_WHITE)
-
-        # Draw the outer bounds of the section.
-        sec_sides = [
-            [(x_start, y_start), (x_start + qqs * 4, y_start)],
-            [(x_start + qqs * 4, y_start), (x_start + qqs * 4, y_start + qqs * 4)],
-            [(x_start + qqs * 4, y_start + qqs * 4), (x_start, y_start + qqs * 4)],
-            [(x_start, y_start + qqs * 4), (x_start, y_start)],
-        ]
-
-        for side in sec_sides:
-            self.draw.line(
-                side,
-                fill=settings.sec_line_RGBA,
-                width=settings.sec_line_stroke)
-
-        # If requested, write in the section number
-        if sec_num is not None and settings.write_section_numbers:
-            # TODO: DEBUG -- Section numbers are printing very slightly
-            #   farther down than they should be. Figure out why.
-            w, h = self.draw.textsize(str(sec_num), font=settings.secfont)
-            self.draw.text(
-                (x_center - (w // 2), y_center - (h // 2)),
-                str(sec_num),
-                fill=settings.secfont_RGBA,
-                font=settings.secfont)
-
-
-########################################################################
-# MultiPlat objects - for creating / processing a collection of Plat objects
-########################################################################
-
-class MultiPlat:
-    """
-    An object to create, process, hold, and output one or multiple Plat
-    objects, all using identical settings and general parameters. For
-    example, generating one or more Plat objects from a parsed
-    pytrs.PLSSDesc object (which can cover one or multiple townships).
-
-    MultiPlat objects can be configured (size, font, colors, margins,
-    etc.) at init, thus:
-        -- MultiPlat init parameter `settings=` accepts anything that
-            is also acceptable to Plat init parameter `settings=`.
-    NOTE: Changes to settings after a MultiPlat has been initialized
-    will not necessarily have any effect. It is therefore best practice
-    to configure a Settings object prior to initializing a MultiPlat
-    object.
-
-    MultiPlat objects can incorporate and/or be created from these
-    objects directly:
-        -- pytrs.PLSSDesc (created externally via the pytrs module)
-            `.plat_plssdesc()` -- to process a pytrs.PLSSDesc object
-                into an existing MultiPlat object
-            `MultiPlat.from_plssdesc()` -- to create a new MultiPlat
-                object from an an existing pytrs.PLSSDesc object
-            NOTE: To process more than one PLSSDesc object, use the
-                MultiPlatQueue options, which filter the data in
-                PLSSDesc objects into respective Twp/Rge before platting
-                them, so that only one Plat object is generated per
-                township. Calling `.plat_plssdesc()` repeatedly on a
-                single MultiPlat object will create new Plat objects
-                every time.
-        -- pytrsplat.MultiPlatQueue
-            `.process_queue()` -- to process all of the objects in a
-                MultiPlatQueue object into an existing MultiPlat
-            `.queue_add()` -- to add an object to an existing
-                MultiPlatQueue (stored in the MultiPlat's `.mpq`
-                attribute)
-            `.queue_add_text()` -- to parse the raw text of a PLSS
-                land description, then add it to an existing
-                MultiPlatQueue (stored in the MultiPlat's `.mpq`
-                attribute)
-            `MultiPlat.from_queue()` -- to create a new MultiPlat object
-                from an existing MultiPlatQueue object
-        -- Raw text of a PLSS land description (i.e. a string):
-            `MultiPlat.from_unparsed_text()` -- to create a new
-                MultiPlat object from the raw text of a PLSS land
-                description (i.e. parse the text into a pytrs.PLSSDesc
-                object behind-the-scenes, and generate a MultiPlat from
-                that)
-
-        In addition to the above, MultiPlat objects can *indirectly*
-        process any of the following object types, by first adding them
-        to a MultiPlatQueue object and then using any of the above
-        options for processing MultiPlatQueue objects:
-                -- pytrs.PLSSDesc
-                -- pytrs.Tract
-                -- pytrsplat.SectionGrid
-                -- pytrsplat.TownshipGrid
-                -- pytrsplat.PlatQueue
-
-    For better results, optionally pass a pytrsplat.LotDefDB object (or
-    the filepath to a .csv file that can be read into a LotDefDB object)
-    to init parameter `lddb=`, to specify how to handle lots -- i.e.
-    which QQ's are intended by which lots. (See more info in docs for
-    `pytrsplat.LotDefDB`.)
-    Also specify at init (parameter `allow_ld_defaults=<bool>`) whether
-    'default' lot definitions are allowed as a fall-back option, when
-    lots have not been explicitly defined for a given section.
-    (Default lots are the 'usual' lots in Sections 1 - 7, 18, 19, 30,
-    and 31 of a 'standard' township -- i.e. along the northern and
-    western boundaries of a township. Potentially useful as a 'better-
-    than-nothing' option, but not as reliable as user-specified lot
-    definitions.)
-    NOTE: All lots that were not defined but which the user tried to
-    plat are compiled into a nested dict via the `.all_unhandled_lots`
-    property (keyed by twprge).
-
-    MultiPlat objects can be output with these methods:
-        `.output()` -- Return a list of a flattened PIL.Image.Image
-            object for each Plat generated.
-        `.output_to_pdf()` -- Save the images as a PDF
-        `.output_to_png()` -- Save each image as a separate PNG
-        NOTE: The subordinate Plat objects are stored in `.plats`, where
-            they remain pytrsplat.Plat objects but not yet 'flattened'
-            images. They get flattened via the above output methods.
-
-    A pytrsplat.MultiPlatQueue object is initialized for each MultiPlat
-    as `.mpq` attribute. It can be added to with `.queue_add()` and
-    `.queue_add_text()`, and processed with `.process_queue()`.
-    """
-
-    # TODO: Wherever LDDB, TLD, or LD is referenced in a kwarg, allow it
-    #   to pull from self.lddb.
-
-    # TODO: Figure out a good way to organize the plats. I'm thinking a
-    #  dict, keyed by T&R. Currently, it's a list.
-
-    def __init__(self, settings=None, lddb=None, allow_ld_defaults=False):
-        """
-        An object to create, process, hold, and output one or multiple
-        Plat objects, all using identical settings and general
-        parameters.
-
-        :param settings: How each subordinate Plat should be configured.
-        May be passed as either:
-            -- any `pytrsplat.Settings` object
-            -- the name (i.e. a string) of a saved preset
-                -- Get a current list of available presets:
-                    `pytrsplat.Settings.list_presets()`
-                -- View / edit / create presets with this GUI tool:
-                    `pytrsplat.settingseditor.launch_settings_editor()`
-        :param lddb: A `pytrsplat.LotDefDB` object, which defines how
-        each lot should be interpreted (in terms of its corresponding QQ
-        or QQs). May also pass the filepath to a .csv file containing
-        appropriately formatted lot definitions. (See documentation on
-        `pytrsplat.LotDefDB` objects for acceptable .csv formatting.)
-        :param allow_ld_defaults: Whether 'default' lot definitions are
-        allowed as a fall-back option, when lots have not been
-        explicitly defined for a given section. (Default lots are the
-        'usual' lots in Sections 1 - 7, 18, 19, 30, and 31 of a
-        'standard' township -- i.e. along the northern and western
-        boundaries of a township. Potentially useful as a 'better-than-
-        nothing' option, but not as reliable as user-specified lot
-        definitions.)
-        """
-        # If settings was not specified, create a default Settings object.
-        if settings is None:
-            settings = Settings()
-        elif isinstance(settings, str):
-            # If passed as a string, it should be the name of a preset.
-            # Create that Settings object now. (Will throw off an error
-            # if not an existing preset name.)
-            settings = Settings(preset=settings)
-        self.settings = settings
-
-        # A list of generated plats
-        self.plats = []
-
-        # A MultiPlatQueue object holding PlatQueue objects (which in
-        # turn hold elements/tracts that will be platted).
-        self.mpq = MultiPlatQueue()
-
-        # Try converting lddb to a pathlib.Path object (e.g., if it was
-        # passed as a string). If unsuccessful, it seems the user has
-        # NOT tried to pass a filepath as `lddb`.
-        try:
-            lddb = Path(lddb)
-        except TypeError:
-            pass
-
-        # LotDefDB object for defining lots in subordinate plats (if not
-        # specified when platting objects).
-        if isinstance(lddb, Path):
-            # If a string is passed, we assume it's a filepath to a file
-            # that can be read into a LDDB object (e.g., a .csv file).
-            # Convert to LDDB object now. (Will throw off errors if it
-            # does not lead to a '.csv' file.)
-            lddb = LotDefDB(from_csv=lddb)
-        if not isinstance(lddb, LotDefDB):
-            # If there's no valid LDDB by now, default to an empty LDDB.
-            lddb = LotDefDB()
-        self.lddb = lddb
-
-        # Whether or not to pull default TLD's when they are not set
-        # in our LotDefDB. (See `Grid.LotDefDB.get_tld()` for more info)
-        self.allow_ld_defaults = allow_ld_defaults
+        self.queue = pytrs.TractList()
+        self.background: Image.Image = None
+        # Main image and draw object.
+        self.image: Image.Image = None
+        self.draw: ImageDraw.Draw = None
+        # Overlays the main image with QQs, etc.
+        self.overlay_image: Image.Image = None
+        self.overlay_draw: ImageDraw.Draw = None
+        # Footer image and draw object.
+        self.footer_image: Image.Image = None
+        self.footer_draw: ImageDraw.Draw = None
+        self.image_layers: list[Image] = []
+        self.header = PlatHeader(owner=self)
+        self.body = PlatBody(twp, rge, owner=self)
+        self.footer = PlatFooter(owner=self)
+        # If `.owner` is used, it must include .settings attribute.
+        self.owner: ISettingsLotDefinerOwner | None = owner
+        # ._settings will not be used if this Plat has an owner.
+        self._settings: Settings = settings
+        if settings is None and owner is None:
+            self._settings = DEFAULT_SETTINGS
+        self._lot_definer: LotDefiner | None = lot_definer
+        if lot_definer is None and owner is None:
+            self._lot_definer = LotDefiner()
+        # ._all_lot_defs_cached will not be used if this Plat has an owner.
+        # It's a cache of lot definitions (including defaults). Gets used while
+        # executing queue, then cleared.
+        self._all_lot_defs_cached = {}
 
     @property
-    def all_unhandled_lots(self):
+    def settings(self):
+        if self.owner is not None:
+            return self.owner.settings
+        return self._settings
+
+    @settings.setter
+    def settings(self, new_settings):
         """
-        Get a nested dict of all of the unhandled lots in each plat,
-        keyed by T&R.
+        Set and execute the new settings, and pass them to subordinates.
         """
-        uhl = {}
-        for pl_obj in self.plats:
-            uhl[pl_obj.twprge] = pl_obj.unhandled_lots_by_sec
-        return uhl
+        if self.owner is not None:
+            raise AttributeError(
+                'Attempting to change settings in an object that has an owner.'
+                ' Change the settings in the owner object instead.'
+            )
+        self._settings = new_settings
+        self.configure()
 
-    @staticmethod
-    def from_queue(mpq, settings=None, lddb=None, allow_ld_defaults=False):
+    @property
+    def lot_definer(self):
+        if self.owner is not None:
+            return self.owner.lot_definer
+        return self._lot_definer
+
+    @lot_definer.setter
+    def lot_definer(self, new_lot_definer):
+        if self.owner is not None:
+            raise AttributeError(
+                'Attempting to change `lot_definer` in an object that has an owner.'
+                ' Change the `lot_definer` in the owner object instead.'
+            )
+        self._new_lot_definer = new_lot_definer
+
+    @property
+    def all_lot_defs_cached(self):
+        if self.owner is not None:
+            return self.owner.all_lot_defs_cached
+        return self._all_lot_defs_cached
+
+    @all_lot_defs_cached.setter
+    def all_lot_defs_cached(self, new_cached):
+        if self.owner is None:
+            self._all_lot_defs_cached = new_cached
+
+    def configure(self):
+        """Configure this plat and its subordinates."""
+        self.background = Image.new('RGBA', self.settings.dim, Settings.RGBA_WHITE)
+        self.image = Image.new('RGBA', self.settings.dim, (0, 0, 0, 0))
+        self.draw = ImageDraw.Draw(self.image, 'RGBA')
+        self.overlay_image = Image.new('RGBA', self.settings.dim, (255, 255, 255, 0))
+        self.overlay_draw = ImageDraw.Draw(self.overlay_image, 'RGBA')
+        self.footer_image = Image.new('RGBA', self.settings.dim, (255, 255, 255, 0))
+        self.footer_draw = ImageDraw.Draw(self.footer_image, 'RGBA')
+        # The images in the order that they should be stacked for output.
+        self.image_layers = [self.background, self.image, self.overlay_image, self.footer_image]
+        self.body.configure()
+        self.footer.configure()
+        return None
+
+    def execute_queue(self) -> pytrs.TractList:
         """
-        Generate and return a MultiPlat object from a MultiPlatQueue
-        object.
+        Execute the queue of tracts to fill in the plat.
 
-        All parameters are identical to vanilla __init__() except:
-        :param mpq: a pytrsplat.MultiPlatQueue object whose contents
-        should be processed immediately at init.
+        :return: A ``pytrs.TractList`` containing all tracts that could
+            not be platted (no lots or aliquots identified).
         """
+        self.configure()
+        twprge = f"{self.twp}{self.rge}"
+        unplattable_tracts = pytrs.TractList()
+        self.queue.custom_sort()
+        if self.owner is None:
+            cached = self.lot_definer.get_all_definitions(mandatory_twprges=[twprge])
+            self.all_lot_defs_cached = cached
+        for tract in self.queue:
+            if self.twp is None:
+                self.twp = tract.twp
+            if self.rge is None:
+                self.rge = tract.rge
+            self.lot_definer.process_tract(tract, commit=True)
+            sec = tract.sec_num
+            plat_sec = self.body.sections[sec]
+            plat_sec.queue.append(tract)
+        for plat_sec in self.body.sections.values():
+            unplattable = plat_sec.execute_queue()
+            unplattable_tracts.extend(unplattable)
+        if self.settings.write_tracts:
+            for tract in self.queue:
+                tractfont_rgba = self.settings.footerfont_rgba
+                if tract in unplattable_tracts:
+                    tractfont_rgba = self.settings.warningfont_rgba
+                self.footer.write_tract(tract, font_rgba=tractfont_rgba)
+        if self.settings.write_header:
+            self.write_header(twp=self.twp, rge=self.rge)
+        if self.settings.write_lot_numbers:
+            self.write_lot_numbers(at_depth=2)
+        if self.owner is None:
+            self.all_lot_defs_cached = None
+        return unplattable_tracts
 
-        mp_obj = MultiPlat(
-            settings=settings, lddb=lddb, allow_ld_defaults=allow_ld_defaults)
-        mp_obj.process_queue(mpq)
-        return mp_obj
-
-    def queue_add(self, plattable, twprge='', tracts=None):
+    def write_header(self, custom_header: str = None, **kw) -> None:
         """
-        Queue up an object for platting -- i.e. pass through the
-        arguments to the `.queue_add()` method in the MultiPlat's
-        MultiPlatQueue object (its `.mpq` attribute).
+        Write the header to the top of the plat.
 
-        NOTE: If a pytrs.PLSSDesc object is passed as the `plattable`,
-        then `twprge` and `tracts` are ignored, but rather are deduced
-        automatically (because there can be more than one T&R from a
-        single PLSSDesc object).
+        .. note::
 
-        NOTE ALSO: If a pytrs.Tract object is passed as the `plattable`,
-        then `twprge` is optional (as long as the Tract object has a
-        specified `.twp` and `.rge`), and `tracts` is always optional.
-        However, the Tract object's `.twp` and `.rge` will NOT overrule
-        a kwarg-specified `twprge=` (if any).
+            The default header is the Twp/Rge, styled as follows
+            ``Township 154 North, Range 97 West``.
+            if ``short_header=True`` in the settings, the resulting
+            header will be styled as ``T154N-R97W``. The header can be
+            styled differently if appropriate keyword arguments are
+            passed as ``kw``. Further, the exact header text can be
+            passed as ``custom_header``, which will override everything
+            else.
 
-        :param plattable: The object to be added to the queue. (Must be
-        a type acceptable to MultiPlatQueue -- see docs for those
-        objects.)
-        :param twprge: A string of the Twp/Rge (e.g., '154n97w' or
-        '1s8e') to which the plattable object belongs.
-            ex: If queuing up a pytrs.SectionGrid object for Section 1,
-                T154N-R97W, then `twprge` should be '154n97w'.
-        NOTE: `twprge` is ignored when a pytrs.PLSSDesc object is passed
-            as `plattable`.
-        NOTE ALSO: `twprge` is optional when a pytrs.Tract object is
-            passed as `plattable`, as long as the Tract object has
-            appropriate `.twp` and `.rge` attributes. If `twprge=` is
-            specified in this method, that will control over whatever is
-            in the Tract object's `.twp` and `.rge` attributes.
-        :param tracts: A list of pytrs.Tract objects whose text should
-        eventually be written at the bottom of the appropriate Plat
-        (assuming the MultiPlat is configured in settings to write Tract
-        text).
-        NOTE: Objects added to `tracts` do NOT get drawn on the plat --
-        only written at the bottom. But pytrs.Tract objects passed here
-        as arg `plattable` are automatically added to `tracts`.
+        :param custom_header: (Optional) Override the default header and
+            use this text instead. If used, any other keyword arguments
+            will be ignored.
+        :param kw: (Optional) keyword arguments to pass to
+            ``pytrs.TRS.pretty_twprge()`` to control how the Twp/Rge
+            header should be spelled out.
         """
-        self.mpq.queue_add(plattable=plattable, twprge=twprge, tracts=tracts)
+        self.header.write_header(custom_header=custom_header, **kw)
 
-    def queue_add_text(self, text, config=None):
+    def write_lot_numbers(self, at_depth=2):
+        """Write the lot numbers to the plat."""
+        lotwriter = PlatBody(twp=self.twp, rge=self.rge, owner=self, is_lot_writer=True)
+        lotwriter.configure(xy=self.settings.grid_xy)
+        lotwriter.write_lot_numbers(at_depth)
+        return None
+
+    def write_tracts(self, tracts: pytrs.TractList | pytrs.PLSSDesc = None):
         """
-        Parse the raw text of a PLSS land description (optionally using
-        `config=` parameters -- see pytrs docs), and add the resulting
-        pytrs.PLSSDesc object to this MultiPlat's queue (`.mpq`) -- by
-        passing through the arguments to the `.queue_add_text()` method
-        in the Plat's MultiPlatQueue object.
+        Write all the tract descriptions in the footer.
         """
-        self.mpq.queue_add_text(text=text, config=config)
+        if tracts is None:
+            tracts = self.queue
+        return self.footer.write_tracts(tracts)
 
-    def process_queue(self, queue=None, allow_ld_defaults=None):
-        """Process all objects in a MultiPlatQueue object. If `queue=None`,
-        the MultiPlatQueue object that will be processed is this
-        MultiPlat's `.mpq` attribute."""
-
-        if allow_ld_defaults is None:
-            allow_ld_defaults = self.allow_ld_defaults
-
-        # If a different MultiPlatQueue isn't otherwise specified, use
-        # the MultiPlat's own `.mpq` from init.
-        if queue is None:
-            queue = self.mpq
-
-        for twprge, pq in queue.items():
-            tld = self.lddb.get_tld(twprge, allow_ld_defaults=allow_ld_defaults)
-            pl_obj = Plat.from_twprge(
-                twprge, settings=self.settings, tld=tld,
-                allow_ld_defaults=allow_ld_defaults)
-            pl_obj.process_queue(pq)
-            self.plats.append(pl_obj)
-
-    @staticmethod
-    def from_plssdesc(
-            plssdesc_obj: pytrs.PLSSDesc, settings=None, lddb=None,
-            allow_ld_defaults=False):
-        """
-        Generate a MultiPlat from a parsed pytrs.PLSSDesc object.
-        (lots/QQs must be parsed within the pytrs.Tract objects in the
-        PLSSDesc object's `.parsedDesc` attribute for any QQ's to be
-        filled on the resulting plats -- see pytrs docs for more info.)
-        """
-
-        mp_obj = MultiPlat(
-            settings=settings, lddb=lddb, allow_ld_defaults=allow_ld_defaults)
-
-        mp_obj.plat_plssdesc(
-            plssdesc_obj, lddb=lddb, allow_ld_defaults=allow_ld_defaults)
-
-        return mp_obj
-
-    def plat_plssdesc(
-            self, plssdesc_obj: pytrs.PLSSDesc, lddb=None,
-            allow_ld_defaults=False):
-        """
-        Process a parsed pytrs.PLSSDesc object into an existing
-        MultiPlat.
-
-        :arg plssdesc_obj: a pytrs.PLSSDesc object (whose subordinate
-        pytrs.Tract objects have also been parsed into lots/QQs) to
-        process into this MultiPlat.
-        :param lddb: A pytrsplat.LotDefDB object, for defining how
-        each lot should be interpreted in terms of QQ's (i.e. 'L1'
-        corresponds with 'NENE' in Sec 1, T154N-R97W).
-        :param allow_ld_defaults: Whether to allow 'default' lot
-        definitions where lots have not been explicitly defined for this
-        section.
-        """
-        # Generate a dict of TownshipGrid objects from the PLSSDesc object,
-        # keyed by T&R ('000x000y' or fewer digits)
-        twp_grids = plssdesc_to_twp_grids(
-            plssdesc_obj, lddb=lddb, allow_ld_defaults=allow_ld_defaults)
-
-        # Get a dict linking the this PLSSDesc's parsed Tracts to their
-        # respective T&R's (keyed by T&R -- same as twp_grids dict)
-        twp_to_tract = pytrs.group_tracts_by(plssdesc_obj, attribute='twprge')
-
-        # Generate Plat object of each township, and append it to `self.plats`
-        for k, v in twp_grids.items():
-            pl_obj = Plat.from_township_grid(
-                v, tracts=twp_to_tract[k], settings=self.settings)
-            self.plats.append(pl_obj)
-
-    @staticmethod
-    def from_unparsed_text(
-            text, config=None, settings=None, lddb=None, allow_ld_defaults=False):
-        """Parse the text of a PLSS land description (optionally using
-        `config=` parameters -- see pytrs docs), and generate Plat(s)
-        for the lands described. Returns a MultiPlat object."""
-
-        plssdesc = pytrs.PLSSDesc(text, config=config, parse_qq=True)
-        return MultiPlat.from_plssdesc(
-            plssdesc, settings=settings, lddb=lddb,
-            allow_ld_defaults=allow_ld_defaults)
-
-    def show(self, index: int):
-        """
-        Flatten and display the plat PIL.Image.Image object,
-        specifically the one in the `.plats` list at the specified
-        `index`.
-        (WARNING: will hang the program until the image is closed).
-
-        :param index: An integer, specifying which Plat object to view
-        (i.e. the index of the list stored in the `.plats` attribute.)
-        """
-        self.plats[index].output().show()
-
-    def output_to_pdf(self, filepath, pages=None):
-        """
-        Save all of the Plat images to a single PDF, optionally limiting
-        to only some of the pages.
-
-        :param filepath: The filepath to which to save the .pdf file.
-        Must end in '.pdf'.
-        IMPORTANT: Will NOT prompt before overwriting.
-        :param pages: Which pages to include (indexed to 0), passed as
-        a single int, or a list of ints. If not specified, will output
-        all pages.
-        """
-        # TODO: Use a better module for generating PDF's.
-
-        if not confirm_file_ext(filepath, '.pdf'):
-            raise ValueError('filepath must end with \'.pdf\'')
-
-        output_list = self.output(pages=pages)
-
-        if len(output_list) == 0:
-            return
-
-        im1 = output_list.pop(0)
-        im1.save(filepath, save_all=True, append_images=output_list)
-
-    def output_to_png(self, filepath, pages=None):
-        """
-        Save the Plat images to .png (or multiple .png files, if there
-        is more than one Plat in `.plats`), optionally limiting to only
-        some of the pages.
-
-        :param filepath: The filepath to which to save the .png file(s).
-        Must end in '.png'.
-        IMPORTANT: If multiple plats are output, then numbers (from
-        '_000') will be added to the end of each, before the file
-        extension.
-        ALSO IMPORTANT: Will NOT prompt before overwriting.
-        :param pages: Which pages to include (indexed to 0), passed as
-        a single int, or a list of ints. If not specified, will output
-        all pages.
-        """
-
-        if not confirm_file_ext(filepath, '.png'):
-            raise ValueError('filepath must end with \'.png\'')
-
-        output_list = self.output(pages=pages)
-
-        if len(output_list) == 0:
-            return
-        elif len(output_list) == 1:
-            output_list[0].save(filepath)
-        else:
-            i = 0
-            ext = '.png'
-            fp = filepath[:-len(ext)]
-            while len(output_list) > 0:
-                filepath = f"{fp}_{str(i).rjust(3,'0')}{ext}"
-                output_list.pop(0).save(filepath)
-                i += 1
-
-    def output(self, pages=None) -> list:
-        """
-        Return a list of flattened Image objects from the Plat objects
-        in the `.plats` attribute.
-
-        :param pages: Which pages to include (indexed to 0), passed as
-        a single int, or a list of ints. If not specified, will output
-        all pages.
-        :return: A list of PIL.Image.Image objects, being flattened
-        images of the Plat objects.
-        """
-        plat_ims = []
-        for p in self.plats:
-            plat_ims.append(p.output().convert('RGB'))
-
-        # Cull our list of plat images to only the pages requested
-        # (if not specified -- i.e. `pages=None` -- returns all images)
-        output_list = cull_list(plat_ims, pages)
-
-        return output_list
+    def write_footer_text(self, txt: str):
+        """Write a block of text in the footer."""
+        return self.footer.write_text(txt)
 
 
-class TractTextBox(TextBox):
+class PlatGroup(SettingsOwner, QueueMany):
     """
-    INTERNAL USE:
-    A piltextbox.TextBox object, with additional methods for writing
-    pytrs.Tract data at the bottom of the Plat.
+    A collection of Plats that can span multiple Twp/Rge. Access the
+    plats in ``.plats`` (keyed by a ``twprge`` string in the ``pytrs``
+    format, e.g., ``'154n97w'``).
+    """
 
-    IMPORTANT: After init, any changes to font in the Settings object
-    will have NO EFFECT on the TractTextBox.
+    def __init__(self, settings: Settings = None, lot_definer: LotDefiner = None):
+        """
+        :param settings: The ``Settings`` object to control the behavior
+            and appearance of the subordinate plats.
+        :param lot_definer: A ``LotDefiner`` object to use for defining
+            lots in tracts that are added to the queue. (Can also be
+            modified or replaced in the ``.lot_definer`` attribute
+            later.)
+        """
+        if settings is None:
+            settings = Settings.preset('default')
+        self._settings: Settings = settings
+        if lot_definer is None:
+            lot_definer = LotDefiner()
+        self.lot_definer: LotDefiner = lot_definer
+        self.queue = pytrs.TractList()
+        self.plats: dict[str, Plat] = {}
+        # Cache of lot definitions (including defaults). Gets used while
+        # executing queue, then cleared.
+        self.all_lot_defs_cached: dict = {}
+
+    @property
+    def settings(self):
+        return self._settings
+
+    @settings.setter
+    def settings(self, new_settings):
+        """
+        Execute the new settings, and pass them to subordinates.
+        """
+        self._settings = new_settings
+        for plat in self.plats.values():
+            plat.configure()
+
+    def register_plat(self, twp: str, rge: str) -> Plat:
+        """
+        Register a new plat for the specified ``twp`` and ``rge``. If
+        a plat already exists for the Twp/Rge, this will raise a
+        ``KeyError``.
+        """
+        plat = Plat(twp, rge, owner=self)
+        trs = pytrs.TRS.from_twprgesec(twp, rge, sec=None)
+        twprge = trs.twprge
+        if twprge in self.plats:
+            raise KeyError(f"Duplicate Twp/Rge {twprge!r} cannot registered.")
+        self.plats[trs.twprge] = plat
+        plat.configure()
+        return plat
+
+    def add_tract(self, tract: pytrs.Tract) -> None:
+        """
+        Add a tract to the queue. If no plat yet exists for the Twp/Rge
+        of this tract, one will be created.
+
+        .. note::
+
+            The tract must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
+        """
+        plat = self.plats.get(tract.twprge)
+        if plat is None:
+            plat = self.register_plat(tract.twp, tract.rge)
+        plat.add_tract(tract)
+        return None
+
+    def execute_queue(self, subset_twprges: list[str] = None) -> pytrs.TractList:
+        """
+        Execute the queue of tracts to fill in the plats.
+
+        :param subset_twprges: (Optional) Limit the generated image to
+            this list of Twp/Rges (in the pyTRS format -- e.g.,
+            ``['154n97w', '155n97w']``).
+
+        :return: A ``pytrs.TractList`` containing all tracts that could
+            not be platted (no lots or aliquots identified).
+        """
+        self.all_lot_defs_cached = self.lot_definer.get_all_definitions(
+            mandatory_twprges=list(self.plats.keys())
+        )
+        all_unplattable = pytrs.TractList()
+        if subset_twprges is None:
+            subset_twprges = sorted(self.plats.keys())
+        for twprge in subset_twprges:
+            plat = self.plats[twprge]
+            unplattable = plat.execute_queue()
+            all_unplattable.extend(unplattable)
+        self.all_lot_defs_cached = {}
+        return all_unplattable
+
+    def output(
+            self,
+            fp: str | Path = None,
+            image_format: str = None,
+            stack=None,
+            subset_twprges: list[str] = None
+    ) -> list[Image.Image]:
+        """
+        Compile and return the merged image of the plats. Optionally
+        save the results to disk, either as one or more images, or as a
+        .zip file containing the image(s).
+
+        .. note::
+
+            Most image file formats are acceptable. If saving to a
+            ``.pdf`` or ``.tiff`` file extension, this will assume the
+            user wants a single file -- but separate files can be forced
+            with ``stack=False``.
+
+            If multiple files must be created (e.g., if the image format
+            is ``'png'``), then the respective Twp/Rge will be added to
+            each filename, before the file extension. For example, with
+            ``fp='some_file.png'``, it might create
+            ``some_file 154n97w.png``, ``some_file 155n97w.png``, etc.
+
+        :param fp: (Optional) If provided, save the output to the
+            specified filepath. If the path has a ``.zip`` extension,
+            the results will be put into a .zip file at that path. In
+            that case, you may want to specify the ``image_format``.
+        :param image_format: (Optional) Override the file format of the
+            file specified in ``fp``. If not provided, will defer to the
+            file extension in ``fp``. (Only relevant if saving to file.)
+        :param stack: (Optional) Whether to save the images to a single
+            file (assuming an appropriate image format is used). If the
+            file extension or specified ``image_format`` are ``'tiff'``
+            or ``'pdf'``, then the resulting image will be stacked by
+            default (but can be overridden with ``stack=False``). Any
+            other format will result in separate images.
+        :param subset_twprges: (Optional) Output the plats only for the
+            selected Twp/Rges (formatted as ``['154n97w', '12s58e']``).
+        """
+        results = []
+        written_twprges = []
+        twprges = sorted(self.plats.keys())
+        if subset_twprges is not None:
+            twprges = subset_twprges
+        for twprge in twprges:
+            plat = self.plats[twprge]
+            results.append(plat.output())
+            written_twprges.append(twprge)
+        if fp is not None:
+            save_output_images(results, fp, image_format, stack, written_twprges)
+        return results
+
+
+class MegaPlat(IPlatOwner, QueueMany):
+    """
+    A dynamic plat showing multiple townships on the same page.
+
+    Does not allow for footers, and 'headers' are instead written at the
+    center of each township. Consider using a ``.headerfont_rgba`` in
+    the settings that is faint, to avoid obfuscating section lines, etc.
+
+    .. warning::
+
+        The dimensions of a ``MegaPlat`` output are determined by the
+        number and spread of the townships in the tracts added to the
+        queue. The resulting images can probably be extremely large. As
+        a safeguard, specify ``max_dim=(int, int)`` as a limit to the
+        dimensions you are willing to generate. If either of those
+        dimensions is violated, it will raise a ``RuntimeError``.
+
+    .. note::
+
+        The size of each component plat (one for each township) is
+        controlled by ``.sec_length_px``. And ``.body_marg_top_y``
+        serves as the margins on all four sides of the resulting group
+        of plats.
+
+    .. note::
+
+        This will not allow Townships in the queue to be both North and
+        South (i.e., ``'154n'`` and ``'27s'`` cannot coexist in the
+        queue). Similarly, Ranges may not be both East and West
+        (``'97w'`` and ``'58e'`` cannot coexist). If either condition is
+        violated, a ``ValueError`` will be raised.
     """
 
     def __init__(
-            self, size: tuple, typeface=None, font_size=None,
-            bg_RGBA=Settings.RGBA_WHITE, font_RGBA=Settings.RGBA_BLACK,
-            paragraph_indent=None, new_line_indent=None, spacing=None,
-            settings=None):
+            self,
+            settings: Settings = None,
+            lot_definer: LotDefiner = None,
+            max_dim: tuple[int, int] = None,
+    ):
         """
-        :param size: 2-tuple of (width, height).
-        :param typeface: Which typeface to use, passed either as the
-        filepath to a .ttf font (absolute path, or relative to the
-        'pytrsplat/platsettings/' directory), or as a key for the
-        Settings.TYPEFACES dict (i.e. as the name of a stock font, such
-        as 'Mono (Bold)').
-        :param font_size: The size of the font to create.
-        :param bg_RGBA: 4-tuple of the background color. (Defaults to
-        white, full opacity.)
-        :param font_RGBA: 4-tuple of the font color. (Defaults to black,
-        full opacity.)
-        :param paragraph_indent: How many spaces (i.e. characters, not
-        px) to write before the first line of a new paragraph.
-        :param new_line_indent: How many spaces (i.e. characters, not
-        px) to write before every subsequent line of a paragraph.
-        :param spacing: How many px above each new line.
-        :param settings: A pytrsplat.Settings object (or the name of a
-        preset, i.e. a string), which can specify various relevant
-        attribs for this TractTextBox object. (In the event that an
-        attribute was set in the Settings object but ALSO specified as
-        init parameters here; the init parameters will control.)
+        :param settings: The ``Settings`` object to control the behavior
+            and appearance of this plat.
+        :param lot_definer: A ``LotDefiner`` object to use for defining
+            lots in tracts that are added to the queue. (Can also be
+            modified or replaced in the ``.lot_definer`` attribute
+            later.)
+        :param max_dim: (Optional) Specify the largest dimensions that
+            may be generated. If exceeded, a ``RuntimeError`` will be
+            raised prior to plat generation.
         """
-        # If settings is not specified, get a default Settings object.
+        self.queue = pytrs.TractList()
         if settings is None:
             settings = Settings()
-        elif isinstance(settings, str):
-            settings = Settings(preset=settings)
-        # If these are not specified, pull them from settings
-        if typeface is None:
-            typeface = settings.tractfont_typeface
-        if font_size is None:
-            font_size = settings.tractfont_size
-        if paragraph_indent is None:
-            paragraph_indent = settings.paragraph_indent
-        if new_line_indent is None:
-            new_line_indent = settings.new_line_indent
-        if spacing is None:
-            spacing = settings.y_px_between_tracts
+        self.settings: Settings = settings
+        if lot_definer is None:
+            lot_definer = LotDefiner()
+        self.lot_definer: LotDefiner = lot_definer
+        self.subplats: dict[str, PlatBody] = {}
+        # dim gets dynamically set when executing the queue.
+        self.dim = (1, 1)
+        if max_dim is None:
+            max_dim = (float('inf'), float('inf'))
+        self.max_dim = max_dim
+        self.image_layers: list[Image] = []
+        self.configure()
 
-        # Check if `typeface` is the *name* of a stock font name (i.e. a
-        # key in Settings.TYPEFACES), and if so, get the corresponding
-        # absolute filepath.
-        # If not a font name, then check if `typeface` is a valid
-        # filepath.
-        # If not a valid filepath, check if it is a relative filepath
-        # (relative to 'pytrsplat/platsettings/' dir -- i.e. a stock
-        # font), and if so, convert to that absolute path.
-        if typeface in Settings.TYPEFACES.keys():
-            typeface = Settings.TYPEFACES[typeface]
-        elif not os.path.isfile(typeface):
-            candidate_fp = _rel_path_to_abs(typeface)
-            if os.path.isfile(candidate_fp):
-                typeface = candidate_fp
-
-        TextBox.__init__(
-            self, size=size, typeface=typeface, font_size=font_size,
-            bg_RGBA=bg_RGBA, font_RGBA=font_RGBA, spacing=spacing,
-            paragraph_indent=paragraph_indent, new_line_indent=new_line_indent)
-
-        self.settings = settings
-
-    def write_all_tracts(self, tracts=None, cursor='text_cursor',
-            justify=None):
+    def configure(self):
         """
-        Write the descriptions of each parsed pytrs.Tract object at the
-        current coord of the specified `cursor`. Updates the coord of
-        the `cursor` used.
-
-        :param tracts: A list of pytrs.Tract objects, whose descriptions
-        should be written.
-        :param cursor: The name of an existing cursor, at whose coord
-        the text should be written. (Defaults to 'text_cursor')
-        :param justify: Whether to justify the tract text, if it breaks
-        onto multiple lines. (Defaults to whatever is set in
-        `self.settings.justify_tract_text`)
-        :return:
+        Configure this ``MegaPlat`` and subordinates.
         """
+        self.background = Image.new('RGBA', self.dim, Settings.RGBA_WHITE)
+        self.image = Image.new('RGBA', self.dim, (0, 0, 0, 0))
+        self.draw = ImageDraw.Draw(self.image, 'RGBA')
+        self.overlay_image = Image.new('RGBA', self.dim, (255, 255, 255, 0))
+        self.overlay_draw = ImageDraw.Draw(self.overlay_image, 'RGBA')
+        # No footer to a MegaPlat.
+        self.footer_image = None
+        self.footer_draw = None
+        self.image_layers = [self.background, self.image, self.overlay_image]
 
-        if tracts is None:
-            return
-
-        # Copy tracts, because we'll pop elements from it.
-        ctracts = tracts.copy()
-
-        def write_warning(num_unwritten_tracts, tracts_written):
-            """
-            Could not fit all tracts on the page. Write a warning to
-            that effect at the bottom of the page.
-            """
-
-            # If we wrote at least one tract, we want to include the word
-            # 'other', to avoid any confusion.
-            other = ''
-            if tracts_written > 0:
-                other = ' other'
-
-            plural = ''
-            if num_unwritten_tracts > 1:
-                plural = 's'
-
-            warning = (f'[No space to write {num_unwritten_tracts}{other} '
-                       f'tract{plural}]')
-
-            self.write_line(
-                text=warning, cursor=cursor, override_legal_check=True,
-                font_RGBA=self.settings.warningfont_RGBA)
-
-        pull_ejector = False
-        tracts_written = 0
-
-        while len(ctracts) > 0:
-
-            if pull_ejector or self.on_last_line(cursor=cursor):
-                # We either failed to write the last full tract because it would
-                # have gone outside our textbox, or the next line is the last
-                # available within our textbox, and we have at least one more
-                # tract yet to write. So write a warning now.
-                num_unwritten = len(ctracts)
-                write_warning(num_unwritten, tracts_written)
-                break
-
-            tract = ctracts.pop(0)
-
-            # We will reserve_last_line so we can write a warning,
-            # unless this is the last tract to write.
-            reserve_last_line = len(ctracts) != 0
-
-            font_RGBA = self.font_RGBA
-            if (len(tract.lots_qqs) == 0
-                    or tract.sec in [_ERR_SEC, _UNDEF_SEC]):
-                # If no lots/QQs were identified, or if this tract has a
-                # section number that could not be successfully deduced
-                # -- in which case it could not have been projected onto
-                # this plat), then we'll write the tract in the
-                # configured warning color
-                font_RGBA = self.settings.warningfont_RGBA
-            # Any lines that could not be written will be returned and stored
-            # in list `unwrit_lines` (i.e. empty if all successful)
-            unwrit_lines = self.write_tract(
-                cursor=cursor, tract=tract, font_RGBA=font_RGBA,
-                reserve_last_line=reserve_last_line, justify=justify)
-            if unwrit_lines is not None:
-                # We couldn't write all of our lines, so let's bail.
-                pull_ejector = True
-
-            tracts_written += 1
-
-    def write_tract(
-            self, tract: pytrs.Tract, cursor='text_cursor', font_RGBA=None,
-            override_legal_check=False, reserve_last_line=False,
-            justify=None):
+    def _clean_queue(self, queue=None):
         """
-        Write the description of the parsed pytrs.Tract object at the
-        current coord of the specified `cursor`. First confirms that
-        writing the text would not go past margins; and if so, will not
-        write it. Updates the coord of the `cursor` used.
-
-        :param tract: a pytrs.Tract object, whose description should be
-        written.
-        :param cursor: The name of an existing cursor, at whose coord
-        the text should be written. (Defaults to 'text_cursor')
-        :param font_RGBA: A 4-tuple containing RGBA value to use
-        (defaults to configuration in settings)
-        :param override_legal_check: Ignore whether it is past the
-        margins. (`False` by default)
-        :param reserve_last_line: A bool, whether or not the last line
-        (before the margins are broken) should be reserved -- i.e., if
-        a tract will be written all the way to the end of the margin,
-        this will dictate whether or not to stop before writing that
-        last line, perhaps to write a warning message instead. (Defaults
-        to `False`)
-        :param justify: Whether to justify the tract text, if it breaks
-        onto multiple lines. (Defaults to whatever is set in
-        `self.settings.justify_tract_text`)
-        :return: Returns None if the entire tract text was written, but
-        returns a piltextbox.UnwrittenLines object if at least one line
-        of text could not be written.
+        Scrub out any undefined or error townships in the ``queue`` of
+        tracts.
         """
+        out_queue = pytrs.TractList()
+        if queue is None:
+            queue = self.queue
+        if not queue:
+            return out_queue
+        queue.custom_sort()
+        for tract in queue:
+            if not tract.trs_is_undef(sec=False) and not tract.trs_is_error(sec=False):
+                out_queue.append(tract)
+            else:
+                message = (
+                    "Undefined or otherwise erroneous Twp/Rge. Excluding from plat. "
+                    f"<{tract.quick_desc_short()}>"
+                )
+                warn(message, UserWarning)
+        return out_queue
 
-        # Extract the text of the TRS+description from the Tract object.
-        text = tract.quick_desc()
+    def _get_twprge_spans(self, queue: pytrs.TractList):
+        """
+        Get a list of Twp numbers and a list of Rge numbers that
+        encompass the entirety of the tracts in the ``queue``.
 
-        # If font color not otherwise specified, pull from settings.
-        if font_RGBA is None:
-            font_RGBA = self.settings.tractfont_RGBA
+        If the townships are "North", they will be sorted largest to
+        smallest (so that the highest number appears at the top of the
+        eventual plat); and vice versa for "South".
 
-        if justify is None:
-            justify = self.settings.justify_tract_text
+        If the ranges are "West", they will be sorted largest to
+        smallest (so that the highest number appears at the left of the
+        eventual plat); and vice versa for "East".
 
-        # Write all lines in the description. If any lines could not be written,
-        # store them in list `unwrit_lines`. We reserve_last_line here, because
-        # we want to write an ellipses if more than 1 line remains.
-        unwrit_lines = self.write_paragraph(
-            text=text, cursor=cursor, font_RGBA=font_RGBA, justify=justify,
-            reserve_last_line=True, override_legal_check=override_legal_check)
+        :return: Two lists: One of Twp numbers, and another for Rge
+            numbers.
+        """
+        if not queue:
+            return [], []
+        # Find the boundaries.
+        tract = queue[0]
+        ns = tract.ns
+        ew = tract.ew
+        min_twp_tract = tract
+        max_twp_tract = tract
+        min_rge_tract = tract
+        max_rge_tract = tract
+        for tract in queue:
+            if tract.ns != ns:
+                raise ValueError('Township N/S must all be the same.')
+            if tract.ew != ew:
+                raise ValueError('Range E/W must all be the same.')
+            if tract.twp_num < min_twp_tract.twp_num:
+                min_twp_tract = tract
+            if tract.twp_num > max_twp_tract.twp_num:
+                max_twp_tract = tract
+            if tract.rge_num < min_rge_tract.rge_num:
+                min_rge_tract = tract
+            if tract.rge_num > max_rge_tract.rge_num:
+                max_rge_tract = tract
+        needed_twp_nums = list(range(min_twp_tract.twp_num, max_twp_tract.twp_num + 1))
+        needed_rge_nums = list(range(min_rge_tract.rge_num, max_rge_tract.rge_num + 1))
+        if ns == 'n':
+            needed_twp_nums.reverse()
+        if ew == 'w':
+            needed_rge_nums.reverse()
+        return needed_twp_nums, needed_rge_nums
 
-        if reserve_last_line or unwrit_lines is None:
-            return unwrit_lines
+    def _gen_subplats(self, queue: pytrs.TractList):
+        """
+        Generate subplats for the tracts in the ``queue`` of tracts.
+        Also establishes the ``.dim`` of the image, and the ``.image``
+        and related attributes.
+        """
+        stn = self.settings
+        subplats = {}
+        all_marg = stn.body_marg_top_y
+        topleft = (all_marg, all_marg)
+        sec_len = stn.sec_length_px
+        twp_len = sec_len * 6
+        needed_twp_nums, needed_rge_nums = self._get_twprge_spans(queue)
+        self.dim = (
+            # x is set by number of rge_nums (plus margins).
+            len(needed_rge_nums) * twp_len + all_marg * 2,
+            # y is set by number of twp_nums (plus margins).
+            len(needed_twp_nums) * twp_len + all_marg * 2
+        )
+        if self.dim[0] > self.max_dim[0] or self.dim[1] > self.max_dim[1]:
+            raise RuntimeError(
+                f"Configured max dimensions {self.max_dim} exceeded: {self.dim}")
 
-        # If we had only one more line to write, write it; otherwise,
-        # write an ellipses in red
-        if unwrit_lines.remaining == 1:
-            final_line = unwrit_lines._stage_next_line()
-            single_unwrit = self.write_line(final_line, justify=justify)
-        else:
-            font_RGBA = self.settings.warningfont_RGBA
-            single_unwrit = self.write_line(
-                text="[...]", indent=self.new_line_indent, font_RGBA=font_RGBA)
+        # Create the images here, because `self.dim` was just calculated.
+        self.configure()
 
-        if single_unwrit is not None:
-            # If that last line couldn't be written, unstage it, and
-            # return the full unwrit_lines
-            unwrit_lines._unstage()
-            return unwrit_lines
-        else:
-            # Otherwise, if it was successfully written, pop it off, and
-            # return the remaining unwrit_lines (if any)
-            unwrit_lines._successful_write()
-            if unwrit_lines.remaining == 0:
-                return None
-            return unwrit_lines
+        sample_tract = queue[0]
+        ns = sample_tract.ns
+        ew = sample_tract.ew
+        subplat_lotwriter_info = []
+        for i, twp_num in enumerate(needed_twp_nums):
+            for j, rge_num in enumerate(needed_rge_nums):
+                twp = f"{twp_num}{ns}"
+                rge = f"{rge_num}{ew}"
+                twprge = f"{twp}{rge}"
+                subplat_topleft = (topleft[0] + twp_len * j, topleft[1] + twp_len * i)
+                # Write the header before configuring the subplat itself, so that the
+                # text appears behind the section lines, etc.
+                subplat_header = PlatHeader(owner=self)
+                # Anchor the 'header' to the center of the subplat.
+                header_xy = (subplat_topleft[0] + twp_len // 2, subplat_topleft[1] + twp_len // 2)
+                subplat_header.write_header(twp, rge, xy=header_xy, align='center_center')
+                # Create and configure the grid itself.
+                subplat = PlatBody(twp, rge, owner=self)
+                subplat.configure(xy=subplat_topleft)
+                subplat.draw_outline()
+                subplats[twprge] = subplat
+                # Store Twp/Rge/topleft_xy for lotwriters.
+                subplat_lotwriter_info.append((twp, rge, subplat_topleft))
+
+        if self.settings.write_lot_numbers:
+            mandated = list(subplats.keys())
+            all_defs = self.lot_definer.get_all_definitions(mandatory_twprges=mandated)
+            self.all_lot_defs_cached = all_defs
+            for twp, rge, subplat_xy in subplat_lotwriter_info:
+                lotwriter = PlatBody(twp=twp, rge=rge, owner=self, is_lot_writer=True)
+                lotwriter.configure(xy=subplat_xy)
+                lotwriter.write_lot_numbers(at_depth=2)
+            self.all_lot_defs_cached = {}
+        return subplats
+
+    def execute_queue(self, subset_twprges: list[str] = None) -> pytrs.TractList:
+        """
+        Execute the queue of tracts, and generate the plat.
+
+        :param subset_twprges: (Optional) Limit the generated images to
+            this list of Twp/Rges (in the pyTRS format -- e.g.,
+            ``['154n97w', '155n97w']``).
+        :return: A ``pytrs.TractList`` containing all tracts that could
+            not be platted.
+        """
+        unplattable_tracts = pytrs.TractList()
+        queue = self.queue
+        if subset_twprges is not None:
+            queue = queue.filter(key=lambda tract: tract.twprge in subset_twprges)
+        # Confirm all tracts are valid.
+        queue = self._clean_queue(queue)
+        if not queue:
+            return unplattable_tracts
+
+        # Generate subplats. Also determines the `.dim` of our output.
+        subplats = self._gen_subplats(queue)
+
+        for tract in queue:
+            self.lot_definer.process_tract(tract, commit=True)
+            subplat = subplats[tract.twprge]
+            sec = tract.sec_num
+            plat_sec = subplat.sections[sec]
+            plat_sec.queue.append(tract)
+        for subplat in subplats.values():
+            for plat_sec in subplat.sections.values():
+                unplattable = plat_sec.execute_queue()
+                unplattable_tracts.extend(unplattable)
+        return unplattable_tracts
 
 
-########################################################################
-# Public / Convenience Methods
-########################################################################
-
-def text_to_plats(
-        text, config=None, settings=None, lddb=None,
-        output_filepath=None, allow_ld_defaults=False) -> list:
+def zip_output_images(
+        images: list[Image],
+        fp: str | Path = None,
+        image_format: str = None,
+        stack: bool = None,
+        twprges: list[str] = None
+) -> None:
     """
-    (A convenience function, for simplified interaction with MultiPlat
-    objects.) Parse the raw text of a PLSS land description (optionally
-    using `config=` parameters -- see pytrs.Config docs), and generate
-    plat(s) for the lands described (i.e. PIL.Image.Image objects.
-    Configure the plats with `settings=` parameter (see
-    ``pytrsplat.Settings`` docs). Optionally output to .png or .pdf with
-    `output_filepath=` (end with '.png' or '.pdf' to specify the output
-    file type).  Returns a list of PIL.Image.Image objects of the plats.
+    INTERNAL USE:
 
-    All parameters have the same effect as for init of MultiPlat objects
-    except:
-    :param text: The raw text of a PLSS land description to be platted.
-    :param config: Optional configurable parameters for how the raw
-    description should be parsed (see pytrs docs, especially
-    pytrs.Config).
-    :param output_filepath: If specified, the generated images will be
-    saved to file(s). Defaults to None.
-    NOTE: Must end in either '.pdf' or '.png'.
-    IMPORTANT: If '.png' is used and multiple plats are output, then
-    numbers (from '_000') will be added to the end of each, before the
-    file extension. (This does not apply for '.pdf' files.)
-    ALSO IMPORTANT: Will NOT prompt before overwriting.
-    :return: A list of PIL.Image.Image objects, being flattened images
-    of the generated plats.
+    Save the images to a .zip file, either separately or as a single
+    stacked image.
+
+    :param images: A list of ``Image`` objects, as given by any
+        ``.output()`` method.
+    :param fp: (See docs for ``PlatGroup.output()``.)
+    :param image_format: (See docs for ``PlatGroup.output()``.)
+    :param stack: (See docs for ``PlatGroup.output()``.)
+    :param twprges: (Optional) List of Twp/Rge strings to add to the
+        end of filenames if more than one image is to be written.
     """
+    if image_format is None:
+        if stack:
+            image_format = DEFAULT_IMAGE_FORMAT_STACKED
+        else:
+            image_format = DEFAULT_IMAGE_FORMAT_NONSTACKED
 
-    mp = MultiPlat.from_unparsed_text(
-        text=text, config=config, settings=settings, lddb=lddb,
-        allow_ld_defaults=allow_ld_defaults)
-    if output_filepath is not None:
-        if confirm_file_ext(output_filepath, '.pdf'):
-            mp.output_to_pdf(output_filepath)
-        elif confirm_file_ext(output_filepath, '.png'):
-            mp.output_to_png(output_filepath)
-    return mp.output()
+    if stack:
+        im_bytes = io.BytesIO()
+        im = images[0]
+        im.save(im_bytes, format=image_format, save_all=True, append_images=images[1:])
+        fn = f"{fp.stem}.{image_format}"
+        im_bytes.seek(0)
+        with zipfile.ZipFile(fp, 'w') as zfile:
+            zfile.writestr(fn, im_bytes.getvalue())
+        return None
+
+    just = len(images) % 10
+    with zipfile.ZipFile(fp, 'w') as zfile:
+        for i, im in enumerate(images, start=0):
+            surplus = str(i + 1).rjust(just, '0')
+            if twprges is not None:
+                surplus = twprges[i]
+            fn = f"{fp.stem} {surplus}.{image_format}"
+            im_bytes = io.BytesIO()
+            im.save(im_bytes, format=image_format)
+            im_bytes.seek(0)
+            zfile.writestr(fn, im_bytes.getvalue())
+    return None
+
+
+def save_output_images(
+        images: list[Image],
+        fp: str | Path = None,
+        image_format: str = None,
+        stack: bool = None,
+        twprges: list[str] = None,
+) -> None:
+    """
+    Save the images to disk as one or more separate image files; or
+    into a .zip file (if the file extension of ``fp`` is ``.zip``).
+
+    :param images: A list of ``Image`` objects, as given by any
+        ``.output()`` method.
+    :param fp: (See docs for ``PlatGroup.output()``.)
+    :param image_format: (See docs for ``PlatGroup.output()``.)
+    :param stack: (See docs for ``PlatGroup.output()``.)
+    :param twprges: (Optional) List of Twp/Rge strings to add to the
+        end of filenames if more than one image is to be written.
+    """
+    fp = Path(fp)
+    fp.parent.mkdir(exist_ok=True)
+    sfx = fp.suffix.lower()
+
+    cand_fmt = sfx[1:]
+    if cand_fmt != 'zip':
+        if image_format is None:
+            image_format = cand_fmt
+        if image_format.lower() != cand_fmt:
+            raise ValueError(
+                f"File suffix {cand_fmt!r} "
+                f"does not match image format {image_format!r}")
+    if stack and image_format not in STACKABLE_IMAGE_FORMATS:
+        raise ValueError(
+            f"Cannot stack with image format {image_format!r}. "
+            f"Acceptable formats: {', '.join(STACKABLE_IMAGE_FORMATS)}"
+        )
+    if stack is None and image_format in STACKABLE_IMAGE_FORMATS:
+        # Assume user wants to stack any formats that allow it.
+        stack = True
+    if sfx == '.zip':
+        # Handle .zip files separately.
+        return zip_output_images(images, fp, image_format, stack, twprges)
+
+    n = len(images)
+    just = n % 10
+    if n == 1:
+        im = images[0]
+        im.save(fp, format=image_format)
+        return None
+    elif stack:
+        im = images[0]
+        im.save(fp, format=image_format, save_all=True, append_images=images[1:])
+        return None
+    else:
+        for i, im in enumerate(images, start=0):
+            surplus = str(i + 1).rjust(just, '0')
+            if twprges is not None:
+                surplus = twprges[i]
+            fn = f"{fp.stem} {surplus}.{image_format}"
+            im.save(fp.with_name(fn), format=image_format)
+    return None

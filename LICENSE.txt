@@ -1,5 +1,5 @@
-pyTRS is Copyright (c) 2020-2021, James P. Imes, all rights reserved.
-pyTRSplat is Copyright (c) 2020-2021, James P. Imes, all rights reserved.
+pyTRS is Copyright (c) 2020-2025, James P. Imes, all rights reserved.
+pyTRSplat is Copyright (c) 2020-2025, James P. Imes, all rights reserved.
 
 
 For the purposes of the following license, the "Software" (where capitalized)
@@ -26,14 +26,10 @@ of which is provided in the _modulelicenses/ directory.
 (b) The Python Imaging Library (PIL) is Copyright © 1997-2011 by Secret Labs AB;
 Copyright © 1995-2011 by Fredrik Lundh. **
 
-(c) Pillow is copyright © 2010-2020 by Alex Clark and contributors. **
+(c) Pillow is copyright © 2010-2025 by Alex Clark and contributors. **
 
 ** Both PIL and Pillow are licensed under the PIL Software License, the full
 text of which is provided in the _modulelicenses/ directory.
-
-(d) piltextbox is Copyright (c) 2020, James P. Imes, and is licensed under the
-MIT license, the full text of which is provided in the _modulelicenses/
-directory.
 
 The above-mentioned licenses shall not be construed to limit, expand, or modify
 the following license, except to the extent required therein, and then only in
