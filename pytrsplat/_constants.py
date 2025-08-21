@@ -1,7 +1,7 @@
 # Copyright (c) 2020-2025, James P. Imes. All rights reserved.
 
-__version__ = '0.5.0dev'
-__versionDate__ = '8/19/2025'
+__version__ = '0.5.0'
+__versionDate__ = '8/20/2025'
 __author__ = 'James P. Imes'
 __email__ = 'jamesimes@gmail.com'
 __website__ = 'https://github.com/JamesPImes/pyTRSplat'
