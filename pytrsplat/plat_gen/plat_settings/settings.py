@@ -217,7 +217,7 @@ class Settings:
         self.headerfont_size = 64
         self.footerfont_size = 28
         self.secfont_size = 36
-        self.lotfont_size = 12
+        self.lotfont_size = 14
         self.headerfont_rgba = Settings.RGBA_BLACK
         self.footerfont_rgba = Settings.RGBA_BLACK
         self.secfont_rgba = Settings.RGBA_BLACK
@@ -554,6 +554,7 @@ class Settings:
 
         mp = Settings.preset('default')
         mp.sec_length_px = 120
+        mp.body_marg_top_y = 36
         mp.short_header = True
         mp.set_font(
             purpose='header',

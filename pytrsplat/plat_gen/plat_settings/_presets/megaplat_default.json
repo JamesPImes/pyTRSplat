@@ -67,7 +67,7 @@
   "headerfont_size": 72,
   "footerfont_size": 28,
   "secfont_size": 24,
-  "lotfont_size": 12,
+  "lotfont_size": 14,
   "headerfont_rgba": [
     192,
     192,
@@ -98,7 +98,7 @@
     0,
     255
   ],
-  "body_marg_top_y": 180,
+  "body_marg_top_y": 36,
   "header_px_above_body": 15,
   "footer_px_below_body": 40,
   "footer_marg_left_x": 100,
