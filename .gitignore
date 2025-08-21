@@ -9,3 +9,4 @@ venv/
 /*.egg-info/
 /build/
 scratch*
+/docs/build/
