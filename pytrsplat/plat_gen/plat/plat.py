@@ -284,14 +284,14 @@ class ImageOwner:
     """
     Interface for a class that has the following attributes:
 
-    ``.background``  (``Image``)
-    ``.image``  (``Image``)
+    ``.background``  (``PIL.Image.Image``)
+    ``.image``  (``PIL.Image.Image``)
     ``.draw``  (``ImageDraw.Draw``)
-    ``.overlay_image``  (``Image``)
+    ``.overlay_image``  (``PIL.Image.Image``)
     ``.overlay_draw``  (``ImageDraw.Draw``)
-    ``.footer_image``  (``Image``)
+    ``.footer_image``  (``PIL.Image.Image``)
     ``.footer_draw``  (``ImageDraw.Draw``)
-    ``.image_layers``  (list of ``Image`` objects)
+    ``.image_layers``  (list of ``PIL.Image.Image`` objects)
 
     And an ``.output()`` method.
     """
@@ -322,6 +322,8 @@ class ImageOwner:
         """
         if not self.image_layers:
             return None
+        if len(self.image_layers) == 1:
+            return self.image_layers[0]
         merged = Image.alpha_composite(*self.image_layers[:2])
         for i in range(2, len(self.image_layers)):
             merged = Image.alpha_composite(merged, self.image_layers[i])
@@ -1082,7 +1084,7 @@ class Plat(IPlatOwner, QueueSingle):
         # Footer image and draw object.
         self.footer_image: Image.Image = None
         self.footer_draw: ImageDraw.Draw = None
-        self.image_layers: list[Image] = []
+        self.image_layers: list[Image.Image] = []
         self.header = PlatHeader(owner=self)
         self.body = PlatBody(twp, rge, owner=self)
         self.footer = PlatFooter(owner=self)
@@ -1458,7 +1460,7 @@ class MegaPlat(IPlatOwner, QueueMany):
         if max_dim is None:
             max_dim = (float('inf'), float('inf'))
         self.max_dim = max_dim
-        self.image_layers: list[Image] = []
+        self.image_layers: list[Image.Image] = []
         self.configure()
 
     def configure(self):
@@ -1641,7 +1643,7 @@ class MegaPlat(IPlatOwner, QueueMany):
 
 
 def zip_output_images(
-        images: list[Image],
+        images: list[Image.Image],
         fp: str | Path = None,
         image_format: str = None,
         stack: bool = None,
@@ -1653,14 +1655,16 @@ def zip_output_images(
     Save the images to a .zip file, either separately or as a single
     stacked image.
 
-    :param images: A list of ``Image`` objects, as given by any
-        ``.output()`` method.
+    :param images: A list of ``PIL.Image.Image`` objects, as given by
+        any ``.output()`` method.
     :param fp: (See docs for ``PlatGroup.output()``.)
     :param image_format: (See docs for ``PlatGroup.output()``.)
     :param stack: (See docs for ``PlatGroup.output()``.)
     :param twprges: (Optional) List of Twp/Rge strings to add to the
         end of filenames if more than one image is to be written.
     """
+    if isinstance(images, Image.Image):
+        images = [images]
     if image_format is None:
         if stack:
             image_format = DEFAULT_IMAGE_FORMAT_STACKED
@@ -1692,7 +1696,7 @@ def zip_output_images(
 
 
 def save_output_images(
-        images: list[Image],
+        images: list[Image.Image],
         fp: str | Path = None,
         image_format: str = None,
         stack: bool = None,
@@ -1702,14 +1706,16 @@ def save_output_images(
     Save the images to disk as one or more separate image files; or
     into a .zip file (if the file extension of ``fp`` is ``.zip``).
 
-    :param images: A list of ``Image`` objects, as given by any
-        ``.output()`` method.
+    :param images: A list of ``PIL.Image.Image`` objects, as given by
+        any ``.output()`` method.
     :param fp: (See docs for ``PlatGroup.output()``.)
     :param image_format: (See docs for ``PlatGroup.output()``.)
     :param stack: (See docs for ``PlatGroup.output()``.)
     :param twprges: (Optional) List of Twp/Rge strings to add to the
         end of filenames if more than one image is to be written.
     """
+    if isinstance(images, Image.Image):
+        images = [images]
     fp = Path(fp)
     fp.parent.mkdir(exist_ok=True)
     sfx = fp.suffix.lower()
