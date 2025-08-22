@@ -1063,7 +1063,7 @@ class Plat(IPlatOwner, QueueSingle):
             owner: SettingsOwner | None = None):
         """
         :param twp: The Twp of the Twp/Rge represented by this Plat.
-        :param rge: The Rge of the Twp/Rge represented by this Plut.
+        :param rge: The Rge of the Twp/Rge represented by this Plat.
         :param settings: The ``Settings`` object to control the behavior
             and appearance of this plat. (Will be overridden by the
             settings in ``owner``, if that is passed.)
