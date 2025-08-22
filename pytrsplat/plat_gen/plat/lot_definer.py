@@ -11,6 +11,15 @@ __all__ = [
 
 
 class LotDefiner:
+    """
+    A class for specifying which lots correspond to which aliquots, and
+    for converting those lots into aliquots.
+
+    Can be passed as ``lot_definer=`` when initializing one of the
+    various plat types, or accessed / modified in its ``.lot_definer``
+    attribute later.
+    """
+
     # Defaults in townships with ~40-acre lots.
     DEF_01_THRU_05_40AC = {
         'L1': 'NENE',
