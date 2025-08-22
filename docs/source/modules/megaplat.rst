@@ -44,7 +44,7 @@ This results in the image above.
 
     megaplat = pytrsplat.MegaPlat(settings=mp_preset)
     # If we've written lot definitions to .csv, we load them here.
-    megaplat.lot_definer.load_from_csv('some_lot_definitions.csv')
+    megaplat.lot_definer.read_csv('some_lot_definitions.csv')
     # Otherwise / additionally, we can assume 'default' lots.
     megaplat.lot_definer.allow_defaults = True
     megaplat.lot_definer.standard_lot_size = 40

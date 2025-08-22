@@ -29,7 +29,7 @@ Typical Workflow
 2. Create a ``Plat``, ``PlatGroup``, or ``MegaPlat`` with those settings.
 
 3. Optionally, write lot definitions to a :ref:`csv file <lot_defs_csv>` and load
-   them into the plat with ``.lot_definer.load_from_csv('some_file.csv')``.
+   them into the plat with ``.lot_definer.read_csv('some_file.csv')``.
 
     * Alternatively / additionally, assume :ref:`'default' lots <default_lots>`
       in those sections along the north and west boundaries of the township,
@@ -67,7 +67,7 @@ and another for T154N-R97W.
     plat_group = pytrsplat.PlatGroup(settings=letter_preset)
 
     # If we've written lot definitions to .csv, we load them here.
-    plat_group.lot_definer.load_from_csv('some_lot_definitions.csv')
+    plat_group.lot_definer.read_csv('some_lot_definitions.csv')
     # Otherwise / additionally, we can assume 'default' lots.
     plat_group.lot_definer.allow_defaults = True
     plat_group.lot_definer.standard_lot_size = 40

@@ -21,8 +21,8 @@ plat_group = pytrsplat.PlatGroup()
 # Use preset settings, but modify it to write lot numbers.
 plat_group.settings = pytrsplat.Settings.preset('letter')
 plat_group.settings.write_lot_numbers = True
-# Load a lot definer from .csv f ile.
-plat_group.lot_definer.load_from_csv(r"sample_lot_definitions_154n97w.csv")
+# Update our lot definitions from .csv file.
+plat_group.lot_definer.read_csv(r"sample_lot_definitions_154n97w.csv")
 # Assume 'standard' 40-acre lots (in sections along north and west of township)
 plat_group.lot_definer.allow_defaults = True
 plat_group.lot_definer.standard_lot_size = 40

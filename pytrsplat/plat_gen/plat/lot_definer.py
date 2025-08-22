@@ -179,14 +179,15 @@ class LotDefiner:
             Can be changed later in the ``.standard_lot_size`` property.
         """
         out = cls(allow_defaults=allow_defaults, standard_lot_size=standard_lot_size)
-        out.load_from_csv(fp, twp, rge, sec, lot, qq)
+        out.read_csv(fp, twp, rge, sec, lot, qq)
         return out
 
-    def load_from_csv(
+    def read_csv(
             self, fp: Path | str, twp='twp', rge='rge', sec='sec', lot='lot', qq='qq'):
         """
-        Load lot definitions from csv file. The data should be
-        compatible with ``pyTRS`` formatting.
+        Load lot definitions from csv file into this existing
+        ``LotDefiner``. The data should be compatible with ``pyTRS``
+        formatting.
 
         Example .csv formatting:
 

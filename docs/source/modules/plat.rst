@@ -53,7 +53,7 @@ This results in the image above.
     # If we don't set Twp/Rge here, it will be set when adding a tract.
     plat = pytrsplat.Plat(twp='154n', rge='97w', settings=letter_preset)
     # If we've written lot definitions to .csv, we load them here.
-    plat.lot_definer.load_from_csv('some_lot_definitions.csv')
+    plat.lot_definer.read_csv('some_lot_definitions.csv')
     # Otherwise / additionally, we can assume 'default' lots.
     plat.lot_definer.allow_defaults = True
     plat.lot_definer.standard_lot_size = 40

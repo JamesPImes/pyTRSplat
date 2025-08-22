@@ -21,8 +21,8 @@ mega_plat = pytrsplat.MegaPlat()
 # Use preset settings.
 # Note: HIGHLY recommend using a 'megaplat_default' or 'megaplat_s'.
 mega_plat.settings = pytrsplat.Settings.preset('megaplat_default')
-# Load a lot definer from .csv f ile.
-mega_plat.lot_definer.load_from_csv(r"sample_lot_definitions_154n97w.csv")
+# Update our lot definitions from .csv file.
+mega_plat.lot_definer.read_csv(r"sample_lot_definitions_154n97w.csv")
 # Assume 'standard' 40-acre lots (in sections along north and west of township)
 mega_plat.lot_definer.allow_defaults = True
 mega_plat.lot_definer.standard_lot_size = 40

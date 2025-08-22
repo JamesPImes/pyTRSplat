@@ -66,7 +66,7 @@ Defining lots in .csv
 
 The most efficient way to define lots is to add them to a .csv file and
 load them into a ``LotDefiner`` with ``LotDefiner.from_csv()`` or later
-with ``.load_from_csv()``.
+with ``.read_csv()``.
 
 .. code-block:: python
 
@@ -74,7 +74,7 @@ with ``.load_from_csv()``.
 
     lot_definer = pytrsplat.LotDefiner.from_csv(r'some/path/lot_definitions.csv')
     # Keep the original definitions and add more of them from elsewhere.
-    lot_definer.load_from_csv(r'other/path/more_definitions.csv')
+    lot_definer.read_csv(r'other/path/more_definitions.csv')
 
 
 Below is an example of appropriate .csv formatting:
