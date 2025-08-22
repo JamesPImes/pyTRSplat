@@ -783,8 +783,15 @@ class PlatBody(SettingsOwned, ImageOwned):
 
 
 class PlatHeader(SettingsOwned, ImageOwned):
+    """The header of a plat."""
 
     def __init__(self, owner: IPlatOwner):
+        """
+        :param owner: The ``Plat`` object (or other appropriate type)
+            that is the ultimate owner of this header. (Controls the
+            settings that dictate platting behavior and appearance, and
+            contains the image objects that will be drawn on.)
+        """
         self.owner = owner
 
     def write_header(
