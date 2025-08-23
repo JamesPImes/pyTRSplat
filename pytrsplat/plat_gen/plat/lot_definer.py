@@ -73,8 +73,8 @@ class LotDefiner:
             or ``80``. (This determines the default lot definitions.)
             Can be changed later in the ``.standard_lot_size`` property.
         """
-        # {twprge:      {sec:   {lot:   definition} } }
-        # {'154n97w':   {1:     {'L1':  'NENE', 'L2': 'NWNE', ...} } }
+        # {trs:   {lot:   definition} } }
+        # {'154n97w01':     {'L1':  'NENE', 'L2': 'NWNE', ...} }
         self.definitions = {}
         self.allow_defaults = allow_defaults
         self._standard_lot_size: int = standard_lot_size
@@ -97,26 +97,31 @@ class LotDefiner:
             raise ValueError(
                 f"`standard_lot_size` must be either 40 or 80. Passed: {new_standard}")
         self._standard_lot_size = new_standard
-        self.default_definitions = self.defaults()
 
     def __repr__(self):
         return str(self.definitions)
 
-    def defaults(self):
-        """Get default lot definitions."""
+    def defaults(self, twp, rge):
+        """Get default lot definitions for this Twp/Rge."""
         output = {}
         if self.standard_lot_size == 40:
-            for sec_num in range(1, 6):
-                output[sec_num] = self.DEF_01_THRU_05_40AC.copy()
-            output[6] = self.DEF_06_40AC.copy()
-            for sec_num in (7, 18, 19, 30, 31):
-                output[sec_num] = self.DEF_07_18_19_30_31_40AC.copy()
+            def01_05 = self.DEF_01_THRU_05_40AC.copy()
+            def06 = self.DEF_06_40AC.copy()
+            def07_31 = self.DEF_07_18_19_30_31_40AC.copy()
         elif self.standard_lot_size == 80:
-            for sec_num in range(1, 6):
-                output[sec_num] = self.DEF_01_THRU_05_80AC.copy()
-            output[6] = self.DEF_06_80AC.copy()
-            for sec_num in (7, 18, 19, 30, 31):
-                output[sec_num] = self.DEF_07_18_19_30_31_80AC.copy()
+            def01_05 = self.DEF_01_THRU_05_80AC.copy()
+            def06 = self.DEF_06_80AC.copy()
+            def07_31 = self.DEF_07_18_19_30_31_80AC.copy()
+        else:
+            raise ValueError("Illegal standard lot size.")
+        for sec_num in (1, 2, 3, 4, 5):
+            trs = pytrs.TRS.from_twprgesec(twp, rge, sec_num)
+            output[trs.trs] = def01_05
+        trs = pytrs.TRS.from_twprgesec(twp, rge, 6)
+        output[trs.trs] = def06
+        for sec_num in (7, 18, 19, 30, 31):
+            trs = pytrs.TRS.from_twprgesec(twp, rge, sec_num)
+            output[trs.trs] = def07_31
         return output
 
     def define_lot(self, trs: str | pytrs.TRS, lot: int | str, definition: str):
@@ -132,10 +137,11 @@ class LotDefiner:
         """
         trs = pytrs.TRS(trs)
         self.definitions.setdefault(trs.twprge, {})
-        self.definitions[trs.twprge].setdefault(trs.sec_num, {})
-        if isinstance(lot, int):
+        self.definitions.setdefault(trs.trs, {})
+        if isinstance(lot, int) or not str(lot).upper().startswith('L'):
             lot = f"L{lot}"
-        self.definitions[trs.twprge][trs.sec_num][lot] = definition
+        lot = lot.upper()
+        self.definitions[trs.trs][lot] = definition
 
     @classmethod
     def from_csv(
@@ -236,16 +242,16 @@ class LotDefiner:
                 except ValueError:
                     pass
                 lot_def = row[qq]
-                twprge = f"{twp_}{rge_}"
-                self.definitions.setdefault(twprge, {})
-                self.definitions[twprge].setdefault(sec_, {})
-                self.definitions[twprge][sec_][lot_] = lot_def
+                trs = pytrs.TRS.from_twprgesec(twp_, rge_, sec_)
+                self.definitions.setdefault(trs.trs, {})
+                self.definitions[trs.trs][lot_] = lot_def
         return self.definitions
 
+    @staticmethod
     def _save_definitions_to_csv(
-            self,
-            # {twprge:      {sec:   {lot:   definition} } }
-            definitions: dict[str, dict[int | str, dict[int | str, str]]],
+            # If defined:   {'154n97w01': {'L1': 'NENE', 'L2': 'NWNE'} }
+            # If undefined: {'154n97w01': ['L1', 'L2'] }
+            definitions: dict[str, dict[int | str, str]] | dict[str, list[int | str]],
             fp: Path | str,
             twp='twp',
             rge='rge',
@@ -280,20 +286,20 @@ class LotDefiner:
         with open(fp, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(headers)
-            for twprge, sec_dict in definitions.items():
-                trs = pytrs.TRS(twprge)
+            for trs, lot_definitions in definitions.items():
+                trs = pytrs.TRS(trs)
                 twp_ = trs.twp
                 rge_ = trs.rge
-                for sec_num, lot_definitions in sec_dict.items():
-                    for lot_ in lot_definitions:
-                        try:
-                            # We are writing a defined lots.
-                            definition = lot_definitions.get(lot_)
-                        except AttributeError:
-                            # We are actually writing an UNDEFINED lot.
-                            definition = None
-                        row = [twp_, rge_, sec_num, lot_, definition]
-                        writer.writerow(row)
+                sec_ = trs.sec_num
+                for lot_ in lot_definitions:
+                    try:
+                        # We are writing a defined lots.
+                        definition = lot_definitions.get(lot_)
+                    except AttributeError:
+                        # We are actually writing an UNDEFINED lot.
+                        definition = None
+                    row = [twp_, rge_, sec_, lot_, definition]
+                    writer.writerow(row)
         return None
 
     def save_to_csv(
@@ -341,29 +347,26 @@ class LotDefiner:
             "\n - Leave blank to skip. "
             "\n - Enter 'quit' to quit."
         )
-        for twprge in undefined:
-            for sec_num, lots in undefined[twprge].items():
-                trs = pytrs.TRS(f"{twprge}{str(sec_num).rjust(2, '0')}")
-                for lot in lots:
-                    while True:
-                        defin = input(f"{trs}: {lot} = ")
-                        if not defin:
-                            break
-                        if defin.lower() == 'quit':
-                            return None
-                        tract = pytrs.Tract(defin, parse_qq=True, config='clean_qq')
-                        if not tract.qqs:
-                            msg = (
-                                "No aliquots could be identified in that response. "
-                                "Try again?\n"
-                                "(Leave blank to skip; 'quit' to quit.)"
-                            )
-                            print(msg)
-                        else:
-                            self.define_lot(trs, lot, defin)
-                            break
+        for trs, lots in undefined.items():
+            for lot in lots:
+                while True:
+                    defin = input(f"{trs}: {lot} = ")
+                    if not defin:
+                        break
+                    if defin.lower() == 'quit':
+                        return None
+                    tract = pytrs.Tract(defin, parse_qq=True, config='clean_qq')
+                    if not tract.qqs:
+                        msg = (
+                            "No aliquots could be identified in that response. "
+                            "Try again?\n"
+                            "(Leave blank to skip; 'quit' to quit.)"
+                        )
+                        print(msg)
+                    else:
+                        self.define_lot(trs, lot, defin)
+                        break
         return None
-
 
     def get_all_definitions(
             self,
@@ -390,40 +393,58 @@ class LotDefiner:
             include_defaults = self.allow_defaults
         if not include_defaults:
             output = deepcopy(self.definitions)
-            for twprge in mandatory_twprges:
-                output.setdefault(twprge, {})
             return output
+
+        # Combine Twp/Rges within definitions and mandated Twp/Rges.
+        all_twprge = set()
+        for trs in self.definitions.keys():
+            all_twprge.add(pytrs.TRS(trs).twprge)
+        if mandatory_twprges is not None:
+            all_twprge.update(mandatory_twprges)
+        mandatory_twprges = sorted(all_twprge)
+
+        # Start with defaults.
         output = {}
-        # Merge actual definitions into defaults, overwriting any defaults.
-        for twprge, sec_def in self.definitions.items():
-            output.setdefault(twprge, {})
-            output[twprge] = deepcopy(self.default_definitions)
-            existing_twprge_def = output[twprge]
-            for sec_num, definitions in sec_def.items():
-                existing_twprge_def[sec_num] = definitions
         for twprge in mandatory_twprges:
-            if twprge not in output:
-                output[twprge] = deepcopy(self.default_definitions)
+            trs = pytrs.TRS(twprge)
+            defaults = self.defaults(trs.twp, trs.rge)
+            for trs_, definitions in defaults.items():
+                output[trs_] = definitions
+
+        # Merge actual definitions into defaults, overwriting any defaults.
+        for trs, lot_definitions in self.definitions.items():
+            output[trs] = lot_definitions
         return output
 
     def convert_lots(
             self,
             lots: list[str],
-            twprge: str,
-            sec_num: int,
+            trs: str,
             allow_defaults: bool = None,
     ) -> (list[str], list[str]):
         """
         Convert a list of lots (from the ``.lots`` of a ``pytrs.Tract``
         object) into corresponding aliquots.
+
+        :param lots: The list of lots to convert.
+        :param trs: The Twp/Rge/Sec (in the pyTRS format,
+            ``'154n97w01'``) of the section that the lots belong to.
+        :param allow_defaults: Whether to assume that this section is
+            'standard', with typical lots (if any) in sections along the
+            north and west township boundaries. If not specified here,
+            will use whatever is configured in the ``.allow_defaults``
+            attribute.
+        :returns: List of converted lots (as aliquots); and a list of
+            lots that could not be converted.
         """
-        def_twprge = self.definitions.get(twprge, {})
-        def_sec = def_twprge.get(sec_num, {})
+        trs_ = pytrs.TRS(trs)
+        def_sec = self.definitions.get(trs_.trs, {})
         default_def_sec = None
         if allow_defaults is None:
             allow_defaults = self.allow_defaults
         if allow_defaults:
-            default_def_sec = self.default_definitions.get(sec_num, {})
+            defaults = self.defaults(trs_.twp, trs_.rge)
+            default_def_sec = defaults.get(trs_.trs, {})
         return self._lots_to_aliquots(lots, def_sec, default_def_sec)
 
     def process_tract(
@@ -450,10 +471,7 @@ class LotDefiner:
         :return: Two lists: The first being the converted aliquots, and
             the second being a list of lots that have not been defined.
         """
-        twprge = tract.twprge
-        sec_num = tract.sec_num
-        qqs, undefined_lots = self.convert_lots(
-            tract.lots, twprge, sec_num, allow_defaults)
+        qqs, undefined_lots = self.convert_lots(tract.lots, tract.trs, allow_defaults)
         if commit:
             tract.lots_as_qqs = qqs
             tract.undefined_lots = undefined_lots
@@ -480,7 +498,7 @@ class LotDefiner:
             allow_defaults: bool = None,
             fp: str | Path = None,
             **headers,
-    ) -> dict[str, dict[str, list[str]]]:
+    ) -> dict[str, list[str]]:
         """
         Find all tracts that have one or more lots that have not been
         defined. Optionally write them to a .csv file at path ``fp``, to
@@ -505,23 +523,21 @@ class LotDefiner:
             headers. (Reference the docs for
             ``LotDefiner.save_to_csv()`` for the appropriate
             parameters.)
-        :return: A nested dict, keyed by Twp/Rge (``'154n97w'``), then
-            keyed by section number (``1``), and the deep values being a
-            sorted list of lots for that Twp/Rge/Sec.
+        :return: A dict, keyed by Twp/Rge/Sec (``'154n97w01'``), whose
+            values are a sorted list of lots for that Twp/Rge/Sec.
         """
-        output = {}
+        trs_to_ilots = {}
         for tract in tracts:
             _, undefined_lots = self.process_tract(tract, allow_defaults, commit=False)
             if undefined_lots:
-                output.setdefault(tract.twprge, {})
-                output[tract.twprge].setdefault(tract.sec_num, set())
+                trs_to_ilots.setdefault(tract.trs, set())
                 # Convert lots ['L1', 'L2'] to integers [1, 2] for later sorting.
                 ilots = [int(lt.split('L')[-1]) for lt in undefined_lots]
-                output[tract.twprge][tract.sec_num].update(ilots)
-        for twprge, sec_dict in output.items():
-            for k, lot_set in sec_dict.items():
-                # Convert back to ['L1', 'L2', ...].
-                sec_dict[k] = [f"L{lt}" for lt in sorted(lot_set)]
+                trs_to_ilots[tract.trs].update(ilots)
+        output = {}
+        for trs, lot_set in trs_to_ilots.items():
+            # Convert back to ['L1', 'L2', ...].
+            output[trs] = [f"L{lt}" for lt in sorted(lot_set)]
         if fp is not None:
             self._save_definitions_to_csv(output, fp, **headers)
         return output
@@ -535,6 +551,13 @@ class LotDefiner:
         """
         Convert a list of lots (from the ``.lots`` of a ``pytrs.Tract``
         object) into corresponding aliquots.
+
+        :param lots: The list of lots to convert.
+        :param lot_defs: The true definitions, e.g., ``{'L1': 'NENE'}``.
+        :param default_defs: The default definitions, in the same
+            format.
+        :returns: List of converted lots (as aliquots); and a list of
+            lots that could not be converted.
         """
 
         def process_aliquot(aliq: str, into: list[str]):

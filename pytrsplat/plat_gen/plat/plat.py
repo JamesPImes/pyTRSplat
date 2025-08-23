@@ -672,7 +672,7 @@ class PlatSection(SettingsOwned, ImageOwned):
             to 2 (i.e., quarter-quarters).
         """
         ld = self.owner.all_lot_defs_cached
-        lots_definitions = ld.get(self.trs.twprge, {}).get(self.trs.sec_num, {})
+        lots_definitions = ld.get(self.trs.trs, {})
         for lot, definitions in lots_definitions.items():
             tract = pytrs.Tract(
                 definitions, parse_qq=True, config=f"clean_qq,qq_depth.{at_depth}")
