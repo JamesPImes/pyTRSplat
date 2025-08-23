@@ -116,6 +116,45 @@ Defining lots in code
 ``'2s58e24'``.
 
 
+
+.. _prompt_define:
+
+Defining lots manually in console
+---------------------------------
+
+When calling `.execute_queue()` on any plat-generating class, use parameter
+`prompt_define=True` to first check for undefined lots, and then prompt the
+user in the console to define them individually.
+
+.. code-block:: python
+
+    import pytrsplat
+
+    plat = pytrs.Plat(twp='154n', rge='97w')
+    plat.add_description('T154N-R97W Sec 1: Lots 1 and 2')
+    plat.execute_queue(prompt_define=True)  # Also works with `PlatGroup` and `MegaPlat`
+
+
+Alternatively, if we want to prompt the user to define lots separately
+from executing the queue, by calling `.prompt_define()` on a `LotDefiner`
+object, and passing to it the list of `pytrs.Tract` objects (e.g., a
+plat's `.queue` attribute).
+
+.. code-block:: python
+
+    import pytrsplat
+
+    some_lot_definer = pytrsplat.LotDefiner()
+    plat = pytrs.Plat(twp='154n', rge='97w', lot_definer=some_lot_definer)
+    plat.add_description('T154N-R97W Sec 1: Lots 1 and 2')
+    some_lot_definer.prompt_define(plat.queue)
+    # <Do whatever we want with the lot definitions.>
+    some_lot_definer.save_to_csv(r'some/path/manually_defined_lots.csv')
+    # ...
+    # And eventually, execute the queue:
+    plat.execute_queue()
+
+
 Undefined Lots
 --------------
 
@@ -135,6 +174,10 @@ To check the queue for undefined lots prior to executing the queue, call
     # plat.queue()  # Would show a warning of undefined lots: <154n97w09: L1>
     undefined_lots = plat.find_undefined_lots()
     print(undefined_lots)   # {'154n97w': {9: ['L1']}}
+
+
+Or simply use ``.execute_queue(prompt_define=True)``
+as :ref:`mentioned above <prompt_define>`.
 
 
 Methods and Attributes
