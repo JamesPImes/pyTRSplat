@@ -18,6 +18,18 @@ class LotDefiner:
     Can be passed as ``lot_definer=`` when initializing one of the
     various plat types, or accessed / modified in its ``.lot_definer``
     attribute later.
+
+    **Important attributes:**
+
+    * ``.allow_defaults`` - Whether to assume that all sections are
+      'standard', with typical lots (if any) in sections along the north
+      and west township boundaries. Can be set at init with
+      ``allow_defaults=<bool>`` (off by default).
+
+    * ``.standard_lot_size`` - How big we assume a 'standard' lot is in
+      the township(s) being considered. Must be either ``40`` or ``80``.
+      (This determines the default lot definitions.) Can be set at init
+      with ``standard_lot_size=<40 or 80>``. (``40`` by default.)
     """
 
     # Defaults in townships with ~40-acre lots.
