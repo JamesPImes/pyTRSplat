@@ -1212,7 +1212,7 @@ class Plat(IPlatOwner, QueueSingle):
             not be platted (no lots or aliquots identified).
         """
         if prompt_define:
-            self.lot_definer.prompt_define(self.queue)
+            self.prompt_define()
         self.configure()
         twprge = f"{self.twp}{self.rge}"
         unplattable_tracts = pytrs.TractList()
@@ -1389,7 +1389,7 @@ class PlatGroup(SettingsOwner, QueueMany):
         else:
             selected_tracts = self.queue.filter(lambda t: t.twprge in subset_twprges)
         if prompt_define:
-            self.lot_definer.prompt_define(selected_tracts)
+            self.prompt_define()
         for twprge in subset_twprges:
             plat = self.plats[twprge]
             unplattable = plat.execute_queue()
@@ -1684,7 +1684,7 @@ class MegaPlat(IPlatOwner, QueueMany):
         if subset_twprges is not None:
             queue = queue.filter(key=lambda tract: tract.twprge in subset_twprges)
         if prompt_define:
-            self.lot_definer.prompt_define(queue)
+            self.prompt_define()
         # Confirm all tracts are valid.
         queue = self._clean_queue(queue)
         if not queue:
