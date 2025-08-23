@@ -659,6 +659,7 @@ class PlatSection(SettingsOwned, ImageOwned):
         unplattable_tracts = pytrs.TractList()
         if not self.queue:
             return unplattable_tracts
+        platted_aliquots = set()
         for tract in self.queue:
             self.owner.lot_definer.process_tract(tract, commit=True)
             if not tract.qqs and not tract.lots_as_qqs and not tract.undefined_lots:
@@ -669,14 +670,16 @@ class PlatSection(SettingsOwned, ImageOwned):
                 warn(message, UserWarning)
                 unplattable_tracts.append(tract)
             self.aliquot_tree.register_all_aliquots(tract.qqs)
+            platted_aliquots.update(tract.qqs)
             self.aliquot_tree.register_all_aliquots(tract.lots_as_qqs)
+            platted_aliquots.update(tract.lots_as_qqs)
             if tract.undefined_lots:
                 message = (
                     "Undefined lots that could not be shown on the plat: "
                     f"<{tract.trs}: {', '.join(tract.undefined_lots)}>"
                 )
                 warn(message, UserWarning)
-        if len(self.queue) != len(unplattable_tracts):
+        if len(platted_aliquots) > 0:
             self.aliquot_tree.configure()
             self.aliquot_tree.fill()
         return unplattable_tracts
