@@ -34,7 +34,7 @@ class UnplattableWarning(UserWarning):
     * It has no identifiable lots or aliquots.
     * It has lots, but none of them are defined; and it has no
       identifiable aliquots.
-    * Its Twp/Rge are undefined or otherwise erroneous.
+    * Its Twp/Rge/Sec are undefined or otherwise erroneous.
     """
 
     _main_message = "Cannot add tract to plat"
@@ -54,6 +54,6 @@ class UnplattableWarning(UserWarning):
         return cls._construct(tract, submessage)
 
     @classmethod
-    def unclear_twprge(cls, tract: pytrs.Tract):
-        submessage = 'undefined or otherwise erroneous Twp/Rge'
+    def unclear_trs(cls, tract: pytrs.Tract):
+        submessage = 'undefined or otherwise erroneous Twp/Rge/Sec'
         return cls._construct(tract, submessage)
