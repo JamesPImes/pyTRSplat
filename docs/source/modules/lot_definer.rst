@@ -159,8 +159,9 @@ Undefined Lots
 --------------
 
 When executing the queue in a ``Plat`` or other object, if a tract with
-an undefined lot is encountered, a ``UserWarning`` will be displayed,
-but no error will be raised.
+an undefined lot is encountered, a custom
+:doc:`pytrsplat.UndefinedLotWarning <warnings>`
+will be displayed, but no error will be raised.
 
 To check the queue for undefined lots prior to executing the queue, call
 ``.find_undefined_lots()``.
