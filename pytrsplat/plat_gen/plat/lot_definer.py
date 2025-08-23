@@ -372,7 +372,7 @@ class LotDefiner:
             self,
             include_defaults: bool = None,
             mandatory_twprges: list[str] = None
-    ) -> dict[str, dict[str, dict[str, str]]]:
+    ) -> dict[str, dict[str, str]]:
         """
         Get all definitions, including any defaults (if so configured or
         requested).
@@ -386,8 +386,8 @@ class LotDefiner:
             the return definitions. Will add any such Twp/Rge that is
             not already found in this ``LotDefiner``.
 
-        :return: A nested dict of definitions.
-            ``twprge > sec > lot: definition``
+        :return: A dict of definitions that looks like this:
+            ``{'154n97w01': {'L1': 'NENE', 'L2', 'NWNE'} }``
         """
         if include_defaults is None:
             include_defaults = self.allow_defaults
