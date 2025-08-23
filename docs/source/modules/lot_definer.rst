@@ -122,8 +122,8 @@ Defining lots in code
 Defining lots manually in console
 ---------------------------------
 
-When calling `.execute_queue()` on any plat-generating class, use parameter
-`prompt_define=True` to first check for undefined lots, and then prompt the
+When calling ``.execute_queue()`` on any plat-generating class, use parameter
+``prompt_define=True`` to first check for undefined lots, and then prompt the
 user in the console to define them individually.
 
 .. code-block:: python
