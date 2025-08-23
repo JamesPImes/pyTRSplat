@@ -136,9 +136,9 @@ user in the console to define them individually.
 
 
 Alternatively, if we want to prompt the user to define lots separately
-from executing the queue, by calling `.prompt_define()` on a `LotDefiner`
-object, and passing to it the list of `pytrs.Tract` objects (e.g., a
-plat's `.queue` attribute).
+from executing the queue, by calling ``.prompt_define()`` on a ``LotDefiner``
+object, and passing to it the list of ``pytrs.Tract`` objects (e.g., a
+plat's ``.queue`` attribute).
 
 .. code-block:: python
 
@@ -172,7 +172,7 @@ To check the queue for undefined lots prior to executing the queue, call
     plat = pytrsplat.Plat()
     plat.add_description('T154N-R97W, Sec 9: Lot 1')
 
-    # plat.queue()  # Would show a warning of undefined lots: <154n97w09: L1>
+    # plat.execute_queue()  # Would show a warning of undefined lots: <154n97w09: L1>
     undefined_lots = plat.find_undefined_lots()
     print(undefined_lots)   # {'154n97w': {9: ['L1']}}
 
