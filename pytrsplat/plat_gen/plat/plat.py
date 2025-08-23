@@ -287,8 +287,6 @@ class LotDefinerOwner(QueueSingle):
         return unplattable_tracts
 
 
-
-
 class SettingsOwner:
     """
     Interface for a class that has a ``Settings`` object in its
@@ -1186,13 +1184,18 @@ class Plat(IPlatOwner, QueueSingle):
         self.footer.configure()
         return None
 
-    def execute_queue(self) -> pytrs.TractList:
+    def execute_queue(self, prompt_define=False) -> pytrs.TractList:
         """
         Execute the queue of tracts to fill in the plat.
 
+        :param prompt_define: (Optional) If ``True``, first check for
+            undefined lots, and prompt the user in console to define
+            them.
         :return: A ``pytrs.TractList`` containing all tracts that could
             not be platted (no lots or aliquots identified).
         """
+        if prompt_define:
+            self.lot_definer.prompt_define(self.queue)
         self.configure()
         twprge = f"{self.twp}{self.rge}"
         unplattable_tracts = pytrs.TractList()
@@ -1342,14 +1345,20 @@ class PlatGroup(SettingsOwner, QueueMany):
         plat.add_tract(tract)
         return None
 
-    def execute_queue(self, subset_twprges: list[str] = None) -> pytrs.TractList:
+    def execute_queue(
+            self,
+            subset_twprges: list[str] = None,
+            prompt_define=False
+    ) -> pytrs.TractList:
         """
         Execute the queue of tracts to fill in the plats.
 
         :param subset_twprges: (Optional) Limit the generated image to
             this list of Twp/Rges (in the pyTRS format -- e.g.,
             ``['154n97w', '155n97w']``).
-
+        :param prompt_define: (Optional) If ``True``, first check for
+            undefined lots, and prompt the user in console to define
+            them.
         :return: A ``pytrs.TractList`` containing all tracts that could
             not be platted (no lots or aliquots identified).
         """
@@ -1357,8 +1366,13 @@ class PlatGroup(SettingsOwner, QueueMany):
             mandatory_twprges=list(self.plats.keys())
         )
         all_unplattable = pytrs.TractList()
+        selected_tracts = self.queue
         if subset_twprges is None:
             subset_twprges = sorted(self.plats.keys())
+        else:
+            selected_tracts = self.queue.filter(lambda t: t.twprge in subset_twprges)
+        if prompt_define:
+            self.lot_definer.prompt_define(selected_tracts)
         for twprge in subset_twprges:
             plat = self.plats[twprge]
             unplattable = plat.execute_queue()
@@ -1631,13 +1645,20 @@ class MegaPlat(IPlatOwner, QueueMany):
             self.all_lot_defs_cached = {}
         return subplats
 
-    def execute_queue(self, subset_twprges: list[str] = None) -> pytrs.TractList:
+    def execute_queue(
+            self,
+            subset_twprges: list[str] = None,
+            prompt_define=False
+    ) -> pytrs.TractList:
         """
         Execute the queue of tracts, and generate the plat.
 
         :param subset_twprges: (Optional) Limit the generated images to
             this list of Twp/Rges (in the pyTRS format -- e.g.,
             ``['154n97w', '155n97w']``).
+        :param prompt_define: (Optional) If ``True``, first check for
+            undefined lots, and prompt the user in console to define
+            them.
         :return: A ``pytrs.TractList`` containing all tracts that could
             not be platted.
         """
@@ -1645,6 +1666,8 @@ class MegaPlat(IPlatOwner, QueueMany):
         queue = self.queue
         if subset_twprges is not None:
             queue = queue.filter(key=lambda tract: tract.twprge in subset_twprges)
+        if prompt_define:
+            self.lot_definer.prompt_define(queue)
         # Confirm all tracts are valid.
         queue = self._clean_queue(queue)
         if not queue:
