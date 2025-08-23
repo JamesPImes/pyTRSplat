@@ -241,7 +241,7 @@ class LotDefinerOwner(QueueSingle):
             north and west township boundaries. If not specified here,
             will use whatever is configured in the
             ``lot_definer.allow_defaults`` attribute.
-                :param fp: (Optional) A filepath at which to create a .csv file
+        :param fp: (Optional) A filepath at which to create a .csv file
             containing the undefined lots.
         :param headers: (Optional) If saving the undefined lots to a
             .csv file, pass keyword arguments to specify the desired
