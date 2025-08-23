@@ -571,6 +571,10 @@ class PlatSection(SettingsOwned, ImageOwned):
         self.owner: IPlatOwner = owner
         self.is_lot_writer = is_lot_writer
 
+    @property
+    def _is_dummy(self):
+        return self.grid_offset is None
+
     def configure(self, grid_xy):
         """
         Configure this section and its subordinates.
@@ -578,6 +582,8 @@ class PlatSection(SettingsOwned, ImageOwned):
         :param grid_xy: The top-left coord of the township to which this
             section belongs.
         """
+        if self._is_dummy:
+            return None
         settings = self.settings
         sec_length_px = settings.sec_length_px
         x, y = grid_xy
@@ -659,6 +665,12 @@ class PlatSection(SettingsOwned, ImageOwned):
         """
         unplattable_tracts = pytrs.TractList()
         if not self.queue:
+            return unplattable_tracts
+        elif self._is_dummy:
+            for tract in self.queue:
+                warning = UnplattableWarning.unclear_trs(tract)
+                warn(warning)
+                unplattable_tracts.append(tract)
             return unplattable_tracts
         platted_aliquots = set()
         for tract in self.queue:
@@ -746,7 +758,7 @@ class PlatBody(SettingsOwned, ImageOwned):
         self.owner: IPlatOwner = owner
         self.twp = twp
         self.rge = rge
-        self.sections: dict[int, PlatSection] = {}
+        self.sections: dict[int | None, PlatSection] = {}
         sections_per_side = 6
         k = 0
         # Store each section's "offset" from the top-left of the grid.
@@ -761,6 +773,8 @@ class PlatBody(SettingsOwned, ImageOwned):
                     is_lot_writer=is_lot_writer)
                 self.sections[sec_num] = plat_sec
                 k += 1
+        # A dummy section, for tracts with undefined/error section number.
+        self.sections[None] = PlatSection(None, grid_offset=None)
         # Coord of top-left of the grid.
         self.xy: tuple[int, int] = None
         self.is_lot_writer = is_lot_writer
