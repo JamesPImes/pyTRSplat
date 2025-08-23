@@ -254,6 +254,24 @@ class LotDefinerOwner(QueueSingle):
         return self.lot_definer.find_undefined_lots(
             tracts=self.queue, allow_defaults=allow_defaults, fp=fp, **headers)
 
+    def prompt_define(self, allow_defaults: bool = None):
+        """
+        Prompt the user in console to define all lots that have not yet
+        been defined for tracts in the ``.queue``. Any new lot
+        definitions will be added to the ``.lot_definer``.
+
+        (You may wish to save the results with
+        ``.lot_definer.save_to_csv()`` so that they can be loaded and
+        reused later.)
+
+        :param allow_defaults: Whether to assume that this section is
+            'standard', with typical lots (if any) in sections along the
+            north and west township boundaries. If not specified here,
+            will use whatever is configured in the
+            ``.lot_definer.allow_defaults`` attribute.
+        """
+        return self.lot_definer.prompt_define(self.queue, allow_defaults)
+
     def find_unplattable_tracts(self, allow_defaults: bool = None) -> pytrs.TractList:
         """
         Get a ``pytrs.TractList`` containing all tracts that cannot be
