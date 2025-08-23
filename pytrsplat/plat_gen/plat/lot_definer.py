@@ -501,8 +501,9 @@ class LotDefiner:
             containing the undefined lots.
         :param headers: (Optional) If saving the undefined lots to a
             .csv file, pass keyword arguments to specify the desired
-            headers. (Reference the docs for ``.save_to_csv()`` for the
-            appropriate parameters.)
+            headers. (Reference the docs for
+            ``LotDefiner.save_to_csv()`` for the appropriate
+            parameters.)
         :return: A nested dict, keyed by Twp/Rge (``'154n97w'``), then
             keyed by section number (``1``), and the deep values being a
             sorted list of lots for that Twp/Rge/Sec.

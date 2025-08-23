@@ -222,23 +222,38 @@ class LotDefinerOwner(QueueSingle):
 
     def find_undefined_lots(
             self,
-            allow_defaults: bool = None
+            allow_defaults: bool = None,
+            fp: str | Path = None,
+            **headers,
     ) -> dict[str, dict[str, list[str]]]:
         """
         Find all tracts in the queue that have one or more lots that
-        have not been defined.
+        have not been defined. Optionally write them to a .csv file at
+        path ``fp``, to facilitate defining them externally.
+
+        .. warning::
+
+            If passing ``fp``, any file at that path will be overwritten
+            without warning.
 
         :param allow_defaults: Whether to assume that all sections are
             'standard', with typical lots (if any) in sections along the
             north and west township boundaries. If not specified here,
             will use whatever is configured in the
             ``lot_definer.allow_defaults`` attribute.
+                :param fp: (Optional) A filepath at which to create a .csv file
+            containing the undefined lots.
+        :param headers: (Optional) If saving the undefined lots to a
+            .csv file, pass keyword arguments to specify the desired
+            headers. (Reference the docs for
+            ``LotDefiner.save_to_csv()`` for the appropriate
+            parameters.)
         :return: A nested dict, keyed by Twp/Rge (``'154n97w'``), then
             keyed by section number (``1``), and the deep values being a
             sorted list of lots for that Twp/Rge/Sec.
         """
         return self.lot_definer.find_undefined_lots(
-            tracts=self.queue, allow_defaults=allow_defaults)
+            tracts=self.queue, allow_defaults=allow_defaults, fp=fp, **headers)
 
     def find_unplattable_tracts(self, allow_defaults: bool = None) -> pytrs.TractList:
         """
@@ -270,6 +285,8 @@ class LotDefinerOwner(QueueSingle):
             if not tract.qqs and not converted_aliquots:
                 unplattable_tracts.append(tract)
         return unplattable_tracts
+
+
 
 
 class SettingsOwner:
