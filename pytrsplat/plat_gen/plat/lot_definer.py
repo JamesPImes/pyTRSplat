@@ -242,6 +242,81 @@ class LotDefiner:
                 self.definitions[twprge][sec_][lot_] = lot_def
         return self.definitions
 
+    def _save_definitions_to_csv(
+            self,
+            # {twprge:      {sec:   {lot:   definition} } }
+            definitions: dict[str, dict[int | str, dict[int | str, str]]],
+            fp: Path | str,
+            twp='twp',
+            rge='rge',
+            sec='sec',
+            lot='lot',
+            qq='qq'
+    ):
+        """
+        Convert the ``definitions`` and write it to a .csv file at
+        ``fp`` that can be reloaded later with ``.from_csv()`` or
+        ``.read_csv()``.
+
+        ``definitions`` can be either the dict in the ``.definitions``
+        attribute, or a dict of undefined lots as output by
+        ``.find_undefined_lots()``. For the latter, it will add a column
+        for a user to add aliquots for each lot, but the column will be
+        empty.
+
+        .. warning::
+
+            Will overwrite any file that exists as ``fp`` without
+            warning.
+
+        :param fp: Path to the .csv file to save to.
+        :param twp: Header for the Twp column.
+        :param rge: Header for the Rge column.
+        :param sec: Header for the Sec column.
+        :param lot: Header for the Lot column.
+        :param qq: Header for the lot definition (aliquots) column.
+        """
+        headers = [twp, rge, sec, lot, qq]
+        with open(fp, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(headers)
+            for twprge, sec_dict in definitions.items():
+                trs = pytrs.TRS(twprge)
+                twp_ = trs.twp
+                rge_ = trs.rge
+                for sec_num, lot_definitions in sec_dict.items():
+                    for lot_ in lot_definitions:
+                        try:
+                            # We are writing a defined lots.
+                            definition = lot_definitions.get(lot_)
+                        except AttributeError:
+                            # We are actually writing an UNDEFINED lot.
+                            definition = None
+                        row = [twp_, rge_, sec_num, lot_, definition]
+                        writer.writerow(row)
+        return None
+
+    def save_to_csv(
+            self, fp: Path | str, twp='twp', rge='rge', sec='sec', lot='lot', qq='qq'):
+        """
+        Save the definitions (excluding defaults) to a .csv file that
+        can be reloaded later with ``.from_csv()`` or ``.read_csv()``.
+
+        .. warning::
+
+            Will overwrite any file that exists as ``fp`` without
+            warning.
+
+        :param fp: Path to the .csv file to save to.
+        :param twp: Header for the Twp column.
+        :param rge: Header for the Rge column.
+        :param sec: Header for the Sec column.
+        :param lot: Header for the Lot column.
+        :param qq: Header for the lot definition (aliquots) column.
+        """
+        self._save_definitions_to_csv(self.definitions, fp, twp, rge, sec, lot, qq)
+        return None
+
     def get_all_definitions(
             self,
             include_defaults: bool = None,
@@ -355,10 +430,18 @@ class LotDefiner:
             self,
             tracts: pytrs.TractList | pytrs.PLSSDesc,
             allow_defaults: bool = None,
+            fp: str | Path = None,
+            **headers,
     ) -> dict[str, dict[str, list[str]]]:
         """
         Find all tracts that have one or more lots that have not been
-        defined.
+        defined. Optionally write them to a .csv file at path ``fp``, to
+        facilitate defining them externally.
+
+        .. warning::
+
+            If passing ``fp``, any file at that path will be overwritten
+            without warning.
 
         :param tracts: A collection of ``pytrs.Tract`` objects that have
             been parsed to lots and QQs.
@@ -367,6 +450,12 @@ class LotDefiner:
             north and west township boundaries. If not specified here,
             will use whatever is configured in the ``.allow_defaults``
             attribute.
+        :param fp: (Optional) A filepath at which to create a .csv file
+            containing the undefined lots.
+        :param headers: (Optional) If saving the undefined lots to a
+            .csv file, pass keyword arguments to specify the desired
+            headers. (Reference the docs for ``.save_to_csv()`` for the
+            appropriate parameters.)
         :return: A nested dict, keyed by Twp/Rge (``'154n97w'``), then
             keyed by section number (``1``), and the deep values being a
             sorted list of lots for that Twp/Rge/Sec.
@@ -384,6 +473,8 @@ class LotDefiner:
             for k, lot_set in sec_dict.items():
                 # Convert back to ['L1', 'L2', ...].
                 sec_dict[k] = [f"L{lt}" for lt in sorted(lot_set)]
+        if fp is not None:
+            self._save_definitions_to_csv(output, fp, **headers)
         return output
 
     @staticmethod
