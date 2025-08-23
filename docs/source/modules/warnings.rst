@@ -1,8 +1,8 @@
 Custom Warnings
 ===============
 
-These custom warnings are subclasses of ``UserWarning`` and flag lands
-that could not be depicted on the plat.
+These custom warnings are subclasses of ``UserWarning``, and they flag lands
+that could not be properly depicted on the plat.
 
 
 .. autoclass:: pytrsplat.UndefinedLotWarning
