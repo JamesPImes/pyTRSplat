@@ -326,6 +326,7 @@ class LotDefiner:
         (You may wish to save the results with ``.save_to_csv()`` so
         that they can be loaded and reused later.)
 
+        :param tracts: The tracts to check for undefined lots.
         :param allow_defaults: Whether to assume that this section is
             'standard', with typical lots (if any) in sections along the
             north and west township boundaries. If not specified here,
