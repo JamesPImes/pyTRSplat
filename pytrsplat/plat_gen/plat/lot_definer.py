@@ -342,14 +342,16 @@ class LotDefiner:
         if not undefined:
             return None
         print(
-            "Prompting user to define lots."
-            "\n - Leave blank to skip. "
-            "\n - Enter 'quit' to quit."
+            "Please define the following lots...\n"
+            "   (Leave blank to skip; 'quit' to quit.)"
         )
         for trs, lots in undefined.items():
             for lot in lots:
                 while True:
                     defin = input(f"{trs}: {lot} = ")
+                    # Remove quotation marks.
+                    defin = defin.replace('"', '')
+                    defin = defin.replace("'", '')
                     if not defin:
                         break
                     if defin.lower() == 'quit':
@@ -357,9 +359,9 @@ class LotDefiner:
                     tract = pytrs.Tract(defin, parse_qq=True, config='clean_qq')
                     if not tract.qqs:
                         msg = (
-                            "No aliquots could be identified in that response. "
+                            "   No aliquots could be identified in that response. "
                             "Try again?\n"
-                            "(Leave blank to skip; 'quit' to quit.)"
+                            "   (Leave blank to skip; 'quit' to quit.)"
                         )
                         print(msg)
                     else:
