@@ -136,7 +136,6 @@ class LotDefiner:
             info.)
         """
         trs = pytrs.TRS(trs)
-        self.definitions.setdefault(trs.twprge, {})
         self.definitions.setdefault(trs.trs, {})
         if isinstance(lot, int) or not str(lot).upper().startswith('L'):
             lot = f"L{lot}"
