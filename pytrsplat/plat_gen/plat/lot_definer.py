@@ -317,6 +317,53 @@ class LotDefiner:
         self._save_definitions_to_csv(self.definitions, fp, twp, rge, sec, lot, qq)
         return None
 
+    def prompt_define(self, tracts: pytrs.TractList, allow_defaults: bool = None):
+        """
+        Prompt the user in console to define all lots that have not yet
+        been defined. Any new lot definitions will be added to the
+        ``LotDefiner``.
+
+        (You may wish to save the results with ``.save_to_csv()`` so
+        that they can be loaded and reused later.)
+
+        :param allow_defaults: Whether to assume that this section is
+            'standard', with typical lots (if any) in sections along the
+            north and west township boundaries. If not specified here,
+            will use whatever is configured in the ``.allow_defaults``
+            attribute.
+        """
+        undefined = self.find_undefined_lots(tracts, allow_defaults)
+        if not undefined:
+            return None
+        print(
+            "Prompting user to define lots."
+            "\n - Leave blank to skip. "
+            "\n - Enter 'quit' to quit."
+        )
+        for twprge in undefined:
+            for sec_num, lots in undefined[twprge].items():
+                trs = pytrs.TRS(f"{twprge}{str(sec_num).rjust(2, '0')}")
+                for lot in lots:
+                    while True:
+                        defin = input(f"{trs}: {lot} = ")
+                        if not defin:
+                            break
+                        if defin.lower() == 'quit':
+                            return None
+                        tract = pytrs.Tract(defin, parse_qq=True, config='clean_qq')
+                        if not tract.qqs:
+                            msg = (
+                                "No aliquots could be identified in that response. "
+                                "Try again?\n"
+                                "(Leave blank to skip; 'quit' to quit.)"
+                            )
+                            print(msg)
+                        else:
+                            self.define_lot(trs, lot, defin)
+                            break
+        return None
+
+
     def get_all_definitions(
             self,
             include_defaults: bool = None,
