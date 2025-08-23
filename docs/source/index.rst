@@ -60,3 +60,8 @@ These classes contribute to the behavior and/or appearance of the plats.
 .. toctree::
     modules/settings
     modules/lot_definer
+
+These are custom warnings (subclasses of ``UserWarning``):
+
+.. toctree::
+    modules/warnings

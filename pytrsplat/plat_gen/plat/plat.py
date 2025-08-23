@@ -8,9 +8,10 @@ from PIL import Image, ImageDraw
 import pytrs
 from pytrs.parser.tract.aliquot_simplify import AliquotNode
 
+from .lot_definer import LotDefiner
+from .warnings import UnplattableWarning, UndefinedLotWarning
 from ..plat_settings import Settings
 from ...utils import calc_midpt, get_box, get_box_outline
-from .lot_definer import LotDefiner
 
 __all__ = [
     'Plat',
@@ -662,23 +663,20 @@ class PlatSection(SettingsOwned, ImageOwned):
         platted_aliquots = set()
         for tract in self.queue:
             self.owner.lot_definer.process_tract(tract, commit=True)
-            if not tract.qqs and not tract.lots_as_qqs and not tract.undefined_lots:
-                message = (
-                    "No lots or aliquots could be identified for tract: "
-                    f"<{tract.quick_desc_short()}>"
-                )
-                warn(message, UserWarning)
+            if not tract.qqs and not tract.lots_as_qqs:
+                if not tract.undefined_lots:
+                    warning = UnplattableWarning.no_lots_qqs(tract)
+                else:
+                    warning = UnplattableWarning.only_undefined_lots(tract)
+                warn(warning)
                 unplattable_tracts.append(tract)
             self.aliquot_tree.register_all_aliquots(tract.qqs)
             platted_aliquots.update(tract.qqs)
             self.aliquot_tree.register_all_aliquots(tract.lots_as_qqs)
             platted_aliquots.update(tract.lots_as_qqs)
             if tract.undefined_lots:
-                message = (
-                    "Undefined lots that could not be shown on the plat: "
-                    f"<{tract.trs}: {', '.join(tract.undefined_lots)}>"
-                )
-                warn(message, UserWarning)
+                warning = UndefinedLotWarning.from_tract(tract)
+                warn(warning)
         if len(platted_aliquots) > 0:
             self.aliquot_tree.configure()
             self.aliquot_tree.fill()
@@ -1561,11 +1559,8 @@ class MegaPlat(IPlatOwner, QueueMany):
             if not tract.trs_is_undef(sec=False) and not tract.trs_is_error(sec=False):
                 out_queue.append(tract)
             else:
-                message = (
-                    "Undefined or otherwise erroneous Twp/Rge. Excluding from plat. "
-                    f"<{tract.quick_desc_short()}>"
-                )
-                warn(message, UserWarning)
+                warning = UnplattableWarning.unclear_twprge(tract)
+                warn(warning)
         return out_queue
 
     def _get_twprge_spans(self, queue: pytrs.TractList):
