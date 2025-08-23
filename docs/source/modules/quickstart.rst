@@ -8,8 +8,10 @@ and you can output to a single PDF or separate image files.
 Reference the section on :ref:`default lots <default_lots>`,
 which might be enough for handling lots in 'typical' sections.
 
-If your land description has unpredictable lots, you'll probably want to define
-lots in a :ref:`csv file and load them <lot_defs_csv>`.
+If your land description has unpredictable lots, you may want to define
+lots in a :ref:`csv file and load them <lot_defs_csv>`. Alternatively,
+you can use the :ref:`prompt_define=True <prompt_define>` parameter to
+ask the user to define them individually in the console.
 
 
 Typical Workflow
@@ -85,7 +87,9 @@ and another for T154N-R97W.
     # <Use `.add_description()` for any other lands that we want to add.>
 
     # Executing the queue will fill in the plat.
-    plat_group.execute_queue()
+    # Passing `prompt_define=True` will ask the user to define any lots
+    # that haven't already been defined as their corresponding aliquots.
+    plat_group.execute_queue(prompt_define=True)
 
     # Save to a ZIP file containing multiple PNG images.
     plat_group.output(fp=r'some\path\results.zip', image_format='png')
