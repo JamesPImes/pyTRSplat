@@ -225,7 +225,7 @@ class LotDefinerOwner(QueueSingle):
             allow_defaults: bool = None,
             fp: str | Path = None,
             **headers,
-    ) -> dict[str, dict[str, list[str]]]:
+    ) -> dict[str, list[str]]:
         """
         Find all tracts in the queue that have one or more lots that
         have not been defined. Optionally write them to a .csv file at
@@ -248,9 +248,8 @@ class LotDefinerOwner(QueueSingle):
             headers. (Reference the docs for
             ``LotDefiner.save_to_csv()`` for the appropriate
             parameters.)
-        :return: A nested dict, keyed by Twp/Rge (``'154n97w'``), then
-            keyed by section number (``1``), and the deep values being a
-            sorted list of lots for that Twp/Rge/Sec.
+        :return: A dict, keyed by Twp/Rge/Sec (``'154n97w01'``), whose
+            values are a sorted list of lots for that Twp/Rge/Sec.
         """
         return self.lot_definer.find_undefined_lots(
             tracts=self.queue, allow_defaults=allow_defaults, fp=fp, **headers)
