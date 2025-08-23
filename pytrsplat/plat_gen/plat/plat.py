@@ -1099,16 +1099,13 @@ class Plat(IPlatOwner, QueueSingle):
             rge: str = None,
             settings: Settings = None,
             lot_definer: LotDefiner = None,
-            owner: SettingsOwner | None = None):
+    ):
         """
         :param twp: The Twp of the Twp/Rge represented by this Plat.
         :param rge: The Rge of the Twp/Rge represented by this Plat.
         :param settings: The ``Settings`` object to control the behavior
             and appearance of this plat. (Will be overridden by the
             settings in ``owner``, if that is passed.)
-        :param owner: (Optional) The ``PlatGroup`` object (or other)
-            that this ``Plat`` belongs to. (If used, the ``owner`` will
-            control the settings of this ``Plat``.)
         """
         self.twp = twp
         self.rge = rge
@@ -1128,13 +1125,13 @@ class Plat(IPlatOwner, QueueSingle):
         self.body = PlatBody(twp, rge, owner=self)
         self.footer = PlatFooter(owner=self)
         # If `.owner` is used, it must include .settings attribute.
-        self.owner: ISettingsLotDefinerOwner | None = owner
+        self.owner: ISettingsLotDefinerOwner | None = None
         # ._settings will not be used if this Plat has an owner.
         self._settings: Settings = settings
-        if settings is None and owner is None:
+        if settings is None:
             self._settings = DEFAULT_SETTINGS
         self._lot_definer: LotDefiner | None = lot_definer
-        if lot_definer is None and owner is None:
+        if lot_definer is None:
             self._lot_definer = LotDefiner()
         # ._all_lot_defs_cached will not be used if this Plat has an owner.
         # It's a cache of lot definitions (including defaults). Gets used while
@@ -1174,6 +1171,17 @@ class Plat(IPlatOwner, QueueSingle):
                 ' Change the `lot_definer` in the owner object instead.'
             )
         self._new_lot_definer = new_lot_definer
+
+    def _set_owner(self, owner: ISettingsLotDefinerOwner):
+        """
+        INTERNAL USE:
+
+        Set this plat's owner, whose ``.settings`` and ``.lot_definer``
+        will control.
+        """
+        self._settings = None
+        self._lot_definer = None
+        self.owner = owner
 
     @property
     def all_lot_defs_cached(self):
@@ -1290,7 +1298,7 @@ class Plat(IPlatOwner, QueueSingle):
         return self.footer.write_text(txt)
 
 
-class PlatGroup(SettingsOwner, QueueMany):
+class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
     """
     A collection of Plats that can span multiple Twp/Rge. Access the
     plats in ``.plats`` (keyed by a ``twprge`` string in the ``pytrs``
@@ -1337,7 +1345,10 @@ class PlatGroup(SettingsOwner, QueueMany):
         a plat already exists for the Twp/Rge, this will raise a
         ``KeyError``.
         """
-        plat = Plat(twp, rge, owner=self)
+        plat = Plat(twp, rge)
+        # Register self as owner, in order to use this PlatGroup's
+        # .settings and .lot_definer.
+        plat._set_owner(owner=self)
         trs = pytrs.TRS.from_twprgesec(twp, rge, sec=None)
         twprge = trs.twprge
         if twprge in self.plats:
