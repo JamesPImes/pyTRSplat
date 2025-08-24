@@ -1,4 +1,5 @@
 import unittest
+import os
 from pathlib import Path
 
 try:
@@ -10,11 +11,30 @@ except ImportError:
     from pytrsplat import LotDefiner
 
 RESOURCE_DIR = Path(r"_resources")
-
+TEST_RESULTS_DIR = Path(r"_temp")
 
 class LotDefinerTests(unittest.TestCase):
 
     csv_fp: Path = RESOURCE_DIR / 'test_lot_definitions.csv'
+    out_dir: Path = TEST_RESULTS_DIR / 'lot_definer'
+
+    @classmethod
+    def _delete_temp(cls):
+        try:
+            os.unlink(cls.out_dir)
+        except FileNotFoundError:
+            pass
+        except PermissionError:
+            pass
+
+    @classmethod
+    def setUpClass(cls):
+        cls._delete_temp()
+        cls.out_dir.mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._delete_temp()
 
     def test_init(self):
         ld = LotDefiner(allow_defaults=True)
@@ -36,6 +56,17 @@ class LotDefinerTests(unittest.TestCase):
         self.assertTrue(ld.definitions.get('12s58e14', None) is not None)
         self.assertEqual(len(ld.definitions.keys()), 3)
 
+    def test_save_to_csv(self):
+        ld_orig = LotDefiner.from_csv(self.csv_fp)
+        out_fp = TEST_RESULTS_DIR / 'saved_lot_definitions.csv'
+        # Save to temp, then reload it.
+        ld_orig.save_to_csv(out_fp)
+        ld_reloaded = LotDefiner.from_csv(out_fp)
+        self.assertEqual(
+            len(ld_reloaded.definitions.keys()), len(ld_orig.definitions.keys()))
+        self.assertTrue(ld_reloaded.definitions.get('154n97w08', None) is not None)
+        self.assertTrue(ld_reloaded.definitions.get('12s58e14', None) is not None)
+        self.assertEqual(ld_reloaded.definitions, ld_orig.definitions)
 
 if __name__ == '__main__':
     unittest.main()
