@@ -82,7 +82,7 @@ class LotDefinerTests(unittest.TestCase):
         self.assertEqual(sec_def['L1'], 'NENE')
         self.assertEqual(sec_def['L2'], 'NWNE')
 
-    def test_defaults(self):
+    def test_defaults_40ac(self):
         ld = LotDefiner(allow_defaults=True, standard_lot_size=40)
         defaults = ld.defaults('154n', '97w')
         self.assertEqual(len(defaults.keys()), 11)
@@ -112,6 +112,35 @@ class LotDefinerTests(unittest.TestCase):
                     defaults[f"154n97w{str(sec_num).rjust(2, '0')}"]
                 )
 
+    def test_defaults_80ac(self):
+        ld = LotDefiner(allow_defaults=True, standard_lot_size=80)
+        defaults = ld.defaults('154n', '97w')
+        self.assertEqual(len(defaults.keys()), 11)
+        expected = {
+            '154n97w01',
+            '154n97w02',
+            '154n97w03',
+            '154n97w04',
+            '154n97w05',
+            '154n97w06',
+            '154n97w07',
+            '154n97w18',
+            '154n97w19',
+            '154n97w30',
+            '154n97w31',
+        }
+        self.assertEqual(set(defaults.keys()), expected)
+        expected_defs = {
+            (1, 2, 3, 4, 5): LotDefiner.DEF_01_THRU_05_80AC,
+            (6,): LotDefiner.DEF_06_80AC,
+            (7, 18, 19, 30, 31): LotDefiner.DEF_07_18_19_30_31_80AC,
+        }
+        for group, defs in expected_defs.items():
+            for sec_num in group:
+                self.assertEqual(
+                    defs,
+                    defaults[f"154n97w{str(sec_num).rjust(2, '0')}"]
+                )
 
 if __name__ == '__main__':
     unittest.main()
