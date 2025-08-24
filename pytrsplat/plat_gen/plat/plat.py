@@ -1000,7 +1000,14 @@ class PlatFooter(SettingsOwned, ImageOwned):
                 cand_line = f"{line} {word}"
             else:
                 cand_line = word
-            c_width = stn.footerfont.getlength(cand_line)
+            bbox = stn.footerfont.getbbox(cand_line)
+            c_width = bbox[2] - bbox[0]
+            c_height = bbox[3] - bbox[1]
+            if c_height > avail_h:
+                if line:
+                    writable_lines.append(line)
+                unwritable = ' '.join(words[i:])
+                break
             if c_width <= avail_w:
                 line = cand_line
             else:
