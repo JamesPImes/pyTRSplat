@@ -206,6 +206,18 @@ class LotDefinerTests(unittest.TestCase):
         self.assertEqual(tract.lots_as_qqs, ['NENE'])
         self.assertEqual(tract.undefined_lots, ['L5'])
 
+    def test_process_tracts(self):
+        tracts = [
+            pytrs.Tract('Lots 1, 5', '154n97w01', parse_qq=True),
+            pytrs.Tract('Lots 2, 3', '154n97w01', parse_qq=True),
+        ]
+        tracts = pytrs.TractList(tracts)
+        ld = LotDefiner(allow_defaults=True, standard_lot_size=40)
+        ld.process_tracts(tracts)
+        self.assertEqual(tracts[0].lots_as_qqs, ['NENE'])
+        self.assertEqual(tracts[0].undefined_lots, ['L5'])
+        self.assertEqual(tracts[1].lots_as_qqs, ['NWNE', 'NENW'])
+        self.assertEqual(tracts[1].undefined_lots, [])
 
 if __name__ == '__main__':
     unittest.main()
