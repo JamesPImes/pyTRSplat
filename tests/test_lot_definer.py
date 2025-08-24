@@ -167,6 +167,26 @@ class LotDefinerTests(unittest.TestCase):
         undefined = ld.find_undefined_lots(plss.tracts)
         self.assertEqual(undefined, {'154n97w01': ['L5']})
 
+    def test_get_all_definitions(self):
+        ld = LotDefiner.from_csv(self.csv_fp, allow_defaults=True, standard_lot_size=40)
+        all_definitions = ld.get_all_definitions(mandatory_twprges=['12n34w'])
+        # Check actually defined lots.
+        self.assertEqual(all_definitions['154n97w08'], {'L4': 'S2SE'})
+        self.assertEqual(all_definitions['12s58e14'], {'L1': 'SWSE'})
+        # Check defaults in existing twprges + mandated twprges.
+        expected_defs = {
+            (1, 2, 3, 4, 5): LotDefiner.DEF_01_THRU_05_40AC,
+            (6,): LotDefiner.DEF_06_40AC,
+            (7, 18, 19, 30, 31): LotDefiner.DEF_07_18_19_30_31_40AC,
+        }
+        for group, defs in expected_defs.items():
+            for twprge in ('154n97w', '12s58e', '12n34w'):
+                for sec_num in group:
+                    trs = f"{twprge}{str(sec_num).rjust(2, '0')}"
+                    self.assertEqual(
+                        defs,
+                        all_definitions[trs]
+                )
 
 if __name__ == '__main__':
     unittest.main()
