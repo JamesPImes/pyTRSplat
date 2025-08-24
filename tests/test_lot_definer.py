@@ -2,6 +2,8 @@ import unittest
 import os
 from pathlib import Path
 
+import pytrs
+
 try:
     from pytrsplat import LotDefiner
 except ImportError:
@@ -152,13 +154,18 @@ class LotDefinerTests(unittest.TestCase):
         self.assertEqual(undefined, ['L5'])
 
     def test_convert_lots_allow_defaults(self):
-        # Row 1 of csv file:  154n,97w,8,4,S2SE
         ld = LotDefiner.from_csv(self.csv_fp, allow_defaults=True, standard_lot_size=40)
         lots = ['L1', 'L5']
         trs = '154n97w01'
         converted, undefined = ld.convert_lots(lots, trs)
         self.assertEqual(converted, ['NENE'])
         self.assertEqual(undefined, ['L5'])
+
+    def test_find_undefined_lots(self):
+        ld = LotDefiner.from_csv(self.csv_fp, allow_defaults=True, standard_lot_size=40)
+        plss = pytrs.PLSSDesc('T154N-R97W Sec 1: Lots 1, 5', parse_qq=True)
+        undefined = ld.find_undefined_lots(plss.tracts)
+        self.assertEqual(undefined, {'154n97w01': ['L5']})
 
 
 if __name__ == '__main__':
