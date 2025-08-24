@@ -774,7 +774,7 @@ class PlatBody(SettingsOwned, ImageOwned):
                 self.sections[sec_num] = plat_sec
                 k += 1
         # A dummy section, for tracts with undefined/error section number.
-        self.sections[None] = PlatSection(None, grid_offset=None)
+        self.sections[None] = PlatSection(None, grid_offset=None, owner=self.owner)
         # Coord of top-left of the grid.
         self.xy: tuple[int, int] = None
         self.is_lot_writer = is_lot_writer
@@ -813,7 +813,9 @@ class PlatBody(SettingsOwned, ImageOwned):
                 'This `PlatBody` is not a lot writer. '
                 'Pass `is_lot_writer=True` at init.'
             )
-        for sec_plat in self.sections.values():
+        for sec_num, sec_plat in self.sections.items():
+            if sec_num is None:
+                continue
             sec_plat.write_lot_numbers(at_depth)
         return None
 
