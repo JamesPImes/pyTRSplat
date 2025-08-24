@@ -1,5 +1,5 @@
 import unittest
-import os
+import shutil
 from pathlib import Path
 
 import pytrs
@@ -23,7 +23,7 @@ class LotDefinerTests(unittest.TestCase):
     @classmethod
     def _delete_temp(cls):
         try:
-            os.unlink(cls.out_dir)
+            shutil.rmtree(cls.out_dir)
         except FileNotFoundError:
             pass
         except PermissionError:
@@ -65,7 +65,7 @@ class LotDefinerTests(unittest.TestCase):
 
     def test_save_to_csv(self):
         ld_orig = LotDefiner.from_csv(self.csv_fp)
-        out_fp = TEST_RESULTS_DIR / 'saved_lot_definitions.csv'
+        out_fp = self.out_dir / 'saved_lot_definitions.csv'
         # Save to temp, then reload it.
         ld_orig.save_to_csv(out_fp)
         ld_reloaded = LotDefiner.from_csv(out_fp)
