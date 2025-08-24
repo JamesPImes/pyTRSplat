@@ -13,8 +13,8 @@ except ImportError:
 RESOURCE_DIR = Path(r"_resources")
 TEST_RESULTS_DIR = Path(r"_temp")
 
-class LotDefinerTests(unittest.TestCase):
 
+class LotDefinerTests(unittest.TestCase):
     csv_fp: Path = RESOURCE_DIR / 'test_lot_definitions.csv'
     out_dir: Path = TEST_RESULTS_DIR / 'lot_definer'
 
@@ -141,6 +141,25 @@ class LotDefinerTests(unittest.TestCase):
                     defs,
                     defaults[f"154n97w{str(sec_num).rjust(2, '0')}"]
                 )
+
+    def test_convert_lots(self):
+        # Row 1 of csv file:  154n,97w,8,4,S2SE
+        ld = LotDefiner.from_csv(self.csv_fp)
+        lots = ['L4', 'L5']
+        trs = '154n97w08'
+        converted, undefined = ld.convert_lots(lots, trs)
+        self.assertEqual(converted, ['SESE', 'SWSE'])
+        self.assertEqual(undefined, ['L5'])
+
+    def test_convert_lots_allow_defaults(self):
+        # Row 1 of csv file:  154n,97w,8,4,S2SE
+        ld = LotDefiner.from_csv(self.csv_fp, allow_defaults=True, standard_lot_size=40)
+        lots = ['L1', 'L5']
+        trs = '154n97w01'
+        converted, undefined = ld.convert_lots(lots, trs)
+        self.assertEqual(converted, ['NENE'])
+        self.assertEqual(undefined, ['L5'])
+
 
 if __name__ == '__main__':
     unittest.main()
