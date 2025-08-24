@@ -188,5 +188,24 @@ class LotDefinerTests(unittest.TestCase):
                         all_definitions[trs]
                 )
 
+    def test_process_tract(self):
+        tract = pytrs.Tract('Lots 1, 5', '154n97w01', parse_qq=True)
+        ld = LotDefiner(allow_defaults=True, standard_lot_size=40)
+
+        converted, undefined = ld.process_tract(tract, commit=False)
+        self.assertEqual(converted, ['NENE'])
+        self.assertEqual(undefined, ['L5'])
+        # Ad-hoc attributes NOT added with `commit=False`.
+        self.assertFalse(hasattr(tract, 'lots_as_qqs'))
+        self.assertFalse(hasattr(tract, 'undefined_lots'))
+
+        converted, undefined = ld.process_tract(tract, commit=True)
+        self.assertEqual(converted, ['NENE'])
+        self.assertEqual(undefined, ['L5'])
+        # Check ad-hoc attributes, added with `commit=True`.
+        self.assertEqual(tract.lots_as_qqs, ['NENE'])
+        self.assertEqual(tract.undefined_lots, ['L5'])
+
+
 if __name__ == '__main__':
     unittest.main()
