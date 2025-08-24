@@ -68,5 +68,15 @@ class LotDefinerTests(unittest.TestCase):
         self.assertTrue(ld_reloaded.definitions.get('12s58e14', None) is not None)
         self.assertEqual(ld_reloaded.definitions, ld_orig.definitions)
 
+    def test_define_lot(self):
+        ld = LotDefiner()
+        ld.define_lot('154n97w11', 1, 'NENE')
+        ld.define_lot('154n97w11', 'L2', 'NWNE')
+        self.assertEqual(len(ld.definitions.keys()), 1)
+        sec_def = ld.definitions['154n97w11']
+        self.assertEqual(sec_def['L1'], 'NENE')
+        self.assertEqual(sec_def['L2'], 'NWNE')
+
+
 if __name__ == '__main__':
     unittest.main()
