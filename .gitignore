@@ -10,3 +10,4 @@ venv/
 /build/
 scratch*
 /docs/build/
+/tests/_temp/
