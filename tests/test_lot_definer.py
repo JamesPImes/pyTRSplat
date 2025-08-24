@@ -12,8 +12,8 @@ except ImportError:
     sys.path.append('../')
     from pytrsplat import LotDefiner
 
-RESOURCE_DIR = Path(r"_resources")
-TEST_RESULTS_DIR = Path(r"_temp")
+RESOURCE_DIR = Path(__file__).parent / r"_resources"
+TEST_RESULTS_DIR = Path(__file__).parent / r"_temp"
 
 
 class LotDefinerTests(unittest.TestCase):
@@ -186,7 +186,7 @@ class LotDefinerTests(unittest.TestCase):
                     self.assertEqual(
                         defs,
                         all_definitions[trs]
-                )
+                    )
 
     def test_process_tract(self):
         tract = pytrs.Tract('Lots 1, 5', '154n97w01', parse_qq=True)
@@ -218,6 +218,7 @@ class LotDefinerTests(unittest.TestCase):
         self.assertEqual(tracts[0].undefined_lots, ['L5'])
         self.assertEqual(tracts[1].lots_as_qqs, ['NWNE', 'NENW'])
         self.assertEqual(tracts[1].undefined_lots, [])
+
 
 if __name__ == '__main__':
     unittest.main()
