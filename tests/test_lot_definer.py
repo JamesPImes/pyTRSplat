@@ -37,8 +37,13 @@ class LotDefinerTests(unittest.TestCase):
         cls._delete_temp()
 
     def test_init(self):
-        ld = LotDefiner(allow_defaults=True)
-        self.assertEqual(ld.allow_defaults, True)
+        ld1 = LotDefiner()
+        self.assertEqual(ld1.allow_defaults, False)
+        self.assertEqual(ld1.standard_lot_size, 40)
+
+        ld2 = LotDefiner(allow_defaults=True, standard_lot_size=80)
+        self.assertEqual(ld2.allow_defaults, True)
+        self.assertEqual(ld2.standard_lot_size, 80)
 
     def test_from_csv(self):
         ld = LotDefiner.from_csv(self.csv_fp)
