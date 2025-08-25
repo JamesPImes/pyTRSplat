@@ -62,7 +62,8 @@ class TestPlatOutput(unittest.TestCase):
             expected_dir=self.expected_dir,
             out_dir=self.out_dir,
         )
-        msg = {f"Mismatched output(s):\n{'\n\n'.join(mismatched)}"}
+        linebreak = '\n\n'
+        msg = {f"Mismatched output(s):\n{linebreak.join(mismatched)}"}
         self.assertTrue(len(mismatched) == 0, msg)
         return None
 
