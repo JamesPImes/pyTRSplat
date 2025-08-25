@@ -16,7 +16,7 @@ RESOURCE_DIR = Path(__file__).parent / r"_resources"
 TEST_RESULTS_DIR = Path(__file__).parent / r"_temp"
 
 
-class LotDefinerTests(unittest.TestCase):
+class TestLotDefiner(unittest.TestCase):
     csv_fp: Path = RESOURCE_DIR / 'test_lot_definitions.csv'
     out_dir: Path = TEST_RESULTS_DIR / 'lot_definer'
 
