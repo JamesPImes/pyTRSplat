@@ -18,14 +18,14 @@ except ImportError:
 
     sys.path.append('../')
     from pytrsplat import PlatGroup, Settings
-    from ._utils import (
+    from _utils import (
         prepare_settings,
         get_test_settings_for_plat,
         compare_tests_with_expected_group,
         RESOURCES_DIR,
         TEST_RESULTS_DIR,
     )
-    from ._gen_test_platgroups import (
+    from _gen_test_platgroups import (
         FILENAME_TO_GENFUNC,
     )
 

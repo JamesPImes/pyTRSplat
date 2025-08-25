@@ -1,8 +1,8 @@
 try:
-    import _gen_test_plats
-    import _gen_test_megaplats
-    import _gen_test_platgroups
-    from _utils import gen_all_test_plats
+    from . import _gen_test_plats
+    from . import _gen_test_megaplats
+    from . import _gen_test_platgroups
+    from ._utils import gen_all_test_plats
 
 except ImportError:
     import sys
