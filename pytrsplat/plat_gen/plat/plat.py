@@ -1339,7 +1339,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
             later.)
         """
         if settings is None:
-            settings = Settings.preset('default')
+            settings = Settings()
         self._settings: Settings = settings
         if lot_definer is None:
             lot_definer = LotDefiner()
