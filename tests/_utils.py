@@ -2,6 +2,7 @@
 
 import os
 import platform
+from typing import Union
 from pathlib import Path
 from hashlib import sha512
 
@@ -95,7 +96,7 @@ def images_match(im1: Image.Image, im2: Image.Image):
     return im1_hash == im2_hash
 
 
-def image_matches_existing(fp: Path, image: Image.Image | list[Image.Image]):
+def image_matches_existing(fp: Path, image: Image.Image):
     """
     Check if the generated ``image`` (either a ``PIL.Image.Image`` or a
     list of them) is the same as the previous one at ``fp``.
@@ -107,7 +108,7 @@ def image_matches_existing(fp: Path, image: Image.Image | list[Image.Image]):
     return images_match(existing, image)
 
 
-def write_if_new_single(fp: Path, plat: Plat | MegaPlat, override=False):
+def write_if_new_single(fp: Path, plat: Union[Plat, MegaPlat], override=False):
     """
     Check if the ``Plat`` or ``MegaPlat`` output is different from what
     was previously generated. If any differences, save the output.
