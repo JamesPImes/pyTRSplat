@@ -1,6 +1,7 @@
 from __future__ import annotations
 import zipfile
 import io
+from typing import Union
 from warnings import warn
 from pathlib import Path
 
@@ -87,7 +88,8 @@ class QueueSingle:
         raise ValueError(msg)
 
     def add_tracts(
-            self, tracts: list[pytrs.Tract] | pytrs.TractList | pytrs.PLSSDesc) -> None:
+            self, tracts: Union[list[pytrs.Tract], pytrs.TractList, pytrs.PLSSDesc]
+    ) -> None:
         """
         Add multiple tracts to the queue. All tracts must share the same
         Twp/Rge as any tracts already existing in the queue.
@@ -170,7 +172,8 @@ class QueueMany(QueueSingle):
         return None
 
     def add_tracts(
-            self, tracts: list[pytrs.Tract] | pytrs.TractList | pytrs.PLSSDesc) -> None:
+            self, tracts: Union[list[pytrs.Tract], pytrs.TractList, pytrs.PLSSDesc]
+    ) -> None:
         """
         Add multiple tracts to the queue.
 
@@ -224,7 +227,7 @@ class LotDefinerOwner(QueueSingle):
     def find_undefined_lots(
             self,
             allow_defaults: bool = None,
-            fp: str | Path = None,
+            fp: Union[str, Path] = None,
             **headers,
     ) -> dict[str, list[str]]:
         """
@@ -337,7 +340,9 @@ class ImageOwner:
     footer_draw: ImageDraw.Draw
     image_layers: tuple[Image.Image]
 
-    def output(self, fp: str | Path = None, image_format: str = None, **_kw) -> Image.Image | None:
+    def output(
+            self, fp: Union[str, Path] = None, image_format: str = None, **_kw
+    ) -> Union[Image.Image, None]:
         """
         Compile and return the merged image of the plat. Optionally
         save the results to disk, either as an image or as a .zip file
@@ -758,7 +763,7 @@ class PlatBody(SettingsOwned, ImageOwned):
         self.owner: IPlatOwner = owner
         self.twp = twp
         self.rge = rge
-        self.sections: dict[int | None, PlatSection] = {}
+        self.sections: dict[Union[int, None], PlatSection] = {}
         sections_per_side = 6
         k = 0
         # Store each section's "offset" from the top-left of the grid.
@@ -972,7 +977,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
             text,
             xy_0: tuple[int, int],
             xy_limit: tuple[int, int] = None
-    ) -> (list[str], str | None):
+    ) -> (list[str], Union[str, None]):
         """
         Check if the ``text`` can be written within the confines of this
         footer. Returns two parts: (1) the reformatted text (broken onto
@@ -1023,7 +1028,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
 
     def write_tracts(
             self,
-            tracts: pytrs.TractList | pytrs.PLSSDesc,
+            tracts: Union[list[pytrs.Tract], pytrs.TractList, pytrs.PLSSDesc],
             write_partial=True,
     ) -> list[pytrs.Tract]:
         """
@@ -1050,7 +1055,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
             tract: pytrs.Tract,
             write_partial=True,
             font_rgba: tuple[int, int, int, int] = None,
-    ) -> pytrs.Tract | None:
+    ) -> Union[pytrs.Tract, None]:
         """
         Write a single tract in the footer.
 
@@ -1093,7 +1098,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
             self._write_line(x=self._trs_indent, text=line, fill=fill)
         return None
 
-    def write_text(self, txt, write_partial=False) -> str | None:
+    def write_text(self, txt, write_partial=False) -> Union[str, None]:
         """
         Write a block of text in the footer.
 
@@ -1149,12 +1154,12 @@ class Plat(IPlatOwner, QueueSingle):
         self.body = PlatBody(twp, rge, owner=self)
         self.footer = PlatFooter(owner=self)
         # If `.owner` is used, it must include .settings attribute.
-        self.owner: ISettingsLotDefinerOwner | None = None
+        self.owner: Union[ISettingsLotDefinerOwner, None] = None
         # ._settings will not be used if this Plat has an owner.
         self._settings: Settings = settings
         if settings is None:
             self._settings = DEFAULT_SETTINGS
-        self._lot_definer: LotDefiner | None = lot_definer
+        self._lot_definer: Union[LotDefiner, None] = lot_definer
         if lot_definer is None:
             self._lot_definer = LotDefiner()
         # ._all_lot_defs_cached will not be used if this Plat has an owner.
@@ -1309,7 +1314,10 @@ class Plat(IPlatOwner, QueueSingle):
         lotwriter.write_lot_numbers(at_depth)
         return None
 
-    def write_tracts(self, tracts: pytrs.TractList | pytrs.PLSSDesc = None):
+    def write_tracts(
+            self,
+            tracts: Union[list[pytrs.Tract], pytrs.TractList, pytrs.PLSSDesc] = None
+    ):
         """
         Write all the tract descriptions in the footer.
         """
@@ -1434,7 +1442,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
 
     def output(
             self,
-            fp: str | Path = None,
+            fp: Union[str, Path] = None,
             image_format: str = None,
             stack=None,
             subset_twprges: list[str] = None
@@ -1740,7 +1748,7 @@ class MegaPlat(IPlatOwner, QueueMany):
 
 def zip_output_images(
         images: list[Image.Image],
-        fp: str | Path = None,
+        fp: Union[str, Path] = None,
         image_format: str = None,
         stack: bool = None,
         twprges: list[str] = None
@@ -1793,7 +1801,7 @@ def zip_output_images(
 
 def save_output_images(
         images: list[Image.Image],
-        fp: str | Path = None,
+        fp: Union[str, Path] = None,
         image_format: str = None,
         stack: bool = None,
         twprges: list[str] = None,

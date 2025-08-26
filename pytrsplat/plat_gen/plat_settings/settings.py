@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import Union
 
 from PIL import ImageFont
 
@@ -328,7 +329,7 @@ class Settings:
             self,
             purpose: str,
             size: int = None,
-            typeface: str | Path = None,
+            typeface: Union[str, Path] = None,
             rgba: tuple[int, int, int, int] = None
     ) -> None:
         """
@@ -387,7 +388,7 @@ class Settings:
         return None
 
     def _create_set_font(
-            self, purpose: str, size: int, typeface: str | Path) -> ImageFont:
+            self, purpose: str, size: int, typeface: Union[str, Path]) -> ImageFont:
         """
         Construct an ``ImageFont`` object from the specified ``size``
         and ``typeface`` (a filepath to a ``.ttf`` file), and set it for
@@ -627,7 +628,7 @@ def _abs_path_to_rel(fp: str):
     return fp
 
 
-def _rel_path_to_abs(fp: str | Path):
+def _rel_path_to_abs(fp: Union[str, Path]):
     """
     INTERNAL USE:
 

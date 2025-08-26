@@ -1,5 +1,6 @@
 from __future__ import annotations
 import csv
+from typing import Union
 from pathlib import Path
 from copy import deepcopy
 
@@ -136,7 +137,7 @@ class LotDefiner:
             output[trs.trs] = def07_31
         return output
 
-    def define_lot(self, trs: str | pytrs.TRS, lot: int | str, definition: str):
+    def define_lot(self, trs: Union[str, pytrs.TRS], lot: Union[int, str], definition: str):
         """
         :param trs: The Twp/Rge/Sec in the pyTRS format (e.g.,
             ``'154n97w01'``).
@@ -157,7 +158,7 @@ class LotDefiner:
     @classmethod
     def from_csv(
             cls,
-            fp: Path | str,
+            fp: Union[str, Path],
             twp='twp',
             rge='rge',
             sec='sec',
@@ -209,7 +210,7 @@ class LotDefiner:
         return out
 
     def read_csv(
-            self, fp: Path | str, twp='twp', rge='rge', sec='sec', lot='lot', qq='qq'):
+            self, fp: Union[str, Path], twp='twp', rge='rge', sec='sec', lot='lot', qq='qq'):
         """
         Load lot definitions from csv file into this existing
         ``LotDefiner``. The data should be compatible with ``pyTRS``
@@ -262,8 +263,8 @@ class LotDefiner:
     def _save_definitions_to_csv(
             # If defined:   {'154n97w01': {'L1': 'NENE', 'L2': 'NWNE'} }
             # If undefined: {'154n97w01': ['L1', 'L2'] }
-            definitions: dict[str, dict[int | str, str]] | dict[str, list[int | str]],
-            fp: Path | str,
+            definitions: Union[dict[str, dict[Union[int, str], str]], dict[str, list[Union[int, str]]]],
+            fp: Union[str, Path],
             twp='twp',
             rge='rge',
             sec='sec',
@@ -314,7 +315,7 @@ class LotDefiner:
         return None
 
     def save_to_csv(
-            self, fp: Path | str, twp='twp', rge='rge', sec='sec', lot='lot', qq='qq'):
+            self, fp: Union[str, Path], twp='twp', rge='rge', sec='sec', lot='lot', qq='qq'):
         """
         Save the definitions (excluding defaults) to a .csv file that
         can be reloaded later with ``.from_csv()`` or ``.read_csv()``.
@@ -491,7 +492,8 @@ class LotDefiner:
         return qqs, undefined_lots
 
     def process_tracts(
-            self, tracts: pytrs.TractList | pytrs.PLSSDesc) -> None:
+            self, tracts: Union[list[pytrs.Tract], pytrs.TractList, pytrs.PLSSDesc]
+    ) -> None:
         """
         Convert ``.lots`` in the ``tracts`` into QQs, and add them to
         ad-hoc attribute ``.lots_as_qqs`` for each tract. Also add an
@@ -507,9 +509,9 @@ class LotDefiner:
 
     def find_undefined_lots(
             self,
-            tracts: pytrs.TractList | pytrs.PLSSDesc,
+            tracts: Union[list[pytrs.Tract], pytrs.TractList, pytrs.PLSSDesc],
             allow_defaults: bool = None,
-            fp: str | Path = None,
+            fp: Union[str, Path] = None,
             **headers,
     ) -> dict[str, list[str]]:
         """
