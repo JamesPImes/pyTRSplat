@@ -34,6 +34,8 @@ class Settings:
     To change font size and/or typeface, be sure to use ``.set_font()``.
     """
     SETTINGS_DIR = Path(os.path.dirname(__file__))
+    # Where we'll look for .json files of preset data.
+    PRESET_DIRECTORY = SETTINGS_DIR / "_presets"
 
     TYPEFACES = {
         # 'Arial'-like font
@@ -68,9 +70,6 @@ class Settings:
     }
 
     DEFAULT_TYPEFACE = TYPEFACES['Sans-Serif']
-
-    # Where we'll look for .json files of preset data.
-    PRESET_DIRECTORY = SETTINGS_DIR / "_presets"
 
     # Default page-size dimensions.
     LETTER_72_PPI = (612, 792)
@@ -388,23 +387,27 @@ class Settings:
         return None
 
     def _create_set_font(
-            self, purpose: str, size: int, typeface: Union[str, Path]) -> ImageFont:
+            self, purpose: str, size: int, typeface_fp: Union[str, Path]) -> ImageFont:
         """
         Construct an ``ImageFont`` object from the specified ``size``
-        and ``typeface`` (a filepath to a ``.ttf`` file), and set it for
+        and ``typeface_fp`` (a filepath to a ``.ttf`` file), and set it for
         the specified ``purpose`` (being ``'header'``, ``'footer'``,
         ``'sec'``, or ``'lot'``).
         """
         purpose = purpose.lower()
         if purpose not in ('header', 'footer', 'sec', 'lot'):
             raise ValueError(f"Illegal `purpose`: {purpose!r}")
+        typeface_fp = Path(typeface_fp)
         try:
             # Try as absolute path first.
-            fnt = ImageFont.truetype(typeface, size)
+            fnt = ImageFont.truetype(typeface_fp, size)
         except OSError as no_font_error:
             # Try instead as relative path (within 'pytrsplat/plat_gen/plat_settings/'.)
             try:
-                fnt = ImageFont.truetype(_rel_path_to_abs(typeface), size)
+                if not typeface_fp.is_absolute():
+                    fnt = ImageFont.truetype(_rel_path_to_abs(typeface_fp), size)
+                else:
+                    raise
             except OSError:
                 raise no_font_error
         setattr(self, f'{purpose}font', fnt)
@@ -639,6 +642,9 @@ def _rel_path_to_abs(fp: Union[str, Path]):
     :param fp: Relative filepath to convert to an absolute path.
     :return: A ``Path`` object for an absolute path.
     """
+    fp = Path(fp)
+    if fp.is_absolute():
+        return fp
     return Settings.SETTINGS_DIR / fp
 
 
