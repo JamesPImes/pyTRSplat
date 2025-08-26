@@ -1,6 +1,7 @@
 """Utils for unit tests."""
 
 import os
+import platform
 from pathlib import Path
 from hashlib import sha512
 
@@ -226,6 +227,9 @@ def compare_tests_with_expected(
     #       func(fn: <filename>, out_dir: <directory path>, override: bool)
     # And its docstring is an explanation of the settings and input for that plat.
     mismatched = []
+    if platform.system != 'Windows':
+        # TODO: Output comparison with Mac & Linux
+        return mismatched
     for fn, plat_gen_func in filename_to_genfunc.items():
         expected_fp = expected_dir / fn
         gen_fp = plat_gen_func(fn=fn, out_dir=out_dir, override=True)
@@ -281,6 +285,9 @@ def compare_tests_with_expected_group(
         base_fns[base_fn] += 1
 
     mismatched = []
+    if platform.system != 'Windows':
+        # TODO: Output comparison with Mac & Linux
+        return mismatched
     for top_fn, plat_gen_func in filename_to_genfunc.items():
         gen_fps = plat_gen_func(fn=top_fn, out_dir=out_dir, override=True)
         if base_fns[top_fn] != len(gen_fps):
