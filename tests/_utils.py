@@ -228,8 +228,9 @@ def compare_tests_with_expected(
     #       func(fn: <filename>, out_dir: <directory path>, override: bool)
     # And its docstring is an explanation of the settings and input for that plat.
     mismatched = []
-    if platform.system != 'Windows':
-        # TODO: Output comparison with Mac & Linux
+    if platform.system not in ('Windows', 'Darwin'):
+        # Currently only working on Windows and Mac (Darwin).
+        # TODO: Output comparison with Linux.
         return mismatched
     for fn, plat_gen_func in filename_to_genfunc.items():
         expected_fp = expected_dir / fn
@@ -286,8 +287,9 @@ def compare_tests_with_expected_group(
         base_fns[base_fn] += 1
 
     mismatched = []
-    if platform.system != 'Windows':
-        # TODO: Output comparison with Mac & Linux
+    if platform.system not in ('Windows', 'Darwin'):
+        # Currently only working on Windows and Mac (Darwin).
+        # TODO: Output comparison with Linux.
         return mismatched
     for top_fn, plat_gen_func in filename_to_genfunc.items():
         gen_fps = plat_gen_func(fn=top_fn, out_dir=out_dir, override=True)
