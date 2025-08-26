@@ -320,6 +320,9 @@ class Settings:
             path_components = [v]
             if '/' in v:
                 path_components = v.split('/')
+                if v[0] == '/':
+                    # Put macOS's initial slash back in.
+                    v.insert(0, '/')
             v = os.path.join(*path_components)
             d[att] = v
         return cls.from_dict(d)
