@@ -57,9 +57,9 @@ Section 14: NE/4, NE/4NW/4, S/2NW/4NW/4
 
 ## Desktop Application
 
-See [this archived repo](https://github.com/JamesPImes/pyTRSplat-archived) for the desktop application.
+See [release v0.4.2](https://github.com/JamesPImes/pyTRSplat/tree/v0.4.2) for the desktop application.
 
-*(No longer maintained as part of this library as of v0.5.0.)*
+*(No longer maintained as part of this library; removed as of v0.5.0.)*
 
 ![plat_gui_01](_readme_images/plat_gui_01.gif)
 
