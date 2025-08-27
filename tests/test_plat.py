@@ -37,6 +37,7 @@ DESC_2 = 'T154N-R97W Sec 8: Lot 4'
 
 
 class TestPlatBehavior(unittest.TestCase):
+
     expected_dir: Path = RESOURCES_DIR / 'expected_images' / 'plat'
     out_dir: Path = TEST_RESULTS_DIR / 'plat'
 
@@ -101,7 +102,7 @@ class TestPlatBehavior(unittest.TestCase):
         plat_nolots.lot_definer.allow_defaults = True
         plat_nolots.add_description(DESC_1)
         plat_nolots.execute_queue()
-        plat_nolots_ouptut = plat_nolots.output()
+        plat_nolots_output = plat_nolots.output()
 
         settings.write_lot_numbers = True
         plat_withlots = Plat(settings=settings)
@@ -109,7 +110,7 @@ class TestPlatBehavior(unittest.TestCase):
         plat_withlots.lot_definer.allow_defaults = True
         plat_withlots.execute_queue()
         plat_withlots_output = plat_withlots.output()
-        self.assertFalse(images_match(plat_nolots_ouptut, plat_withlots_output))
+        self.assertFalse(images_match(plat_nolots_output, plat_withlots_output))
 
     def test_write_tracts(self):
         settings = get_test_settings_for_plat()
@@ -117,7 +118,7 @@ class TestPlatBehavior(unittest.TestCase):
         plat_notractswritten = Plat(settings=settings)
         plat_notractswritten.add_description(DESC_1)
         plat_notractswritten.execute_queue()
-        plat_notractswritten_ouptut = plat_notractswritten.output()
+        plat_notractswritten_output = plat_notractswritten.output()
 
         settings.write_tracts = True
         plat_withtractswritten = Plat(settings=settings)
@@ -125,7 +126,7 @@ class TestPlatBehavior(unittest.TestCase):
         plat_withtractswritten.execute_queue()
         plat_withtractswritten_output = plat_withtractswritten.output()
         self.assertFalse(
-            images_match(plat_notractswritten_ouptut, plat_withtractswritten_output))
+            images_match(plat_notractswritten_output, plat_withtractswritten_output))
 
     def test_change_rgba(self):
         settings = get_test_settings_for_plat()
