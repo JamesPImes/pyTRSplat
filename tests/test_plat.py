@@ -55,7 +55,7 @@ class TestPlatBehavior(unittest.TestCase):
         plat = Plat(settings=settings)
         plat.add_description(DESC_1)
         plat.execute_queue()
-        fp = self.out_dir / 'plat_test_dim_default_small.png'
+        fp = self.out_dir / 'plat_test_square_s.png'
         returned_im = plat.output(fp)
         opened_im = Image.open(fp)
         self.assertEqual(opened_im.size, settings.dim)
