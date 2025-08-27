@@ -84,7 +84,7 @@ class TestPlatGroupBehavior(unittest.TestCase):
         self.assertFalse(images_match(plat_nodefs_output[0], plat_withdefs_output[0]))
 
     def test_dim_preset_default(self):
-        settings = Settings.preset('letter')
+        settings = Settings.preset('default')
         pg = PlatGroup(settings=settings)
         pg.add_description(DESC_1)
         pg.execute_queue()

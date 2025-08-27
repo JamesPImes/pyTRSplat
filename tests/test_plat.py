@@ -85,7 +85,7 @@ class TestPlatBehavior(unittest.TestCase):
         self.assertFalse(images_match(plat_nodefs_output, plat_withdefs_output))
 
     def test_dim_preset_default(self):
-        settings = Settings.preset('letter')
+        settings = Settings.preset('default')
         plat = Plat(settings=settings)
         plat.add_description(DESC_1)
         plat.execute_queue()
