@@ -271,10 +271,10 @@ class Settings:
             d[att] = fp
         return d
 
-    def to_json(self, filepath: Path) -> None:
-        """Save settings to a ``.json`` file at the ``filepath``."""
+    def to_json(self, fp: Union[str, Path]) -> None:
+        """Save settings to a ``.json`` file at the filepath ``fp``."""
         d = self.to_dict()
-        with open(filepath, 'w', newline='') as f:
+        with open(fp, 'w', newline='') as f:
             json_str = json.dumps(d, indent=2)
             f.write(json_str)
         return None
@@ -289,9 +289,9 @@ class Settings:
         return config
 
     @classmethod
-    def from_json(cls, filepath: Path) -> Settings:
-        """Load settings from a ``.json`` file at the ``filepath``."""
-        with open(filepath, 'r') as f:
+    def from_json(cls, fp: Union[str, Path]) -> Settings:
+        """Load settings from a ``.json`` file at the filepath ``fp``."""
+        with open(fp, 'r') as f:
             d = json.load(fp=f)
         line_stroke = {}
         for k, v in d['line_stroke'].items():
