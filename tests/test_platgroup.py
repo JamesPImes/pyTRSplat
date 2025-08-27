@@ -49,7 +49,7 @@ class TestPlatGroupBehavior(unittest.TestCase):
         plat = PlatGroup(settings=settings)
         plat.add_description(DESC_1)
         plat.execute_queue()
-        fp = self.out_dir / 'platgroup_test_dim_default_small.png'
+        fp = self.out_dir / 'platgroup_test_square_s.png'
         returned_images = plat.output(fp)
         returned_im = returned_images[0]
         opened_im = Image.open(fp)
