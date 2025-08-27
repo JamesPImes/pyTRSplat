@@ -287,7 +287,7 @@ def compare_tests_with_expected_group(
         base_fns[base_fn] += 1
 
     mismatched = []
-    if platform.system not in ('Windows', 'Darwin'):
+    if platform.system() not in ('Windows', 'Darwin'):
         # Currently only working on Windows and Mac (Darwin).
         # TODO: Output comparison with Linux.
         return mismatched
