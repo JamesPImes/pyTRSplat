@@ -228,7 +228,7 @@ def compare_tests_with_expected(
     #       func(fn: <filename>, out_dir: <directory path>, override: bool)
     # And its docstring is an explanation of the settings and input for that plat.
     mismatched = []
-    if platform.system not in ('Windows', 'Darwin'):
+    if platform.system() not in ('Windows', 'Darwin'):
         # Currently only working on Windows and Mac (Darwin).
         # TODO: Output comparison with Linux.
         return mismatched
