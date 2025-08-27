@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 from PIL import Image
+from shutil import rmtree
 
 try:
     from pytrsplat import Plat, Settings
@@ -44,6 +45,10 @@ class TestPlatBehavior(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         prepare_settings()
+        if cls.out_dir.exists():
+            rmtree(cls.out_dir)
+        else:
+            cls.out_dir.mkdir(exist_ok=True, parents=True)
 
     def test_init(self):
         plat = Plat('154n', '97w')
@@ -212,11 +217,15 @@ class TestPlatOutput(unittest.TestCase):
     """Test the output results for Plat."""
 
     expected_dir: Path = RESOURCES_DIR / 'expected_images' / 'plat'
-    out_dir: Path = TEST_RESULTS_DIR / 'plat'
+    out_dir: Path = TEST_RESULTS_DIR / 'plat_output'
 
     @classmethod
     def setUpClass(cls):
         prepare_settings()
+        if cls.out_dir.exists():
+            rmtree(cls.out_dir)
+        else:
+            cls.out_dir.mkdir(exist_ok=True, parents=True)
 
     def test_matching_outputs(self):
         """
