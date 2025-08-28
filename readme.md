@@ -91,7 +91,7 @@ plat_group.add_description(land_description, config='n,w')
 plat_group.execute_queue()
 
 # Save as PNG inside a .zip file.
-plat_group.output(fp=r'C:\land plats\sample_plats.zip', filetype='png')
+plat_group.output(fp=r'C:\land plats\sample_plats.zip', image_format='png')
 
 # Or as a PDF.
 plat_group.output(fp=r'C:\land plats\sample_plats.pdf')
