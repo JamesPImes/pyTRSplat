@@ -1615,12 +1615,15 @@ class MegaPlat(IPlatOwner, QueueMany):
         self.footer_draw = None
         self.image_layers = [self.background, self.image, self.overlay_image]
 
-    def _clean_queue(self, queue=None):
+    def _clean_queue(self, queue=None) -> (pytrs.TractList, pytrs.TractList):
         """
         Scrub out any undefined or error townships in the ``queue`` of
         tracts.
+        :return: A ``TractList`` of clean tracts, and a ``TractList`` of
+            unplattable tracts.
         """
         out_queue = pytrs.TractList()
+        unplattable_tracts = pytrs.TractList()
         if queue is None:
             queue = self.queue
         if not queue:
@@ -1630,9 +1633,10 @@ class MegaPlat(IPlatOwner, QueueMany):
             if not tract.trs_is_undef(sec=False) and not tract.trs_is_error(sec=False):
                 out_queue.append(tract)
             else:
+                unplattable_tracts.append(tract)
                 warning = UnplattableWarning.unclear_trs(tract)
                 warn(warning)
-        return out_queue
+        return out_queue, unplattable_tracts
 
     def _get_twprge_spans(self, queue: pytrs.TractList):
         """
@@ -1759,14 +1763,13 @@ class MegaPlat(IPlatOwner, QueueMany):
         :return: A ``pytrs.TractList`` containing all tracts that could
             not be platted.
         """
-        unplattable_tracts = pytrs.TractList()
         queue = self.queue
         if subset_twprges is not None:
             queue = queue.filter(key=lambda tract: tract.twprge in subset_twprges)
         if prompt_define:
             self.prompt_define()
         # Confirm all tracts are valid.
-        queue = self._clean_queue(queue)
+        queue, unplattable_tracts = self._clean_queue(queue)
         if not queue:
             return unplattable_tracts
 
