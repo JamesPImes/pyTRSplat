@@ -387,6 +387,18 @@ class ISettingsLotDefinerOwner(SettingsOwner, LotDefinerOwner):
     pass
 
 
+class LotDefinerOwned:
+    """
+    Class with an ``owner`` (``LotDefinerOwner``) that has a
+    ``.lot_definer`` attribute.
+    """
+    owner: LotDefinerOwner
+
+    @property
+    def lot_definer(self):
+        return self.owner.lot_definer
+
+
 class SettingsOwned:
     """
     Class with an ``owner`` (``SettingsOwner``) that has a
@@ -539,7 +551,7 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
             child.write_lot_numbers(at_depth)
 
 
-class PlatSection(SettingsOwned, ImageOwned):
+class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
     """A section of land, as represented in the plat."""
 
     def __init__(
@@ -679,7 +691,7 @@ class PlatSection(SettingsOwned, ImageOwned):
             return unplattable_tracts
         platted_aliquots = set()
         for tract in self.queue:
-            self.owner.lot_definer.process_tract(tract, commit=True)
+            self.lot_definer.process_tract(tract, commit=True)
             if not tract.qqs and not tract.lots_as_qqs:
                 if not tract.undefined_lots:
                     warning = UnplattableWarning.no_lots_qqs(tract)
@@ -763,7 +775,7 @@ class PlatBody(SettingsOwned, ImageOwned):
         self.owner: IPlatOwner = owner
         self.twp = twp
         self.rge = rge
-        self.sections: dict[Union[int, None], PlatSection] = {}
+        self.plat_secs: dict[Union[int, None], PlatSection] = {}
         sections_per_side = 6
         k = 0
         # Store each section's "offset" from the top-left of the grid.
@@ -776,10 +788,10 @@ class PlatBody(SettingsOwned, ImageOwned):
                     grid_offset=(i, j),
                     owner=self.owner,
                     is_lot_writer=is_lot_writer)
-                self.sections[sec_num] = plat_sec
+                self.plat_secs[sec_num] = plat_sec
                 k += 1
         # A dummy section, for tracts with undefined/error section number.
-        self.sections[None] = PlatSection(None, grid_offset=None, owner=self.owner)
+        self.plat_secs[None] = PlatSection(None, grid_offset=None, owner=self.owner)
         # Coord of top-left of the grid.
         self.xy: tuple[int, int] = None
         self.is_lot_writer = is_lot_writer
@@ -787,7 +799,7 @@ class PlatBody(SettingsOwned, ImageOwned):
     def nonempty_sections(self):
         """Get a list of any sections that have aliquots to be platted."""
         output = []
-        for sec_num, plat_sec in self.sections.items():
+        for sec_num, plat_sec in self.plat_secs.items():
             if not plat_sec.aliquot_tree.is_leaf():
                 output.append(sec_num)
         return output
@@ -802,9 +814,43 @@ class PlatBody(SettingsOwned, ImageOwned):
         if xy is None:
             xy = self.settings.grid_xy
         self.xy = xy
-        for plat_sec in self.sections.values():
+        for plat_sec in self.plat_secs.values():
             plat_sec.configure(grid_xy=xy)
         return None
+
+    def add_tract(self, tract: pytrs.Tract):
+        """
+        Add a tract to the queue of the appropriate subordinate
+        ``PlatSec``.
+
+        .. note::
+
+            This assumes that the Twp/Rge of the ``tract`` already
+            matches the Twp/Rge of this ``PlatBody``, or that Twp/Rge is
+            irrelevant.
+
+        :param tract: A ``pytrs.Tract`` that has been parsed into Lots
+            and QQ's.
+        """
+        # tracts with sec_num that is `None` or otherwise not found in the `.plat_secs`
+        # dict (e.g., nonsense "Section 0" or "Section 37" or higher) will get
+        # added to the queue for the dummy plat_sec -- i.e., `.plat_secs[None]`.
+        plat_sec = self.plat_secs.get(tract.sec_num, self.plat_secs[None])
+        plat_sec.queue.append(tract)
+        return None
+
+    def execute_subordinate_queues(self) -> pytrs.TractList:
+        """
+        Execute the queue in each subordinate ``PlatSec``.
+
+        :return: A ``pytrs.TractList`` containing all tracts that could
+            not be platted (no lots or aliquots identified).
+        """
+        unplattable_tracts = pytrs.TractList()
+        for plat_sec in self.plat_secs.values():
+            unplattable = plat_sec.execute_queue()
+            unplattable_tracts.extend(unplattable)
+        return unplattable_tracts
 
     def write_lot_numbers(self, at_depth=2):
         """
@@ -818,7 +864,7 @@ class PlatBody(SettingsOwned, ImageOwned):
                 'This `PlatBody` is not a lot writer. '
                 'Pass `is_lot_writer=True` at init.'
             )
-        for sec_num, sec_plat in self.sections.items():
+        for sec_num, sec_plat in self.plat_secs.items():
             if sec_num is None:
                 continue
             sec_plat.write_lot_numbers(at_depth)
@@ -1252,7 +1298,6 @@ class Plat(IPlatOwner, QueueSingle):
             self.prompt_define()
         self.configure()
         twprge = f"{self.twp}{self.rge}"
-        unplattable_tracts = pytrs.TractList()
         self.queue.custom_sort()
         if self.owner is None:
             cached = self.lot_definer.get_all_definitions(mandatory_twprges=[twprge])
@@ -1262,13 +1307,8 @@ class Plat(IPlatOwner, QueueSingle):
                 self.twp = tract.twp
             if self.rge is None:
                 self.rge = tract.rge
-            self.lot_definer.process_tract(tract, commit=True)
-            sec = tract.sec_num
-            plat_sec = self.body.sections[sec]
-            plat_sec.queue.append(tract)
-        for plat_sec in self.body.sections.values():
-            unplattable = plat_sec.execute_queue()
-            unplattable_tracts.extend(unplattable)
+            self.body.add_tract(tract)
+        unplattable_tracts = self.body.execute_subordinate_queues()
         if self.settings.write_tracts:
             for tract in self.queue:
                 tractfont_rgba = self.settings.footerfont_rgba
@@ -1432,7 +1472,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
         else:
             selected_tracts = self.queue.filter(lambda t: t.twprge in subset_twprges)
         if prompt_define:
-            self.prompt_define()
+            self.lot_definer.prompt_define(tracts=selected_tracts)
         for twprge in subset_twprges:
             plat = self.plats[twprge]
             unplattable = plat.execute_queue()
@@ -1590,7 +1630,7 @@ class MegaPlat(IPlatOwner, QueueMany):
             if not tract.trs_is_undef(sec=False) and not tract.trs_is_error(sec=False):
                 out_queue.append(tract)
             else:
-                warning = UnplattableWarning.unclear_twprge(tract)
+                warning = UnplattableWarning.unclear_trs(tract)
                 warn(warning)
         return out_queue
 
@@ -1736,13 +1776,10 @@ class MegaPlat(IPlatOwner, QueueMany):
         for tract in queue:
             self.lot_definer.process_tract(tract, commit=True)
             subplat = subplats[tract.twprge]
-            sec = tract.sec_num
-            plat_sec = subplat.sections[sec]
-            plat_sec.queue.append(tract)
+            subplat.add_tract(tract)
         for subplat in subplats.values():
-            for plat_sec in subplat.sections.values():
-                unplattable = plat_sec.execute_queue()
-                unplattable_tracts.extend(unplattable)
+            unplattable = subplat.execute_subordinate_queues()
+            unplattable_tracts.extend(unplattable)
         return unplattable_tracts
 
 
