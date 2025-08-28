@@ -323,6 +323,8 @@ class ImageOwner:
     ``.background``  (``PIL.Image.Image``)
     ``.image``  (``PIL.Image.Image``)
     ``.draw``  (``ImageDraw.Draw``)
+    ``.header_image``  (``PIL.Image.Image``)
+    ``.header_draw``  (``ImageDraw.Draw``)
     ``.overlay_image``  (``PIL.Image.Image``)
     ``.overlay_draw``  (``ImageDraw.Draw``)
     ``.footer_image``  (``PIL.Image.Image``)
@@ -334,11 +336,13 @@ class ImageOwner:
     background: Image.Image
     image: Image.Image
     draw: ImageDraw.Draw
+    header_image: Image.Image
+    header_draw: ImageDraw.Draw
     overlay_image: Image.Image
     overlay_draw: ImageDraw.Draw
     footer_image: Image.Image
     footer_draw: ImageDraw.Draw
-    image_layers: tuple[Image.Image]
+    image_layers: list[Image.Image]
 
     def output(
             self, fp: Union[str, Path] = None, image_format: str = None, **_kw
@@ -430,6 +434,14 @@ class ImageOwned:
         return self.owner.draw
 
     @property
+    def header_image(self):
+        return self.owner.header_image
+
+    @property
+    def header_draw(self):
+        return self.owner.header_draw
+
+    @property
     def overlay_image(self):
         return self.owner.overlay_image
 
@@ -463,7 +475,8 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
         super().__init__(parent=parent, label=label)
         # Coord of top-left of this square.
         self.xy: tuple[int, int] = None
-        # `.owner` must have .settings, .image, .draw, .overlay_image, .overlay_draw
+        # `.owner` must have .settings, .image, .draw, .header_image, .header_draw,
+        #   .overlay_image, .overlay_draw
         self.owner: IPlatOwner = owner
 
     @property
@@ -952,7 +965,7 @@ class PlatHeader(SettingsOwned, ImageOwned):
             header = trs.pretty_twprge(**kw)
         font = self.settings.headerfont
         fill = self.settings.headerfont_rgba
-        draw = self.draw
+        draw = self.header_draw
         _, _, w, h = draw.textbbox(xy=(0, 0), text=header, font=font)
         if xy is None and align == 'default':
             x = (self.image.width - w) // 2
@@ -1274,12 +1287,20 @@ class Plat(IPlatOwner, QueueSingle):
         self.background = Image.new('RGBA', self.settings.dim, Settings.RGBA_WHITE)
         self.image = Image.new('RGBA', self.settings.dim, (0, 0, 0, 0))
         self.draw = ImageDraw.Draw(self.image, 'RGBA')
+        self.header_image = Image.new('RGBA', self.settings.dim, (0, 0, 0, 0))
+        self.header_draw = ImageDraw.Draw(self.header_image, 'RGBA')
         self.overlay_image = Image.new('RGBA', self.settings.dim, (255, 255, 255, 0))
         self.overlay_draw = ImageDraw.Draw(self.overlay_image, 'RGBA')
         self.footer_image = Image.new('RGBA', self.settings.dim, (255, 255, 255, 0))
         self.footer_draw = ImageDraw.Draw(self.footer_image, 'RGBA')
         # The images in the order that they should be stacked for output.
-        self.image_layers = [self.background, self.image, self.overlay_image, self.footer_image]
+        self.image_layers = [
+            self.background,
+            self.header_image,
+            self.footer_image,
+            self.image,
+            self.overlay_image,
+        ]
         self.body.configure()
         self.footer.configure()
         return None
@@ -1608,12 +1629,19 @@ class MegaPlat(IPlatOwner, QueueMany):
         self.background = Image.new('RGBA', self.dim, Settings.RGBA_WHITE)
         self.image = Image.new('RGBA', self.dim, (0, 0, 0, 0))
         self.draw = ImageDraw.Draw(self.image, 'RGBA')
+        self.header_image = Image.new('RGBA', self.dim, (0, 0, 0, 0))
+        self.header_draw = ImageDraw.Draw(self.header_image, 'RGBA')
         self.overlay_image = Image.new('RGBA', self.dim, (255, 255, 255, 0))
         self.overlay_draw = ImageDraw.Draw(self.overlay_image, 'RGBA')
         # No footer to a MegaPlat.
         self.footer_image = None
         self.footer_draw = None
-        self.image_layers = [self.background, self.image, self.overlay_image]
+        self.image_layers = [
+            self.background,
+            self.header_image,
+            self.image,
+            self.overlay_image,
+        ]
 
     def _clean_queue(self, queue=None) -> (pytrs.TractList, pytrs.TractList):
         """
