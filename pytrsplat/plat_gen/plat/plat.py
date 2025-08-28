@@ -693,10 +693,10 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         for tract in self.queue:
             self.lot_definer.process_tract(tract, commit=True)
             if not tract.qqs and not tract.lots_as_qqs:
-                if not tract.undefined_lots:
-                    warning = UnplattableWarning.no_lots_qqs(tract)
-                else:
+                if len(tract.undefined_lots) > 0:
                     warning = UnplattableWarning.only_undefined_lots(tract)
+                else:
+                    warning = UnplattableWarning.no_lots_qqs(tract)
                 warn(warning)
                 unplattable_tracts.append(tract)
             self.aliquot_tree.register_all_aliquots(tract.qqs)
