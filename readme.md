@@ -64,11 +64,12 @@ See [release v0.4.2](https://github.com/JamesPImes/pyTRSplat/tree/v0.4.2) for th
 ![plat_gui_01](_readme_images/plat_gui_01.gif)
 
 
-## Demonstration
+## Quick Demo
 
-The following code generates the letter-size plat shown in the examples
-above. It assumes that there are 'standard' approximately 40-acre lots
-in the sections along the north and west boundaries of the township.
+The following code generates the [letter-size plat](_readme_images/plat_gui_01.gif)
+shown in the examples above. It assumes that the sections along the north and west
+boundaries of the township have the 
+['usual' ~40-acre lots](https://pytrsplat.readthedocs.io/en/latest/modules/lot_definer.html#default-lots).
 
 ```
 import pytrsplat
@@ -84,16 +85,14 @@ plat_group = pytrsplat.PlatGroup()
 plat_group.settings = pytrsplat.Settings.preset('letter')
 plat_group.lot_definer.allow_defaults = True
 plat_group.lot_definer.standard_lot_size = 40
-# `config` gets passed along to the pytrs library.
+
+# Add lands. (`config` tells the pyTRS library how best to parse this land description.)
 plat_group.add_description(land_description, config='n,w')
 plat_group.execute_queue()
+
+# Save as PNG inside a .zip file.
 plat_group.output(fp=r'C:\land plats\sample_plats.zip', filetype='png')
-```
 
-If there were multiple townships in our plat group, we could put the
-resulting plats in a single PDF:
-
-```
-# `stack=True` tells the output to add them all to the same image file.
-plat_group.output(fp=r'C:\land plats\sample_plats.PDF', stack=True)
+# Or as a PDF.
+plat_group.output(fp=r'C:\land plats\sample_plats.pdf')
 ```
