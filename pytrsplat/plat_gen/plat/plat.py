@@ -21,6 +21,7 @@ __all__ = [
 ]
 
 DEFAULT_SETTINGS = Settings()
+DEFAULT_MEGAPLAT_SETTINGS = Settings.preset('megaplat_default')
 STACKABLE_IMAGE_FORMATS = ('pdf', 'tiff')
 DEFAULT_IMAGE_FORMAT_NONSTACKED = 'png'
 DEFAULT_IMAGE_FORMAT_STACKED = 'pdf'
@@ -1408,7 +1409,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
             later.)
         """
         if settings is None:
-            settings = Settings()
+            settings = DEFAULT_SETTINGS
         self._settings: Settings = settings
         if lot_definer is None:
             lot_definer = LotDefiner()
@@ -1608,7 +1609,7 @@ class MegaPlat(IPlatOwner, QueueMany):
         """
         self.queue = pytrs.TractList()
         if settings is None:
-            settings = Settings()
+            settings = DEFAULT_MEGAPLAT_SETTINGS
         self.settings: Settings = settings
         if lot_definer is None:
             lot_definer = LotDefiner()
