@@ -18,8 +18,13 @@ __all__ = [
     'MegaPlat',
 ]
 
-DEFAULT_SETTINGS = Settings.preset('default')
-DEFAULT_MEGAPLAT_SETTINGS = Settings.preset('megaplat_default')
+try:
+    DEFAULT_SETTINGS = Settings.preset('default')
+    DEFAULT_MEGAPLAT_SETTINGS = Settings.preset('megaplat_default')
+except FileNotFoundError:
+    Settings.restore_presets()
+    DEFAULT_SETTINGS = Settings.preset('default')
+    DEFAULT_MEGAPLAT_SETTINGS = Settings.preset('megaplat_default')
 
 
 class QueueSingle:
