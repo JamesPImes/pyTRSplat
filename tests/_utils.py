@@ -7,6 +7,7 @@ from pathlib import Path
 from hashlib import sha512
 
 from PIL import Image
+import webbrowser
 
 try:
     from pytrsplat import Settings, Plat, PlatGroup, MegaPlat
@@ -191,7 +192,10 @@ def gen_all_test_plats(filename_to_genfunc: dict, check_new=False, override=Fals
             new_files.append(fp_)
             if not check_new:
                 continue
-            os.startfile(fp_)
+            if platform.system() == 'Windows':
+                os.startfile(fp_)
+            else:
+                webbrowser.open_new_tab(str(fp_))
             response = ''
             while response not in ('y', 'n'):
                 print(fp_)

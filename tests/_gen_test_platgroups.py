@@ -1,3 +1,4 @@
+import platform
 from pathlib import Path
 
 try:
@@ -47,6 +48,11 @@ __all__ = [
 ]
 
 DEFAULT_OUT_DIR = RESOURCES_DIR / 'expected_images' / 'platgroup'
+if platform.system() == 'Linux':
+    DEFAULT_OUT_DIR = DEFAULT_OUT_DIR / 'linux'
+else:
+    DEFAULT_OUT_DIR = DEFAULT_OUT_DIR / 'win_mac'
+
 DESC_1 = 'T154N-R97W Sec 1: Lots 1, 2, S/2N/2'
 DESC_2 = 'T154N-R97W Sec 6: Lots 2 - 4'
 DESC_3 = 'T154N-R96W Sec 8: N/2S/2NW/4'
