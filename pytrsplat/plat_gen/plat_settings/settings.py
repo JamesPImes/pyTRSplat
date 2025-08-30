@@ -6,6 +6,8 @@ from typing import Union
 
 from PIL import ImageFont
 
+from ._preset_hardcode import PRESET_HARDCODE
+
 __all__ = [
     'Settings',
 ]
@@ -447,7 +449,7 @@ class Settings:
         presets = []
         for f in files:
             if f.lower().endswith('.json'):
-                presets.append(f.lower()[:-4])
+                presets.append(f.lower()[:-5])
         presets.sort()
         return presets
 
@@ -475,139 +477,9 @@ class Settings:
         created by a user.)
         """
         cls.restore_default()
-        letter = cls.preset('default')
-        letter.qq_fill_rgba = (0, 0, 255, 100)
-        letter.save_preset('letter')
-
-        letter.qq_fill_rgba = (68, 68, 68, 100)
-        letter.warningfont_rgba = (68, 68, 68, 255)
-        letter.save_preset('letter_gray')
-
-        legal = cls.preset('letter')
-        legal.dim = (1700, 2800)
-        legal.save_preset('legal')
-
-        legal_gray = cls.preset('letter_gray')
-        legal_gray.dim = (1700, 2800)
-        legal_gray.save_preset('legal_gray')
-
-        sq_l = cls.preset('default')
-        sq_l.dim = (1200, 1200)
-        sq_l.headerfont_size = 48
-        sq_l.footerfont_size = 14
-        sq_l.secfont_size = 24
-        sq_l.lotfont_size = 12
-        sq_l.body_marg_top_y = 120
-        sq_l.footer_marg_bottom_y = 20
-        sq_l.header_px_above_body = 18
-        sq_l.footer_marg_left_x = 20
-        sq_l.footer_marg_right_x = 20
-        sq_l.footer_px_below_body = 40
-        sq_l.footer_px_between_lines = 7
-        sq_l.sec_length_px = 160
-        sq_l.line_stroke = {
-            -1: 3,
-            0: 1,
-            1: 1,
-            2: 1,
-            3: 1,
-            None: 1
-        }
-        sq_l.line_rgba[1] = (64, 64, 64, 255)
-        for n in (2, 3, None):
-            sq_l.line_rgba[n] = (196, 196, 196, 255)
-        sq_l.write_tracts = False
-        sq_l.write_lot_numbers = False
-        sq_l.centerbox_dim = 48
-        sq_l.save_preset('square_l')
-
-        sq_m = sq_l
-        sq_m.dim = (560, 560)
-        sq_m.headerfont_size = 20
-        sq_m.footerfont_size = 14
-        sq_m.secfont_size = 14
-        sq_m.lotfont_size = 1
-        sq_m.body_marg_top_y = 40
-        sq_m.header_px_above_body = 4
-        sq_m.sec_length_px = 80
-        sq_m.line_rgba[1] = (128, 128, 128, 255)
-        for n in (2, 3, None):
-            sq_m.line_rgba[n] = (230, 230, 230, 255)
-        sq_m.centerbox_dim = 24
-        sq_m.save_preset('square_m')
-
-        sq_s = sq_m
-        sq_s.dim = (416, 416)
-        sq_s.headerfont_size = 18
-        sq_s.footerfont_size = 14
-        sq_s.secfont_size = 12
-        sq_s.lotfont_size = 12
-        sq_s.secfont_rgba = (128, 128, 128, 255)
-        sq_s.footer_marg_bottom_y = 14
-        sq_s.header_px_above_body = 3
-        sq_s.footer_marg_left_x = 14
-        sq_s.footer_marg_right_x = 14
-        sq_s.footer_px_below_body = 40
-        sq_s.sec_length_px = 56
-        sq_s.line_stroke[-1] = 2
-        sq_s.centerbox_dim = 20
-        sq_s.save_preset('square_s')
-
-        sq_tn = sq_s
-        sq_tn.dim = (216, 216)
-        sq_tn.headerfont_size = 10
-        sq_tn.footerfont_size = 8
-        sq_tn.secfont_size = 10
-        sq_tn.lotfont_size = 1
-        sq_tn.secfont_rgba = (64, 64, 64, 255)
-        sq_tn.body_marg_top_y = 12
-        sq_tn.header_px_above_body = 1
-        sq_tn.footer_px_between_lines = 6
-        sq_tn.sec_length_px = 32
-        sq_tn.write_header = False
-        sq_tn.centerbox_dim = 12
-        sq_tn.save_preset('square_tiny')
-
-        mp = Settings.preset('default')
-        mp.sec_length_px = 120
-        mp.body_marg_top_y = 36
-        mp.short_header = True
-        mp.set_font(
-            purpose='header',
-            rgba=(192, 192, 192, 255),
-            typeface='Mono (Bold)',
-            size=72
-        )
-        mp.set_font(
-            purpose='sec',
-            size=24
-        )
-        mp.line_stroke[-1] = 8
-        mp.line_stroke[1] = 1
-        mp.line_stroke[2] = 1
-        mp.centerbox_dim = 38
-        mp.save_preset('megaplat_default')
-
-        mp_s = mp
-        mp_s.body_marg_top_y = 14
-        mp_s.sec_length_px = 64
-        mp_s.short_header = True
-        mp_s.set_font(
-            purpose='header',
-            rgba=(192, 192, 192, 255),
-            typeface='Mono (Bold)',
-            size=48
-        )
-        mp_s.set_font(
-            purpose='sec',
-            size=14
-        )
-        mp_s.line_stroke[-1] = 4
-        mp_s.line_stroke[0] = 0
-        mp_s.line_stroke[1] = 0
-        mp_s.line_stroke[2] = 0
-        mp_s.centerbox_dim = 20
-        mp_s.save_preset('megaplat_s')
+        for preset_name, setting_vals in PRESET_HARDCODE.items():
+            stn = Settings.from_dict(setting_vals)
+            stn.save_preset(preset_name)
         return None
 
 
