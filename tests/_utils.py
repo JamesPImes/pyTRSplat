@@ -38,6 +38,12 @@ RESOURCES_DIR = Path(__file__).parent / r"_resources"
 TEST_RESULTS_DIR = Path(__file__).parent / r"_temp"
 PRESETS_DIR = TEST_RESULTS_DIR / 'presets'
 
+# Expected outputs are platform-specific. Must separately generate for
+# Windows (which also works for macOS) and Linux.
+EXPECTED_SUBDIR = 'win_mac'
+if platform.system() not in ('Windows', 'Darwin'):
+    EXPECTED_SUBDIR = 'linux'
+
 
 def prepare_settings():
     """
@@ -220,7 +226,10 @@ def compare_tests_with_expected(
         ``_gen_test_plats``, ``_gen_test_megaplats``. (Do not use with
         ``_gen_test_platgroups``.)
     :param expected_dir: The path to the directory containing the
-        preexisting outputs to compare against.
+        preexisting outputs to compare against. (Gets adjusted here to
+        the subdirectory that is specific to the operating system being
+        used for this test: ``win_mac`` for Windows / macOS; ``linux``
+        otherwise.)
     :param out_dir: The path to the temp directory in which to save test
         outputs.
     :return: A list of strings, each encoding both the filepath and
@@ -232,12 +241,8 @@ def compare_tests_with_expected(
     #       func(fn: <filename>, out_dir: <directory path>, override: bool)
     # And its docstring is an explanation of the settings and input for that plat.
     mismatched = []
-    if platform.system() not in ('Windows', 'Darwin'):
-        # Currently only working on Windows and Mac (Darwin).
-        # TODO: Output comparison with Linux.
-        return mismatched
     for fn, plat_gen_func in filename_to_genfunc.items():
-        expected_fp = expected_dir / fn
+        expected_fp = expected_dir / EXPECTED_SUBDIR / fn
         gen_fp = plat_gen_func(fn=fn, out_dir=out_dir, override=True)
         try:
             expected = Image.open(expected_fp)
@@ -262,7 +267,10 @@ def compare_tests_with_expected_group(
         ``_gen_test_platgroups``. (Do not use with other platting
         classes' test generators.)
     :param expected_dir: The path to the directory containing the
-        preexisting outputs to compare against.
+        preexisting outputs to compare against. (Gets adjusted here to
+        the subdirectory that is specific to the operating system being
+        used for this test: ``win_mac`` for Windows / macOS; ``linux``
+        otherwise.)
     :param out_dir: The path to the temp directory in which to save test
         outputs.
     :return: A list of strings, each encoding both the filepath and
@@ -281,7 +289,7 @@ def compare_tests_with_expected_group(
         return f"{base}.png"
 
     existing_files = [
-        fn for fn in os.listdir(expected_dir)
+        fn for fn in os.listdir(expected_dir / EXPECTED_SUBDIR)
         if fn.lower().endswith('.png')
     ]
     base_fns = {}
@@ -291,10 +299,6 @@ def compare_tests_with_expected_group(
         base_fns[base_fn] += 1
 
     mismatched = []
-    if platform.system() not in ('Windows', 'Darwin'):
-        # Currently only working on Windows and Mac (Darwin).
-        # TODO: Output comparison with Linux.
-        return mismatched
     for top_fn, plat_gen_func in filename_to_genfunc.items():
         gen_fps = plat_gen_func(fn=top_fn, out_dir=out_dir, override=True)
         if base_fns[top_fn] != len(gen_fps):
@@ -310,7 +314,7 @@ def compare_tests_with_expected_group(
             # So pull the actually-generated filepath.
             gen_fp = Path(gen_fp)
             gen_fn = gen_fp.name
-            expected_fp = expected_dir / gen_fn
+            expected_fp = expected_dir / EXPECTED_SUBDIR / gen_fn
             try:
                 expected = Image.open(expected_fp)
                 generated = Image.open(gen_fp)
