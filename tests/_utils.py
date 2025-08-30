@@ -2,12 +2,12 @@
 
 import os
 import platform
+import webbrowser
 from typing import Union
 from pathlib import Path
 from hashlib import sha512
 
 from PIL import Image
-import webbrowser
 
 try:
     from pytrsplat import Settings, Plat, PlatGroup, MegaPlat
