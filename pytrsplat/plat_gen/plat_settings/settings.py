@@ -447,7 +447,7 @@ class Settings:
         presets = []
         for f in files:
             if f.lower().endswith('.json'):
-                presets.append(f.lower()[:-4])
+                presets.append(f.lower()[:-5])
         presets.sort()
         return presets
 
