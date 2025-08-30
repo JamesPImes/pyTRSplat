@@ -18,7 +18,7 @@ __all__ = [
     'MegaPlat',
 ]
 
-DEFAULT_SETTINGS = Settings()
+DEFAULT_SETTINGS = Settings.preset('default')
 DEFAULT_MEGAPLAT_SETTINGS = Settings.preset('megaplat_default')
 
 
