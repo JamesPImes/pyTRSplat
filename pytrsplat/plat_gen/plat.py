@@ -1069,19 +1069,25 @@ class PlatFooter(SettingsOwned, ImageOwned):
             c_width = bbox[2] - bbox[0]
             c_height = bbox[3] - bbox[1]
             if c_height > avail_h:
-                if line:
-                    writable_lines.append(line)
                 unwritable = ' '.join(words[i:])
-                break
-            if c_width <= avail_w:
+                if line:
+                    unwritable = f"{line} {unwritable}"
+                return writable_lines, unwritable
+            if c_width <= avail_w and c_height <= avail_h:
                 line = cand_line
-            else:
+            elif c_height > avail_h:
+                if line:
+                    unwritable = f"{line} {' '.join(words[i:])}"
+                else:
+                    unwritable = ' '.join(words[i:])
+                return writable_lines, unwritable
+            elif c_width > avail_w:
                 writable_lines.append(line)
                 line = word
                 avail_h -= (self._text_line_height + stn.footer_px_between_lines)
                 if avail_h <= self._text_line_height:
                     unwritable = ' '.join(words[i:])
-                    break
+                    return writable_lines, unwritable
         if line:
             writable_lines.append(line)
         return writable_lines, unwritable
@@ -1387,9 +1393,16 @@ class Plat(IPlatOwner, QueueSingle):
             tracts = self.queue
         return self.footer.write_tracts(tracts)
 
-    def write_footer_text(self, txt: str):
-        """Write a block of text in the footer."""
-        return self.footer.write_text(txt)
+    def write_footer_text(self, txt: str, write_partial=False):
+        """
+        Write a block of text in the footer.
+
+        :param txt: The block of text to write.
+        :param write_partial: (Optional, off by default) If there is not
+            space to write the entire block of text, write whatever will
+            fit.
+        """
+        return self.footer.write_text(txt, write_partial)
 
 
 class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
