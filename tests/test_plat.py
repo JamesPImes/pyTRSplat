@@ -240,6 +240,15 @@ class TestPlatBehavior(unittest.TestCase):
             txt = plat.write_footer_text(line)
             assert txt == expected[i]
 
+    def test_find_undefined_lots(self):
+        plat = Plat()
+        plat.add_description(DESC_2)
+        undef = plat.find_undefined_lots()
+        self.assertEqual(len(undef), 1)
+        for trs, lots in undef.items():
+            self.assertEqual('154n97w08', trs)
+            self.assertEqual(['L4'], lots)
+
 
 class TestPlatOutput:
 
