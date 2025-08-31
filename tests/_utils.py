@@ -27,8 +27,7 @@ __all__ = [
     'get_test_settings_for_plat',
     'get_test_settings_for_megaplat',
     'gen_all_test_plats',
-    'compare_tests_with_expected',
-    'compare_tests_with_expected_group',
+    'get_expected_subdir',
     'PRESETS_DIR',
     'RESOURCES_DIR',
     'TEST_RESULTS_DIR',
@@ -37,12 +36,6 @@ __all__ = [
 RESOURCES_DIR = Path(__file__).parent / r"_resources"
 TEST_RESULTS_DIR = Path(__file__).parent / r"_temp"
 PRESETS_DIR = TEST_RESULTS_DIR / 'presets'
-
-# Expected outputs are platform-specific. Must separately generate for
-# Windows (which also works for macOS) and Linux.
-EXPECTED_SUBDIR = 'win_mac'
-if platform.system() not in ('Windows', 'Darwin'):
-    EXPECTED_SUBDIR = 'linux'
 
 
 def prepare_settings():
@@ -215,113 +208,14 @@ def gen_all_test_plats(filename_to_genfunc: dict, check_new=False, override=Fals
     return new_files
 
 
-def compare_tests_with_expected(
-        filename_to_genfunc: dict, expected_dir: Path, out_dir: Path
-) -> list[str]:
+def get_expected_subdir():
     """
-    Generate plats during unit tests, and compare the output against the
-    preexisting existing results in ``expected_dir``.
-
-    :param filename_to_genfunc: The ``FILENAME_TO_GENFUNC`` dict from
-        ``_gen_test_plats``, ``_gen_test_megaplats``. (Do not use with
-        ``_gen_test_platgroups``.)
-    :param expected_dir: The path to the directory containing the
-        preexisting outputs to compare against. (Gets adjusted here to
-        the subdirectory that is specific to the operating system being
-        used for this test: ``win_mac`` for Windows / macOS; ``linux``
-        otherwise.)
-    :param out_dir: The path to the temp directory in which to save test
-        outputs.
-    :return: A list of strings, each encoding both the filepath and
-        docstring for any outputs that don't match the expected results.
+    Get the subdirectory for this platform: `'win_mac'` for Windows or Mac;
+    `'linux'` for Linux.
     """
-    # Each function in `FILENAME_TO_GENFUNC` is defined in
-    # _gen_test_plats, _gen_test_megaplats, or _gen_test_platgroups;
-    # and has the signature:
-    #       func(fn: <filename>, out_dir: <directory path>, override: bool)
-    # And its docstring is an explanation of the settings and input for that plat.
-    mismatched = []
-    for fn, plat_gen_func in filename_to_genfunc.items():
-        expected_fp = expected_dir / EXPECTED_SUBDIR / fn
-        gen_fp = plat_gen_func(fn=fn, out_dir=out_dir, override=True)
-        try:
-            expected = Image.open(expected_fp)
-            generated = Image.open(gen_fp)
-        except FileNotFoundError:
-            expected = None
-            generated = None
-        if not images_match(expected, generated):
-            failed_plat_explanation = plat_gen_func.__doc__
-            mismatched.append(f"{fn}\n{failed_plat_explanation}")
-    return mismatched
-
-
-def compare_tests_with_expected_group(
-        filename_to_genfunc: dict, expected_dir: Path, out_dir: Path
-) -> list[str]:
-    """
-    Generate plats during unit tests, and compare the output against the
-    preexisting existing results in ``expected_dir``.
-
-    :param filename_to_genfunc: The ``FILENAME_TO_GENFUNC`` dict from
-        ``_gen_test_platgroups``. (Do not use with other platting
-        classes' test generators.)
-    :param expected_dir: The path to the directory containing the
-        preexisting outputs to compare against. (Gets adjusted here to
-        the subdirectory that is specific to the operating system being
-        used for this test: ``win_mac`` for Windows / macOS; ``linux``
-        otherwise.)
-    :param out_dir: The path to the temp directory in which to save test
-        outputs.
-    :return: A list of strings, each encoding both the filepath and
-        docstring for any outputs that don't match the expected results.
-    """
-
-    # Each function in `FILENAME_TO_GENFUNC` is defined in
-    # _gen_test_plats, _gen_test_megaplats, or _gen_test_platgroups;
-    # and has the signature:
-    #       func(fn: <filename>, out_dir: <directory path>, override: bool)
-    # And its docstring is an explanation of the settings and input for that plat.
-    def get_base_filename(fn: str):
-        """Convert ``'some_plat 154n97w.png'`` to ``'some_plat.png'``."""
-        fn_components = fn[:-4].split(' ')
-        base = fn_components[0]
-        return f"{base}.png"
-
-    existing_files = [
-        fn for fn in os.listdir(expected_dir / EXPECTED_SUBDIR)
-        if fn.lower().endswith('.png')
-    ]
-    base_fns = {}
-    for fn in existing_files:
-        base_fn = get_base_filename(fn)
-        base_fns.setdefault(base_fn, 0)
-        base_fns[base_fn] += 1
-
-    mismatched = []
-    for top_fn, plat_gen_func in filename_to_genfunc.items():
-        gen_fps = plat_gen_func(fn=top_fn, out_dir=out_dir, override=True)
-        if base_fns[top_fn] != len(gen_fps):
-            failed_plat_explanation = plat_gen_func.__doc__
-            mismatched.append(
-                f"{top_fn}\n"
-                f"({base_fns[top_fn]} images expected, {len(gen_fps)} generated)\n"
-                f"{failed_plat_explanation}")
-            continue
-        for gen_fp in gen_fps:
-            # The filename can be different than passed to `plat_gen_func`,
-            # because a PlatGroup outputs multiple images when not stacked.
-            # So pull the actually-generated filepath.
-            gen_fp = Path(gen_fp)
-            gen_fn = gen_fp.name
-            expected_fp = expected_dir / EXPECTED_SUBDIR / gen_fn
-            try:
-                expected = Image.open(expected_fp)
-                generated = Image.open(gen_fp)
-            except FileNotFoundError:
-                expected = None
-                generated = None
-            if not images_match(expected, generated):
-                failed_plat_explanation = plat_gen_func.__doc__
-                mismatched.append(f"{gen_fn}\n{failed_plat_explanation}")
-    return mismatched
+    # Expected outputs are platform-specific. Must separately generate for
+    # Windows (which also works for macOS) and Linux.
+    subdir = 'win_mac'
+    if platform.system() not in ('Windows', 'Darwin'):
+        subdir = 'linux'
+    return subdir
