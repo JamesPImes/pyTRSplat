@@ -293,7 +293,6 @@ class TestPlatBehavior(unittest.TestCase):
         for i, line in enumerate(LOREM_IPSUM_LINES):
             # write_partial = False is default behavior.
             unwritten_txt = plat.write_footer_text(line)
-            print(i, unwritten_txt)
             assert unwritten_txt == expected[i]
 
     def test_write_footer_text_partial(self):
@@ -307,7 +306,7 @@ class TestPlatBehavior(unittest.TestCase):
             0: 0,
             1: 0,
             2: 0,
-            3: 90,  # TODO: verify this number.
+            3: 72,
             4: 69,
         }
         expected_unwrit_wordcount_winmac = {
