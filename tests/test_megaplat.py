@@ -209,6 +209,31 @@ class TestMegaPlatBehavior(unittest.TestCase):
         mp_sans_output = mp_sans.output()
         self.assertFalse(images_match(mp_mono_output, mp_sans_output))
 
+    def test_find_undefined_lots(self):
+        mega = MegaPlat()
+        mega.add_description(DESC_2)
+        undef = mega.find_undefined_lots()
+        self.assertEqual(len(undef), 1)
+        for trs, lots in undef.items():
+            self.assertEqual('154n97w08', trs)
+            self.assertEqual(['L4'], lots)
+
+    def test_find_unplattable_tracts_yes(self):
+        mega = MegaPlat()
+        mega.add_description(DESC_1)
+        mega.add_description(DESC_2)
+        unplattable = mega.find_unplattable_tracts()
+        self.assertEqual(len(unplattable), 1)
+        for tract in unplattable:
+            self.assertEqual('154n97w08', tract.trs)
+            self.assertEqual(['L4'], tract.lots)
+
+    def test_find_unplattable_tracts_no(self):
+        mega = MegaPlat()
+        mega.add_description(DESC_1)
+        unplattable = mega.find_unplattable_tracts()
+        self.assertEqual(len(unplattable), 0)
+
 
 class TestMegaPlatOutput:
 
