@@ -1,4 +1,4 @@
-import unittest
+import pytest
 
 try:
     from .test_plat import *
@@ -14,4 +14,5 @@ except ImportError:
     from test_settings import *
 
 if __name__ == '__main__':
-    unittest.main()
+    prepare_settings()
+    pytest.main()
