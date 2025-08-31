@@ -1461,9 +1461,13 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
             The tract must already be parsed for lots/QQs. (See
             ``pyTRS`` documentation for details.)
         """
+        # Add tract to own queue.
+        self.queue.append(tract)
+        # Create plat if necessary.
         plat = self.plats.get(tract.twprge)
         if plat is None:
             plat = self.register_plat(tract.twp, tract.rge)
+        # Add tract to that plat's queue.
         plat.add_tract(tract)
         return None
 

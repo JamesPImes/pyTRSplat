@@ -216,6 +216,30 @@ class TestPlatGroupBehavior(unittest.TestCase):
         pg_sans_output = pg_sans.output()
         self.assertFalse(images_match(pg_mono_output[0], pg_sans_output[0]))
 
+    def test_find_undefined_lots(self):
+        pg = PlatGroup()
+        pg.add_description(DESC_2)
+        undef = pg.find_undefined_lots()
+        self.assertEqual(len(undef), 1)
+        for trs, lots in undef.items():
+            self.assertEqual('154n97w08', trs)
+            self.assertEqual(['L4'], lots)
+
+    def test_find_unplattable_tracts_yes(self):
+        pg = PlatGroup()
+        pg.add_description(DESC_1)
+        pg.add_description(DESC_2)
+        unplattable = pg.find_unplattable_tracts()
+        self.assertEqual(len(unplattable), 1)
+        for tract in unplattable:
+            self.assertEqual('154n97w08', tract.trs)
+            self.assertEqual(['L4'], tract.lots)
+
+    def test_find_unplattable_tracts_no(self):
+        pg = PlatGroup()
+        pg.add_description(DESC_1)
+        unplattable = pg.find_unplattable_tracts()
+        self.assertEqual(len(unplattable), 0)
 
 def _get_base_filename(fn: str):
     """
@@ -248,7 +272,7 @@ class TestPlatGroupOutput:
     )
     def test_platgroup_output(self, fn, gen_func):
         """
-        Generate test megaplats, and compare their outputs against expected
+        Generate test plat groups, and compare their outputs against expected
         results.
         """
         gen_fps = gen_func(fn=fn, out_dir=OUTPUT_TEST_OUT_DIR, override=True)
