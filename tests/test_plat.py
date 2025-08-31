@@ -249,6 +249,22 @@ class TestPlatBehavior(unittest.TestCase):
             self.assertEqual('154n97w08', trs)
             self.assertEqual(['L4'], lots)
 
+    def test_find_unplattable_tracts_yes(self):
+        plat = Plat()
+        plat.add_description(DESC_1)
+        plat.add_description(DESC_2)
+        unplattable = plat.find_unplattable_tracts()
+        self.assertEqual(len(unplattable), 1)
+        for tract in unplattable:
+            self.assertEqual('154n97w08', tract.trs)
+            self.assertEqual(['L4'], tract.lots)
+
+    def test_find_unplattable_tracts_no(self):
+        plat = Plat()
+        plat.add_description(DESC_1)
+        unplattable = plat.find_unplattable_tracts()
+        self.assertEqual(len(unplattable), 0)
+
 
 class TestPlatOutput:
 
