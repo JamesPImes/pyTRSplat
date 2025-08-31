@@ -1,2 +1,3 @@
 Pillow
 git+https://github.com/JamesPImes/pyTRS
+pytest
