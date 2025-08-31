@@ -1,21 +1,22 @@
 import unittest
+import os
 from pathlib import Path
 from PIL import Image
 from shutil import rmtree
+
+import pytest
 
 try:
     from pytrsplat import PlatGroup, Settings
     from ._utils import (
         prepare_settings,
         get_test_settings_for_plat,
-        compare_tests_with_expected_group,
+        get_expected_subdir,
         images_match,
         RESOURCES_DIR,
         TEST_RESULTS_DIR,
     )
-    from ._gen_test_platgroups import (
-        FILENAME_TO_GENFUNC,
-    )
+    from ._gen_test_platgroups import FILENAME_TO_GENFUNC
 except ImportError:
     import sys
 
@@ -24,30 +25,32 @@ except ImportError:
     from _utils import (
         prepare_settings,
         get_test_settings_for_plat,
-        compare_tests_with_expected_group,
+        get_expected_subdir,
         images_match,
         RESOURCES_DIR,
         TEST_RESULTS_DIR,
     )
-    from _gen_test_platgroups import (
-        FILENAME_TO_GENFUNC,
-    )
+    from _gen_test_platgroups import FILENAME_TO_GENFUNC
+
+EXPECTED_DIR: Path = RESOURCES_DIR / 'expected_images' / 'platgroup' / get_expected_subdir()
+OUT_DIR: Path = TEST_RESULTS_DIR / 'platgroup'
+OUTPUT_TEST_OUT_DIR: Path = TEST_RESULTS_DIR / 'platgroup_output'
+
+if OUT_DIR.exists():
+    rmtree(OUT_DIR)
+else:
+    OUT_DIR.mkdir(exist_ok=True, parents=True)
+
+if OUTPUT_TEST_OUT_DIR.exists():
+    rmtree(OUTPUT_TEST_OUT_DIR)
+else:
+    OUTPUT_TEST_OUT_DIR.mkdir(exist_ok=True, parents=True)
 
 DESC_1 = 'T154N-R97W Sec 14: NE/4'
 DESC_2 = 'T154N-R97W Sec 8: Lot 4'
 
 
 class TestPlatGroupBehavior(unittest.TestCase):
-    expected_dir: Path = RESOURCES_DIR / 'expected_images' / 'platgroup'
-    out_dir: Path = TEST_RESULTS_DIR / 'platgroup'
-
-    @classmethod
-    def setUpClass(cls):
-        prepare_settings()
-        if cls.out_dir.exists():
-            rmtree(cls.out_dir)
-        else:
-            cls.out_dir.mkdir(exist_ok=True, parents=True)
 
     def test_init(self):
         plat_group = PlatGroup()
@@ -58,7 +61,7 @@ class TestPlatGroupBehavior(unittest.TestCase):
         plat = PlatGroup(settings=settings)
         plat.add_description(DESC_1)
         plat.execute_queue()
-        fp = self.out_dir / 'platgroup_test_square_s.png'
+        fp = OUT_DIR / 'platgroup_test_square_s.png'
         returned_images = plat.output(fp)
         returned_im = returned_images[0]
         opened_im = Image.open(fp)
@@ -214,38 +217,67 @@ class TestPlatGroupBehavior(unittest.TestCase):
         self.assertFalse(images_match(pg_mono_output[0], pg_sans_output[0]))
 
 
-class TestPlatGroupOutput(unittest.TestCase):
+def _get_base_filename(fn: str):
+    """
+    Helper function to convert ``'some_plat 154n97w.png'``
+    to ``'some_plat.png'``.
+    """
+    fn_components = fn[:-4].split(' ')
+    base = fn_components[0]
+    return f"{base}.png"
+
+
+class TestPlatGroupOutput:
     """Test the output results for PlatGroup."""
 
-    expected_dir: Path = RESOURCES_DIR / 'expected_images' / 'platgroup'
-    out_dir: Path = TEST_RESULTS_DIR / 'platgroup_output'
+    # Inventory existing .png files
+    existing_files = [
+        fn for fn in os.listdir(EXPECTED_DIR)
+        if fn.lower().endswith('.png')
+    ]
+    # Count output files per 'base filename'.
+    base_fns = {}
+    for fn in existing_files:
+        base_fn = _get_base_filename(fn)
+        base_fns.setdefault(base_fn, 0)
+        base_fns[base_fn] += 1
 
-    @classmethod
-    def setUpClass(cls):
-        prepare_settings()
-        if cls.out_dir.exists():
-            rmtree(cls.out_dir)
-        else:
-            cls.out_dir.mkdir(exist_ok=True, parents=True)
-
-    def test_matching_outputs(self):
+    @pytest.mark.parametrize(
+        "fn,gen_func",
+        [(fn, gen_func) for fn, gen_func in FILENAME_TO_GENFUNC.items()]
+    )
+    def test_platgroup_output(self, fn, gen_func):
         """
-        Generate test platgroups and compare their output to expected
+        Generate test megaplats, and compare their outputs against expected
         results.
-
-        (See ``_gen_test_platgroups.py`` for the inputs/settings for the
-        various platgroups.)
         """
-        mismatched = compare_tests_with_expected_group(
-            FILENAME_TO_GENFUNC,
-            expected_dir=self.expected_dir,
-            out_dir=self.out_dir,
+        gen_fps = gen_func(fn=fn, out_dir=OUTPUT_TEST_OUT_DIR, override=True)
+        # Check correct number of images created.
+        error_msg = (
+            f"{fn}\n"
+            f"({self.base_fns[fn]} images expected, {len(gen_fps)} generated)\n"
+            f"{gen_func.__doc__}"
         )
-        linebreak = '\n\n'
-        msg = {f"Mismatched output(s):\n{linebreak.join(mismatched)}"}
-        self.assertTrue(len(mismatched) == 0, msg)
+        assert self.base_fns[fn] == len(gen_fps), error_msg
+
+        for gen_fp in gen_fps:
+            # The filename can be different than passed to `plat_gen_func`,
+            # because a PlatGroup outputs multiple images when not stacked.
+            # So pull the actually-generated filepath.
+            gen_fp = Path(gen_fp)
+            gen_fn = gen_fp.name
+            expected_fp = EXPECTED_DIR / gen_fn
+            try:
+                expected = Image.open(expected_fp)
+                generated = Image.open(gen_fp)
+            except FileNotFoundError:
+                expected = None
+                generated = None
+            explanation = gen_func.__doc__
+            assert images_match(expected, generated), explanation
         return None
 
 
 if __name__ == '__main__':
+    prepare_settings()
     unittest.main()

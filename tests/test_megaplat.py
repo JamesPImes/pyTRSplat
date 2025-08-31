@@ -3,19 +3,19 @@ from pathlib import Path
 from PIL import Image
 from shutil import rmtree
 
+import pytest
+
 try:
     from pytrsplat import MegaPlat, Settings
     from ._utils import (
         prepare_settings,
         get_test_settings_for_megaplat,
-        compare_tests_with_expected,
+        get_expected_subdir,
         images_match,
         RESOURCES_DIR,
         TEST_RESULTS_DIR,
     )
-    from ._gen_test_megaplats import (
-        FILENAME_TO_GENFUNC,
-    )
+    from ._gen_test_megaplats import FILENAME_TO_GENFUNC
 except ImportError:
     import sys
 
@@ -24,14 +24,26 @@ except ImportError:
     from _utils import (
         prepare_settings,
         get_test_settings_for_megaplat,
-        compare_tests_with_expected,
+        get_expected_subdir,
         images_match,
         RESOURCES_DIR,
         TEST_RESULTS_DIR,
     )
-    from _gen_test_megaplats import (
-        FILENAME_TO_GENFUNC,
-    )
+    from _gen_test_megaplats import FILENAME_TO_GENFUNC
+
+EXPECTED_DIR: Path = RESOURCES_DIR / 'expected_images' / 'megaplat' / get_expected_subdir()
+OUT_DIR: Path = TEST_RESULTS_DIR / 'megaplat'
+OUTPUT_TEST_OUT_DIR: Path = OUT_DIR / 'megaplat_output'
+
+if OUT_DIR.exists():
+    rmtree(OUT_DIR)
+else:
+    OUT_DIR.mkdir(exist_ok=True, parents=True)
+
+if OUTPUT_TEST_OUT_DIR.exists():
+    rmtree(OUTPUT_TEST_OUT_DIR)
+else:
+    OUTPUT_TEST_OUT_DIR.mkdir(exist_ok=True, parents=True)
 
 DESC_1 = 'T154N-R97W Sec 14: NE/4'
 DESC_2 = 'T154N-R97W Sec 8: Lot 4'
@@ -39,17 +51,7 @@ DESC_3 = 'T153N-R96W Sec 9: S/2'
 
 
 class TestMegaPlatBehavior(unittest.TestCase):
-
-    expected_dir: Path = RESOURCES_DIR / 'expected_images' / 'megaplat'
-    out_dir: Path = TEST_RESULTS_DIR / 'megaplat'
-
-    @classmethod
-    def setUpClass(cls):
-        prepare_settings()
-        if cls.out_dir.exists():
-            rmtree(cls.out_dir)
-        else:
-            cls.out_dir.mkdir(exist_ok=True, parents=True)
+    OUT_DIR: Path = TEST_RESULTS_DIR / 'megaplat'
 
     def test_init(self):
         megaplat = MegaPlat()
@@ -61,7 +63,7 @@ class TestMegaPlatBehavior(unittest.TestCase):
         mp.add_description(DESC_1)
         mp.add_description(DESC_3)
         mp.execute_queue()
-        fp = self.out_dir / 'megaplat_test_default.png'
+        fp = OUT_DIR / 'megaplat_test_default.png'
         returned_im = mp.output(fp)
         opened_im = Image.open(fp)
         # Output grid is 2x2 townships.
@@ -208,38 +210,29 @@ class TestMegaPlatBehavior(unittest.TestCase):
         self.assertFalse(images_match(mp_mono_output, mp_sans_output))
 
 
-class TestMegaPlatOutput(unittest.TestCase):
-    """Test the output results for MegaPlat."""
+class TestMegaPlatOutput:
 
-    expected_dir: Path = RESOURCES_DIR / 'expected_images' / 'megaplat'
-    out_dir: Path = TEST_RESULTS_DIR / 'megaplat_output'
-
-    @classmethod
-    def setUpClass(cls):
-        prepare_settings()
-        if cls.out_dir.exists():
-            rmtree(cls.out_dir)
-        else:
-            cls.out_dir.mkdir(exist_ok=True, parents=True)
-
-    def test_matching_outputs(self):
+    @pytest.mark.parametrize(
+        "fn,gen_func",
+        [(fn, gen_func) for fn, gen_func in FILENAME_TO_GENFUNC.items()]
+    )
+    def test_megaplat_output(self, fn, gen_func):
         """
-        Generate test megaplats and compare their output to expected
+        Generate test megaplats, and compare their outputs against expected
         results.
-
-        (See ``_gen_test_megaplats.py`` for the inputs/settings for the
-        various megaplats.)
         """
-        mismatched = compare_tests_with_expected(
-            FILENAME_TO_GENFUNC,
-            expected_dir=self.expected_dir,
-            out_dir=self.out_dir,
-        )
-        linebreak = '\n\n'
-        msg = {f"Mismatched output(s):\n{linebreak.join(mismatched)}"}
-        self.assertTrue(len(mismatched) == 0, msg)
-        return None
+        expected_fp = EXPECTED_DIR / fn
+        gen_fp = gen_func(fn=fn, out_dir=OUTPUT_TEST_OUT_DIR, override=True)
+        try:
+            expected = Image.open(expected_fp)
+            generated = Image.open(gen_fp)
+        except FileNotFoundError:
+            expected = None
+            generated = None
+        explanation = gen_func.__doc__
+        assert images_match(expected, generated), explanation
 
 
 if __name__ == '__main__':
+    prepare_settings()
     unittest.main()
