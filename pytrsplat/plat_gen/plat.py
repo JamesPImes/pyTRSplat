@@ -1068,11 +1068,6 @@ class PlatFooter(SettingsOwned, ImageOwned):
             bbox = stn.footerfont.getbbox(cand_line)
             c_width = bbox[2] - bbox[0]
             c_height = bbox[3] - bbox[1]
-            if c_height > avail_h:
-                unwritable = ' '.join(words[i:])
-                if line:
-                    unwritable = f"{line} {unwritable}"
-                return writable_lines, unwritable
             if c_width <= avail_w and c_height <= avail_h:
                 line = cand_line
             elif c_height > avail_h:
