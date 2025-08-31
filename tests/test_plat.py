@@ -213,6 +213,33 @@ class TestPlatBehavior(unittest.TestCase):
         plat_sans_output = plat_sans.output()
         self.assertFalse(images_match(plat_mono_output, plat_sans_output))
 
+    def test_write_footer_text(self):
+        lorem_ipsum_lines = [
+            'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin euismod a est sit amet tincidunt. Proin ligula nulla, pellentesque ac velit placerat, vestibulum blandit velit. In mollis eros ac mauris luctus, vel tristique augue facilisis. Integer vulputate tempor ex, in eleifend lacus commodo ac. Fusce tristique nec quam quis scelerisque. Aenean tristique porta commodo. Integer ut felis eu lorem eleifend fermentum. Donec ultrices tristique neque, at tempor ligula congue et. Vivamus in tincidunt mi, id finibus enim. Nullam vestibulum viverra pretium. Sed risus purus, finibus vitae sodales eget, pretium ac leo. Nunc luctus quis nisi eu viverra. Duis sollicitudin quam ac ipsum cursus, ac blandit magna ullamcorper.',
+
+            'Duis eu lacinia diam. Praesent non velit posuere, ullamcorper est in, varius elit. Sed et nisi ac leo ullamcorper blandit. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse potenti. Mauris dolor metus, vestibulum et rutrum at, ornare sed felis. Mauris eget ante id est tempor sollicitudin. Vivamus in tristique arcu. Cras ut aliquet ipsum. In accumsan fringilla leo, sed blandit enim dapibus ac. Donec mattis ipsum vel rutrum fermentum. Aliquam tempor sodales porta. In consectetur iaculis magna, id commodo quam tempor at.',
+
+            'Etiam vitae leo est. Praesent lacinia in velit in malesuada. Curabitur aliquam sem tincidunt feugiat auctor. Etiam finibus elit rutrum, elementum lacus ac, semper ex. Sed et risus vitae erat accumsan aliquet. Donec porttitor luctus placerat. Donec in luctus eros. Etiam convallis magna vel porttitor volutpat. Aliquam mauris velit, venenatis sit amet tortor eu, eleifend aliquet erat. Aliquam lacinia augue id pulvinar efficitur.',
+
+            'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Etiam a arcu nec ipsum facilisis feugiat. Nulla quis malesuada felis, in porta eros. Phasellus viverra tempus sapien, a scelerisque orci tempus ac. Duis molestie lobortis pulvinar. Vivamus est quam, auctor ut ante mattis, convallis sollicitudin arcu. Vestibulum bibendum, risus eu condimentum hendrerit, sem nibh bibendum diam, non pharetra urna purus eu tellus. Interdum et malesuada fames ac ante ipsum primis in faucibus. Ut ipsum mi, ullamcorper vel purus eu, sollicitudin consectetur felis. Cras in commodo erat. Vestibulum aliquam felis ut nunc sodales elementum ut ut elit. Aliquam et enim sed lacus vulputate molestie. In dolor nulla, porttitor eget ultrices vel, auctor at massa. Nulla bibendum, felis sed sodales accumsan, lacus magna vestibulum mi, ut posuere nibh eros eu sapien. Fusce sit amet metus nec urna ultricies bibendum.',
+
+            'Aenean sit amet elit purus. Praesent eget quam non ligula gravida ultrices in at nulla. Praesent aliquam tellus nisl, a eleifend ligula luctus et. Nulla eget mauris imperdiet, dictum mauris quis, mattis lacus. Donec iaculis vel nibh non accumsan. Vestibulum aliquet iaculis odio. Maecenas eget nunc nisi. Suspendisse ut arcu tincidunt, varius eros sit amet, ornare ex. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.',
+        ]
+        plat = Plat(settings=Settings.preset('letter'))
+        plat.settings.write_tracts = False
+        plat.add_description("T154N-R97W Sec 14: NE/4")
+        plat.execute_queue()
+        expected = {
+            0: None,
+            1: None,
+            2: None,
+            3: lorem_ipsum_lines[3],
+            4: None,
+        }
+        for i, line in enumerate(lorem_ipsum_lines):
+            txt = plat.write_footer_text(line)
+            assert txt == expected[i]
+
 
 class TestPlatOutput:
 
