@@ -38,13 +38,11 @@ OUTPUT_TEST_OUT_DIR: Path = TEST_RESULTS_DIR / 'platgroup_output'
 
 if OUT_DIR.exists():
     rmtree(OUT_DIR)
-else:
-    OUT_DIR.mkdir(exist_ok=True, parents=True)
+OUT_DIR.mkdir(exist_ok=True, parents=True)
 
 if OUTPUT_TEST_OUT_DIR.exists():
     rmtree(OUTPUT_TEST_OUT_DIR)
-else:
-    OUTPUT_TEST_OUT_DIR.mkdir(exist_ok=True, parents=True)
+OUTPUT_TEST_OUT_DIR.mkdir(exist_ok=True, parents=True)
 
 DESC_1 = 'T154N-R97W Sec 14: NE/4'
 DESC_2 = 'T154N-R97W Sec 8: Lot 4'
