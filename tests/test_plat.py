@@ -1,4 +1,5 @@
 import unittest
+import platform
 from pathlib import Path
 from PIL import Image
 from shutil import rmtree
@@ -37,16 +38,65 @@ OUTPUT_TEST_OUT_DIR: Path = OUT_DIR / 'plat_output'
 
 if OUT_DIR.exists():
     rmtree(OUT_DIR)
-else:
-    OUT_DIR.mkdir(exist_ok=True, parents=True)
+OUT_DIR.mkdir(exist_ok=True, parents=True)
 
 if OUTPUT_TEST_OUT_DIR.exists():
     rmtree(OUTPUT_TEST_OUT_DIR)
-else:
-    OUTPUT_TEST_OUT_DIR.mkdir(exist_ok=True, parents=True)
+OUTPUT_TEST_OUT_DIR.mkdir(exist_ok=True, parents=True)
 
 DESC_1 = 'T154N-R97W Sec 14: NE/4'
 DESC_2 = 'T154N-R97W Sec 8: Lot 4'
+
+LOREM_IPSUM_LINES = [
+    """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin euismod a 
+    est sit amet tincidunt. Proin ligula nulla, pellentesque ac velit placerat, 
+    vestibulum blandit velit. In mollis eros ac mauris luctus, vel tristique 
+    augue facilisis. Integer vulputate tempor ex, in eleifend lacus commodo ac. 
+    Fusce tristique nec quam quis scelerisque. Aenean tristique porta commodo. 
+    Integer ut felis eu lorem eleifend fermentum. Donec ultrices tristique 
+    neque, at tempor ligula congue et. Vivamus in tincidunt mi, id finibus enim.
+    Nullam vestibulum viverra pretium. Sed risus purus, finibus vitae sodales
+    eget, pretium ac leo. Nunc luctus quis nisi eu viverra. Duis sollicitudin
+    quam ac ipsum cursus, ac blandit magna ullamcorper.""",
+
+    """Duis eu lacinia diam. Praesent non velit posuere, ullamcorper est in,
+    varius elit. Sed et nisi ac leo ullamcorper blandit. Lorem ipsum dolor sit
+    amet, consectetur adipiscing elit. Suspendisse potenti. Mauris dolor metus,
+    vestibulum et rutrum at, ornare sed felis. Mauris eget ante id est tempor 
+    sollicitudin. Vivamus in tristique arcu. Cras ut aliquet ipsum. In accumsan 
+    fringilla leo, sed blandit enim dapibus ac. Donec mattis ipsum vel rutrum 
+    fermentum. Aliquam tempor sodales porta. In consectetur iaculis magna, id 
+    commodo quam tempor at.""",
+
+    """Etiam vitae leo est. Praesent lacinia in velit in malesuada. Curabitur 
+    aliquam sem tincidunt feugiat auctor. Etiam finibus elit rutrum, elementum 
+    lacus ac, semper ex. Sed et risus vitae erat accumsan aliquet. Donec 
+    porttitor luctus placerat. Donec in luctus eros. Etiam convallis magna vel 
+    porttitor volutpat. Aliquam mauris velit, venenatis sit amet tortor eu, 
+    eleifend aliquet erat. Aliquam lacinia augue id pulvinar efficitur.""",
+
+    """Pellentesque habitant morbi tristique senectus et netus et malesuada 
+    fames ac turpis egestas. Etiam a arcu nec ipsum facilisis feugiat. Nulla 
+    quis malesuada felis, in porta eros. Phasellus viverra tempus sapien, a 
+    scelerisque orci tempus ac. Duis molestie lobortis pulvinar. Vivamus est 
+    quam, auctor ut ante mattis, convallis sollicitudin arcu. Vestibulum 
+    bibendum, risus eu condimentum hendrerit, sem nibh bibendum diam, non 
+    pharetra urna purus eu tellus. Interdum et malesuada fames ac ante ipsum 
+    primis in faucibus. Ut ipsum mi, ullamcorper vel purus eu, sollicitudin 
+    consectetur felis. Cras in commodo erat. Vestibulum aliquam felis ut nunc 
+    sodales elementum ut ut elit. Aliquam et enim sed lacus vulputate molestie. 
+    In dolor nulla, porttitor eget ultrices vel, auctor at massa. Nulla 
+    bibendum, felis sed sodales accumsan, lacus magna vestibulum mi, ut posuere 
+    nibh eros eu sapien. Fusce sit amet metus nec urna ultricies bibendum.""",
+
+    """Aenean sit amet elit purus. Praesent eget quam non ligula gravida 
+    ultrices in at nulla. Praesent aliquam tellus nisl, a eleifend ligula luctus
+    et. Nulla eget mauris imperdiet, dictum mauris quis, mattis lacus. Donec
+    iaculis vel nibh non accumsan. Vestibulum aliquet iaculis odio. Maecenas
+    eget nunc nisi. Suspendisse ut arcu tincidunt, varius eros sit amet, ornare
+    ex. Orci varius natoque penatibus et magnis dis parturient montes, nascetur
+    ridiculus mus.""",
+]
 
 
 class TestPlatBehavior(unittest.TestCase):
@@ -213,32 +263,69 @@ class TestPlatBehavior(unittest.TestCase):
         plat_sans_output = plat_sans.output()
         self.assertFalse(images_match(plat_mono_output, plat_sans_output))
 
-    def test_write_footer_text(self):
-        lorem_ipsum_lines = [
-            'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin euismod a est sit amet tincidunt. Proin ligula nulla, pellentesque ac velit placerat, vestibulum blandit velit. In mollis eros ac mauris luctus, vel tristique augue facilisis. Integer vulputate tempor ex, in eleifend lacus commodo ac. Fusce tristique nec quam quis scelerisque. Aenean tristique porta commodo. Integer ut felis eu lorem eleifend fermentum. Donec ultrices tristique neque, at tempor ligula congue et. Vivamus in tincidunt mi, id finibus enim. Nullam vestibulum viverra pretium. Sed risus purus, finibus vitae sodales eget, pretium ac leo. Nunc luctus quis nisi eu viverra. Duis sollicitudin quam ac ipsum cursus, ac blandit magna ullamcorper.',
-
-            'Duis eu lacinia diam. Praesent non velit posuere, ullamcorper est in, varius elit. Sed et nisi ac leo ullamcorper blandit. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse potenti. Mauris dolor metus, vestibulum et rutrum at, ornare sed felis. Mauris eget ante id est tempor sollicitudin. Vivamus in tristique arcu. Cras ut aliquet ipsum. In accumsan fringilla leo, sed blandit enim dapibus ac. Donec mattis ipsum vel rutrum fermentum. Aliquam tempor sodales porta. In consectetur iaculis magna, id commodo quam tempor at.',
-
-            'Etiam vitae leo est. Praesent lacinia in velit in malesuada. Curabitur aliquam sem tincidunt feugiat auctor. Etiam finibus elit rutrum, elementum lacus ac, semper ex. Sed et risus vitae erat accumsan aliquet. Donec porttitor luctus placerat. Donec in luctus eros. Etiam convallis magna vel porttitor volutpat. Aliquam mauris velit, venenatis sit amet tortor eu, eleifend aliquet erat. Aliquam lacinia augue id pulvinar efficitur.',
-
-            'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Etiam a arcu nec ipsum facilisis feugiat. Nulla quis malesuada felis, in porta eros. Phasellus viverra tempus sapien, a scelerisque orci tempus ac. Duis molestie lobortis pulvinar. Vivamus est quam, auctor ut ante mattis, convallis sollicitudin arcu. Vestibulum bibendum, risus eu condimentum hendrerit, sem nibh bibendum diam, non pharetra urna purus eu tellus. Interdum et malesuada fames ac ante ipsum primis in faucibus. Ut ipsum mi, ullamcorper vel purus eu, sollicitudin consectetur felis. Cras in commodo erat. Vestibulum aliquam felis ut nunc sodales elementum ut ut elit. Aliquam et enim sed lacus vulputate molestie. In dolor nulla, porttitor eget ultrices vel, auctor at massa. Nulla bibendum, felis sed sodales accumsan, lacus magna vestibulum mi, ut posuere nibh eros eu sapien. Fusce sit amet metus nec urna ultricies bibendum.',
-
-            'Aenean sit amet elit purus. Praesent eget quam non ligula gravida ultrices in at nulla. Praesent aliquam tellus nisl, a eleifend ligula luctus et. Nulla eget mauris imperdiet, dictum mauris quis, mattis lacus. Donec iaculis vel nibh non accumsan. Vestibulum aliquet iaculis odio. Maecenas eget nunc nisi. Suspendisse ut arcu tincidunt, varius eros sit amet, ornare ex. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.',
-        ]
+    def test_write_footer_text_nopartial(self):
+        """
+        Test ``.write_footer_text()`` with default behavior (i.e.,
+        ``write_partial=False``).
+        """
         plat = Plat(settings=Settings.preset('letter'))
         plat.settings.write_tracts = False
         plat.add_description("T154N-R97W Sec 14: NE/4")
         plat.execute_queue()
-        expected = {
+        # Handle platform-specific font rendering.
+        expected_linux = {
             0: None,
             1: None,
             2: None,
-            3: lorem_ipsum_lines[3],
+            3: LOREM_IPSUM_LINES[3],
             4: None,
         }
-        for i, line in enumerate(lorem_ipsum_lines):
-            txt = plat.write_footer_text(line)
-            assert txt == expected[i]
+        expected_winmac = {
+            0: None,
+            1: None,
+            2: None,
+            3: LOREM_IPSUM_LINES[3],
+            4: LOREM_IPSUM_LINES[4],
+        }
+        expected = expected_linux
+        if platform.system() in ('Windows', 'Darwin'):
+            expected = expected_winmac
+        for i, line in enumerate(LOREM_IPSUM_LINES):
+            # write_partial = False is default behavior.
+            unwritten_txt = plat.write_footer_text(line)
+            print(i, unwritten_txt)
+            assert unwritten_txt == expected[i]
+
+    def test_write_footer_text_partial(self):
+        """Test ``.write_footer_text(..., write_partial=True)``"""
+        plat = Plat(settings=Settings.preset('letter'))
+        plat.settings.write_tracts = False
+        plat.add_description("T154N-R97W Sec 14: NE/4")
+        plat.execute_queue()
+        # Handle platform-specific font rendering.
+        expected_unwrit_wordcount_linux = {
+            0: 0,
+            1: 0,
+            2: 0,
+            3: 90,  # TODO: verify this number.
+            4: 69,
+        }
+        expected_unwrit_wordcount_winmac = {
+            0: 0,
+            1: 0,
+            2: 0,
+            3: 90,
+            4: 69,
+        }
+        expected_unwrit_wordcount = expected_unwrit_wordcount_linux
+        if platform.system() in ('Windows', 'Darwin'):
+            expected_unwrit_wordcount = expected_unwrit_wordcount_winmac
+        for i, line in enumerate(LOREM_IPSUM_LINES):
+            unwritten_txt = plat.write_footer_text(line, write_partial=True)
+            unwrit_wordcount = 0
+            if unwritten_txt is not None:
+                unwrit_wordcount = len(unwritten_txt.split())
+            assert unwrit_wordcount == expected_unwrit_wordcount[i]
 
     def test_find_undefined_lots(self):
         plat = Plat()
