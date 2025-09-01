@@ -136,6 +136,38 @@ class TestMegaPlatBehavior(unittest.TestCase):
         mp_withlots_output = mp_withlots.output()
         self.assertFalse(images_match(mp_nolots_output, mp_withlots_output))
 
+    def test_write_lot_numbers_only_for_queue(self):
+        desc = 'T154N-R97W Sec 1: Lots 1 - 3'
+        stn = Settings()
+        mega_nolotnums = MegaPlat(settings=stn)
+        mega_nolotnums.lot_definer.allow_defaults = True
+        mega_nolotnums.settings.write_lot_numbers = False
+        mega_nolotnums.add_description(desc)
+        mega_nolotnums.execute_queue()
+        mega_nolotnums_output = mega_nolotnums.output()
+
+        mega_alllotnums = MegaPlat(settings=stn)
+        mega_alllotnums.lot_definer.allow_defaults = True
+        mega_alllotnums.settings.write_lot_numbers = True
+        mega_alllotnums.add_description(desc)
+        mega_alllotnums.execute_queue()
+        mega_alllotnums_output = mega_alllotnums.output()
+
+        mega_queuelotnums = MegaPlat(settings=stn)
+        mega_queuelotnums.lot_definer.allow_defaults = True
+        mega_queuelotnums.settings.write_lot_numbers = True
+        mega_queuelotnums.settings.lots_only_for_queue = True
+        mega_queuelotnums.add_description(desc)
+        mega_queuelotnums.execute_queue()
+        mega_queuelotnums_output = mega_queuelotnums.output()
+
+        self.assertFalse(
+            images_match(mega_queuelotnums_output, mega_nolotnums_output))
+        self.assertFalse(
+            images_match(mega_queuelotnums_output, mega_alllotnums_output))
+        self.assertFalse(
+            images_match(mega_nolotnums_output, mega_alllotnums_output))
+
     def test_change_rgba(self):
         settings = get_test_settings_for_megaplat()
         settings.qq_fill_rgba = (0, 0, 255, 100)

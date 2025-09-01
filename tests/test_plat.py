@@ -168,6 +168,38 @@ class TestPlatBehavior(unittest.TestCase):
         plat_withlots_output = plat_withlots.output()
         self.assertFalse(images_match(plat_nolots_output, plat_withlots_output))
 
+    def test_write_lot_numbers_only_for_queue(self):
+        desc = 'T154N-R97W Sec 1: Lots 1 - 3'
+        stn = Settings()
+        plat_nolotnums = Plat(settings=stn)
+        plat_nolotnums.lot_definer.allow_defaults = True
+        plat_nolotnums.settings.write_lot_numbers = False
+        plat_nolotnums.add_description(desc)
+        plat_nolotnums.execute_queue()
+        plat_nolotnums_output = plat_nolotnums.output()
+
+        plat_alllotnums = Plat(settings=stn)
+        plat_alllotnums.lot_definer.allow_defaults = True
+        plat_alllotnums.settings.write_lot_numbers = True
+        plat_alllotnums.add_description(desc)
+        plat_alllotnums.execute_queue()
+        plat_alllotnums_output = plat_alllotnums.output()
+
+        plat_queuelotnums = Plat(settings=stn)
+        plat_queuelotnums.lot_definer.allow_defaults = True
+        plat_queuelotnums.settings.write_lot_numbers = True
+        plat_queuelotnums.settings.lots_only_for_queue = True
+        plat_queuelotnums.add_description(desc)
+        plat_queuelotnums.execute_queue()
+        plat_queuelotnums_output = plat_queuelotnums.output()
+
+        self.assertFalse(
+            images_match(plat_queuelotnums_output, plat_nolotnums_output))
+        self.assertFalse(
+            images_match(plat_queuelotnums_output, plat_alllotnums_output))
+        self.assertFalse(
+            images_match(plat_nolotnums_output, plat_alllotnums_output))
+
     def test_write_tracts(self):
         settings = get_test_settings_for_plat()
         settings.write_tracts = False

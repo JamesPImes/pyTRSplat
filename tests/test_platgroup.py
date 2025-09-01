@@ -119,6 +119,38 @@ class TestPlatGroupBehavior(unittest.TestCase):
         pg_withlots_output = pg_withlots.output()
         self.assertFalse(images_match(pg_nolots_output[0], pg_withlots_output[0]))
 
+    def test_write_lot_numbers_only_for_queue(self):
+        desc = 'T154N-R97W Sec 1: Lots 1 - 3'
+        stn = Settings()
+        pg_nolotnums = PlatGroup(settings=stn)
+        pg_nolotnums.lot_definer.allow_defaults = True
+        pg_nolotnums.settings.write_lot_numbers = False
+        pg_nolotnums.add_description(desc)
+        pg_nolotnums.execute_queue()
+        pg_nolotnums_output = pg_nolotnums.output()
+
+        pg_alllotnums = PlatGroup(settings=stn)
+        pg_alllotnums.lot_definer.allow_defaults = True
+        pg_alllotnums.settings.write_lot_numbers = True
+        pg_alllotnums.add_description(desc)
+        pg_alllotnums.execute_queue()
+        pg_alllotnums_output = pg_alllotnums.output()
+
+        pg_queuelotnums = PlatGroup(settings=stn)
+        pg_queuelotnums.lot_definer.allow_defaults = True
+        pg_queuelotnums.settings.write_lot_numbers = True
+        pg_queuelotnums.settings.lots_only_for_queue = True
+        pg_queuelotnums.add_description(desc)
+        pg_queuelotnums.execute_queue()
+        pg_queuelotnums_output = pg_queuelotnums.output()
+
+        self.assertFalse(
+            images_match(pg_queuelotnums_output[0], pg_nolotnums_output[0]))
+        self.assertFalse(
+            images_match(pg_queuelotnums_output[0], pg_alllotnums_output[0]))
+        self.assertFalse(
+            images_match(pg_nolotnums_output[0], pg_alllotnums_output[0]))
+
     def test_write_tracts(self):
         settings = get_test_settings_for_plat()
         settings.write_tracts = False

@@ -21,7 +21,7 @@ __all__ = [
 try:
     DEFAULT_SETTINGS = Settings.preset('default')
     DEFAULT_MEGAPLAT_SETTINGS = Settings.preset('megaplat_default')
-except FileNotFoundError:
+except (FileNotFoundError, KeyError):
     Settings.restore_presets()
     DEFAULT_SETTINGS = Settings.preset('default')
     DEFAULT_MEGAPLAT_SETTINGS = Settings.preset('megaplat_default')
@@ -1371,7 +1371,7 @@ class Plat(IPlatOwner, QueueSingle):
         """
         self.header.write_header(custom_header=custom_header, **kw)
 
-    def write_lot_numbers(self, at_depth=2, only_for_queue=False):
+    def write_lot_numbers(self, at_depth=2, only_for_queue: bool = None):
         """
         Write the lot numbers to the plat.
 
@@ -1383,6 +1383,8 @@ class Plat(IPlatOwner, QueueSingle):
         """
         subset_sec_nums = None
         clear_cache_after = False
+        if only_for_queue is None:
+            only_for_queue = self.settings.lots_only_for_queue
         if only_for_queue:
             subset_sec_nums = sorted(set([tract.sec_num for tract in self.queue]))
         if not self.all_lot_defs_cached and self.owner is None:
@@ -1532,7 +1534,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
         self.all_lot_defs_cached = {}
         return all_unplattable
 
-    def write_lot_numbers(self, at_depth=2, only_for_queue=False):
+    def write_lot_numbers(self, at_depth=2, only_for_queue: bool = None):
         """
         Write the lot numbers to the plats.
 
@@ -1810,10 +1812,10 @@ class MegaPlat(IPlatOwner, QueueMany):
                 subplat_lotwriter_info.append((twp, rge, subplat_topleft))
 
         if self.settings.write_lot_numbers:
-            self.write_lot_numbers()
+            self.write_lot_numbers(only_for_queue=self.settings.lots_only_for_queue)
         return self.latest_subplats
 
-    def write_lot_numbers(self, at_depth=2, only_for_queue=False):
+    def write_lot_numbers(self, at_depth=2, only_for_queue: bool = None):
         """
         Write the lot numbers to the MegaPlat.
 
@@ -1831,6 +1833,8 @@ class MegaPlat(IPlatOwner, QueueMany):
         mandated = list(self.latest_subplats.keys())
         all_defs = self.lot_definer.get_all_definitions(mandatory_twprges=mandated)
         self.all_lot_defs_cached = all_defs
+        if only_for_queue is None:
+            only_for_queue = self.settings.lots_only_for_queue
         for twprge, subplat in self.latest_subplats.items():
             subset_sec_nums = None
             if only_for_queue:
