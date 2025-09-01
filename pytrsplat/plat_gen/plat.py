@@ -573,7 +573,6 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
             trs: pytrs.TRS = None,
             grid_offset: tuple[int, int] = None,
             owner: IPlatOwner = None,
-            is_lot_writer: bool = False,
     ):
         """
         :param trs: The Twp/Rge/Sec (a ``pytrs.TRS`` object) of this
@@ -585,13 +584,13 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
             this section. (Controls the settings that dictate platting
             behavior and appearance, and contains the image objects that
             will be drawn on.)
-        :param is_lot_writer: If True, this is only intended for writing
-            lot numbers to the plat.
         """
         if trs is not None:
             trs = pytrs.TRS(trs)
         self.trs: pytrs.TRS = trs
         self.aliquot_tree = PlatAliquotNode(owner=owner)
+        # Lot definitions will be written separately to the `.lot_writer` aliquot tree.
+        self.lot_writer = PlatAliquotNode(owner=owner)
         self.queue = pytrs.TractList()
         self.square_dim: int = None
         # Coord of top-left of this square.
@@ -600,7 +599,6 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         self.grid_offset: tuple[int, int] = grid_offset
         # `.owner` must have .settings, .image, .draw, .overlay_image, .overlay_draw
         self.owner: IPlatOwner = owner
-        self.is_lot_writer = is_lot_writer
 
     @property
     def _is_dummy(self):
@@ -624,9 +622,8 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         self.sec_length_px = sec_length_px
         self.square_dim = sec_length_px
         self.xy = (x, y)
-        if not self.is_lot_writer:
-            self.draw_lines()
-            self.clear_center()
+        self.draw_lines()
+        self.clear_center()
         self.aliquot_tree.configure(parent_xy=self.xy)
 
     def draw_lines(self):
@@ -738,9 +735,9 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
             tract = pytrs.Tract(
                 definitions, parse_qq=True, config=f"clean_qq,qq_depth.{at_depth}")
             ilot = int(lot.split('L')[-1])
-            self.aliquot_tree.register_all_aliquots(tract.qqs, ilot)
-        self.aliquot_tree.configure(parent_xy=self.xy)
-        self.aliquot_tree.write_lot_numbers(at_depth)
+            self.lot_writer.register_all_aliquots(tract.qqs, ilot)
+        self.lot_writer.configure(parent_xy=self.xy)
+        self.lot_writer.write_lot_numbers(at_depth)
         return None
 
 
@@ -771,8 +768,7 @@ class PlatBody(SettingsOwned, ImageOwned):
             self,
             twp: str = None,
             rge: str = None,
-            owner: IPlatOwner = None,
-            is_lot_writer=False
+            owner: IPlatOwner = None
     ):
         """
         :param twp: The Twp of the Twp/Rge represented by this body.
@@ -781,10 +777,6 @@ class PlatBody(SettingsOwned, ImageOwned):
             this body. (Controls the settings that dictate platting
             behavior and appearance, and contains the image objects that
             will be drawn on.)
-        :param is_lot_writer: Tell this ``PlatBody`` that it will only
-            be used to write lots onto the plat. (If ``True``, prevents
-            redrawing section lines, quarter lines, etc.; and enables
-            the writing of lot numbers in the respective QQs.)
         """
         self.owner: IPlatOwner = owner
         self.twp = twp
@@ -800,15 +792,14 @@ class PlatBody(SettingsOwned, ImageOwned):
                 plat_sec = PlatSection(
                     trs,
                     grid_offset=(i, j),
-                    owner=self.owner,
-                    is_lot_writer=is_lot_writer)
+                    owner=self.owner
+                )
                 self.plat_secs[sec_num] = plat_sec
                 k += 1
         # A dummy section, for tracts with undefined/error section number.
         self.plat_secs[None] = PlatSection(None, grid_offset=None, owner=self.owner)
         # Coord of top-left of the grid.
         self.xy: tuple[int, int] = None
-        self.is_lot_writer = is_lot_writer
 
     def nonempty_sections(self):
         """Get a list of any sections that have aliquots to be platted."""
@@ -818,17 +809,26 @@ class PlatBody(SettingsOwned, ImageOwned):
                 output.append(sec_num)
         return output
 
-    def configure(self, xy: tuple[int, int] = None):
+    def configure(self, xy: tuple[int, int] = None, twp: str = None, rge: str = None):
         """
         Enact the settings to configure this plat body.
 
         :param xy: The top-left coord of the area of the plat containing
             the grid.
+        :param twp: The Twp of the Twp/Rge of the parent plat or
+            subplat. (If not specified, will remain unchanged.)
+        :param rge: The Rge of the Twp/Rge of the parent plat or
+            subplat. (If not specified, will remain unchanged.)
         """
         if xy is None:
             xy = self.settings.grid_xy
         self.xy = xy
-        for plat_sec in self.plat_secs.values():
+        if twp is None:
+            twp = self.twp
+        if rge is None:
+            rge = self.rge
+        for sec_num, plat_sec in self.plat_secs.items():
+            plat_sec.trs = pytrs.TRS.from_twprgesec(twp, rge, sec_num)
             plat_sec.configure(grid_xy=xy)
         return None
 
@@ -866,21 +866,22 @@ class PlatBody(SettingsOwned, ImageOwned):
             unplattable_tracts.extend(unplattable)
         return unplattable_tracts
 
-    def write_lot_numbers(self, at_depth=2):
+    def write_lot_numbers(self, at_depth=2, subset_sec_nums: list[int] = None):
         """
         Write the lot numbers into the respective squares.
 
         :param at_depth: At which depth to write the numbers. Defaults
             to 2 (i.e., quarter-quarters).
+        :param subset_sec_nums: (Optional) If passed, lots will be
+            written only for the sections in this list.
         """
-        if not self.is_lot_writer:
-            raise ValueError(
-                'This `PlatBody` is not a lot writer. '
-                'Pass `is_lot_writer=True` at init.'
-            )
-        for sec_num, sec_plat in self.plat_secs.items():
-            if sec_num is None:
-                continue
+        if subset_sec_nums is None:
+            subset_sec_nums = [
+                sec_num for sec_num in self.plat_secs.keys()
+                if sec_num is not None
+            ]
+        for sec_num in subset_sec_nums:
+            sec_plat = self.plat_secs[sec_num]
             sec_plat.write_lot_numbers(at_depth)
         return None
 
@@ -1303,7 +1304,7 @@ class Plat(IPlatOwner, QueueSingle):
             self.image,
             self.overlay_image,
         ]
-        self.body.configure()
+        self.body.configure(twp=self.twp, rge=self.rge)
         self.footer.configure()
         return None
 
@@ -1370,11 +1371,28 @@ class Plat(IPlatOwner, QueueSingle):
         """
         self.header.write_header(custom_header=custom_header, **kw)
 
-    def write_lot_numbers(self, at_depth=2):
-        """Write the lot numbers to the plat."""
-        lotwriter = PlatBody(twp=self.twp, rge=self.rge, owner=self, is_lot_writer=True)
-        lotwriter.configure(xy=self.settings.grid_xy)
-        lotwriter.write_lot_numbers(at_depth)
+    def write_lot_numbers(self, at_depth=2, only_for_queue=False):
+        """
+        Write the lot numbers to the plat.
+
+        :param at_depth: Depth at which to write the lots. Default is 2
+            (i.e., quarter-quarters).
+        :param only_for_queue: (Optional) If ``True``, only write
+            section numbers for those sections that appear in the
+            ``.queue``.
+        """
+        subset_sec_nums = None
+        clear_cache_after = False
+        if only_for_queue:
+            subset_sec_nums = sorted(set([tract.sec_num for tract in self.queue]))
+        if not self.all_lot_defs_cached and self.owner is None:
+            twprge = f"{self.twp}{self.rge}"
+            cached = self.lot_definer.get_all_definitions(mandatory_twprges=[twprge])
+            self.all_lot_defs_cached = cached
+            clear_cache_after = True
+        self.body.write_lot_numbers(at_depth=at_depth, subset_sec_nums=subset_sec_nums)
+        if clear_cache_after:
+            self.all_lot_defs_cached = None
         return None
 
     def write_tracts(
@@ -1514,6 +1532,20 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
         self.all_lot_defs_cached = {}
         return all_unplattable
 
+    def write_lot_numbers(self, at_depth=2, only_for_queue=False):
+        """
+        Write the lot numbers to the plats.
+
+        :param at_depth: Depth at which to write the lots. Default is 2
+            (i.e., quarter-quarters).
+        :param only_for_queue: (Optional) If ``True``, only write
+            section numbers for those sections that appear in the
+            ``.queue``.
+        """
+        for plat in self.plats.values():
+            plat.write_lot_numbers(at_depth=at_depth, only_for_queue=only_for_queue)
+        return None
+
     def output(
             self,
             fp: Union[str, Path] = None,
@@ -1633,6 +1665,7 @@ class MegaPlat(IPlatOwner, QueueMany):
             max_dim = (float('inf'), float('inf'))
         self.max_dim = max_dim
         self.image_layers: list[Image.Image] = []
+        self.latest_subplats: dict[str, PlatBody] = {}
         self.configure()
 
     def configure(self):
@@ -1733,7 +1766,7 @@ class MegaPlat(IPlatOwner, QueueMany):
         and related attributes.
         """
         stn = self.settings
-        subplats = {}
+        self.latest_subplats = {}
         all_marg = stn.body_marg_top_y
         topleft = (all_marg, all_marg)
         sec_len = stn.sec_length_px
@@ -1772,20 +1805,40 @@ class MegaPlat(IPlatOwner, QueueMany):
                 subplat = PlatBody(twp, rge, owner=self)
                 subplat.configure(xy=subplat_topleft)
                 subplat.draw_outline()
-                subplats[twprge] = subplat
+                self.latest_subplats[twprge] = subplat
                 # Store Twp/Rge/topleft_xy for lotwriters.
                 subplat_lotwriter_info.append((twp, rge, subplat_topleft))
 
         if self.settings.write_lot_numbers:
-            mandated = list(subplats.keys())
-            all_defs = self.lot_definer.get_all_definitions(mandatory_twprges=mandated)
-            self.all_lot_defs_cached = all_defs
-            for twp, rge, subplat_xy in subplat_lotwriter_info:
-                lotwriter = PlatBody(twp=twp, rge=rge, owner=self, is_lot_writer=True)
-                lotwriter.configure(xy=subplat_xy)
-                lotwriter.write_lot_numbers(at_depth=2)
-            self.all_lot_defs_cached = {}
-        return subplats
+            self.write_lot_numbers()
+        return self.latest_subplats
+
+    def write_lot_numbers(self, at_depth=2, only_for_queue=False):
+        """
+        Write the lot numbers to the MegaPlat.
+
+        .. note::
+
+            Lot numbers will only be written for the Twp/Rge's that were
+            last processed with ``.execute_queue()``.
+
+        :param at_depth: Depth at which to write the lots. Default is 2
+            (i.e., quarter-quarters).
+        :param only_for_queue: (Optional) If ``True``, only write
+            section numbers for those sections that appear in the
+            ``.queue``.
+        """
+        mandated = list(self.latest_subplats.keys())
+        all_defs = self.lot_definer.get_all_definitions(mandatory_twprges=mandated)
+        self.all_lot_defs_cached = all_defs
+        for twprge, subplat in self.latest_subplats.items():
+            subset_sec_nums = None
+            if only_for_queue:
+                relevant_tracts = self.queue.filter(key=lambda tr: tr.twprge == twprge)
+                subset_sec_nums = sorted(set([tr.sec_num for tr in relevant_tracts]))
+            subplat.write_lot_numbers(
+                at_depth=at_depth, subset_sec_nums=subset_sec_nums)
+        self.all_lot_defs_cached = {}
 
     def execute_queue(
             self,
