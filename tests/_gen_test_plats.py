@@ -45,6 +45,7 @@ __all__ = [
     'plat2tracts_defaults40ac',
     'plat2tracts_defaults80ac',
     'plat2tracts_lotnums_defaults40ac',
+    'plat2tracts_lotnums_defaults40ac_only_for_queue',
     'plat2tracts_lotnums_defaults80ac',
     'plat2tracts_writetracts',
     'plat2tracts_writetracts_lotnums',
@@ -117,6 +118,21 @@ def plat2tracts_lotnums_defaults40ac(fn: str, out_dir: Path = DEFAULT_OUT_DIR, o
     plat.execute_queue()
     return write_if_new_single(out_dir / fn, plat, override)
 
+
+@add_docstring(
+    'Plat - Two tracts. 40-acre default lots (written only for queue).',
+    DESC_1, DESC_2)
+def plat2tracts_lotnums_defaults40ac_only_for_queue(fn: str, out_dir: Path = DEFAULT_OUT_DIR, override=False):
+    settings = get_test_settings_for_plat()
+    settings.write_lot_numbers = True
+    settings.lots_only_for_queue = True
+    plat = Plat(settings=settings)
+    plat.lot_definer.allow_defaults = True
+    plat.lot_definer.standard_lot_size = 40
+    plat.add_description(DESC_1)
+    plat.add_description(DESC_2)
+    plat.execute_queue()
+    return write_if_new_single(out_dir / fn, plat, override)
 
 @add_docstring(
     'Plat - Two tracts. 80-acre default lots (written).',

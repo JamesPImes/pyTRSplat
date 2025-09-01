@@ -36,6 +36,7 @@ __all__ = [
     'megaplat3twprge_defaults40ac',
     'megaplat3twprge_defaults80ac',
     'megaplat3twprge_lotnums_defaults40ac',
+    'megaplat3twprge_lotnums_defaults40ac_only_for_queue',
     'megaplat3twprge_lotnums_defaults80ac',
     'megaplat3twprge_ns_subset',
     'megaplat3twprge_ew_subset',
@@ -110,6 +111,25 @@ def megaplat3twprge_lotnums_defaults40ac(
         fn: str, out_dir: Path = DEFAULT_OUT_DIR, override=False):
     settings = get_test_settings_for_megaplat()
     settings.write_lot_numbers = True
+    mega = MegaPlat(settings=settings)
+    mega.lot_definer.allow_defaults = True
+    mega.lot_definer.standard_lot_size = 40
+    mega.add_description(DESC_1)
+    mega.add_description(DESC_2)
+    mega.add_description(DESC_3)
+    mega.execute_queue()
+    return write_if_new_single(out_dir / fn, mega, override)
+
+
+@add_docstring(
+    'MegaPlat - All 3 townships. 40-acre default lots (written only for queue).',
+    DESC_1, DESC_2, DESC_3
+)
+def megaplat3twprge_lotnums_defaults40ac_only_for_queue(
+        fn: str, out_dir: Path = DEFAULT_OUT_DIR, override=False):
+    settings = get_test_settings_for_megaplat()
+    settings.write_lot_numbers = True
+    settings.lots_only_for_queue = True
     mega = MegaPlat(settings=settings)
     mega.lot_definer.allow_defaults = True
     mega.lot_definer.standard_lot_size = 40

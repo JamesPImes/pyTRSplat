@@ -38,6 +38,7 @@ __all__ = [
     'platgroup2tracts2twprges_nodefaults',
     'platgroup2tracts2twprges_lotnums_defaults40ac',
     'platgroup2tracts2twprges_lotnums_defaults80ac',
+    'platgroup2tracts2twprges_lotnums_defaults40ac_only_for_queue',
     'platgroup2tracts_defaults40ac',
     'platgroup2tracts_defaults80ac',
     'platgroup2tracts_lotnums_defaults40ac',
@@ -97,6 +98,21 @@ def platgroup2tracts2twprges_lotnums_defaults40ac(fn: str, out_dir: Path = DEFAU
     pg.execute_queue()
     return write_if_new_group(out_dir / fn, pg, override)
 
+
+@add_docstring(
+    'PlatGroup - Two tracts, one Twp/Rge. 40-acre default lots (written only for queue).',
+    DESC_1, DESC_3)
+def platgroup2tracts2twprges_lotnums_defaults40ac_only_for_queue(fn: str, out_dir: Path = DEFAULT_OUT_DIR, override=False):
+    settings = get_test_settings_for_plat()
+    settings.write_lot_numbers = True
+    settings.lots_only_for_queue = True
+    pg = PlatGroup(settings=settings)
+    pg.lot_definer.allow_defaults = True
+    pg.lot_definer.standard_lot_size = 40
+    pg.add_description(DESC_1)
+    pg.add_description(DESC_3)
+    pg.execute_queue()
+    return write_if_new_group(out_dir / fn, pg, override)
 
 @add_docstring(
     'PlatGroup - Two tracts, two Twp/Rge. 80-acre default lots (written).',
