@@ -109,5 +109,6 @@
   "short_header": false,
   "write_tracts": true,
   "write_section_numbers": true,
-  "write_lot_numbers": false
+  "write_lot_numbers": false,
+  "lots_only_for_queue": false
 }

@@ -52,6 +52,7 @@ PRESET_HARDCODE = {
         'write_tracts': True,
         'write_section_numbers': True,
         'write_lot_numbers': False,
+        'lots_only_for_queue': False,
     },
 
     'legal_gray': {
@@ -103,6 +104,7 @@ PRESET_HARDCODE = {
         'write_tracts': True,
         'write_section_numbers': True,
         'write_lot_numbers': False,
+        'lots_only_for_queue': False,
     },
 
     'letter': {
@@ -154,6 +156,7 @@ PRESET_HARDCODE = {
         'write_tracts': True,
         'write_section_numbers': True,
         'write_lot_numbers': False,
+        'lots_only_for_queue': False,
     },
 
     'letter_gray': {
@@ -205,6 +208,7 @@ PRESET_HARDCODE = {
         'write_tracts': True,
         'write_section_numbers': True,
         'write_lot_numbers': False,
+        'lots_only_for_queue': False,
     },
 
     'megaplat_default': {
@@ -255,6 +259,7 @@ PRESET_HARDCODE = {
         'write_tracts': True,
         'write_section_numbers': True,
         'write_lot_numbers': False,
+        'lots_only_for_queue': False,
     },
 
     'megaplat_s': {
@@ -306,6 +311,7 @@ PRESET_HARDCODE = {
         'write_tracts': True,
         'write_section_numbers': True,
         'write_lot_numbers': False,
+        'lots_only_for_queue': False,
     },
 
     'square_l': {
@@ -357,6 +363,7 @@ PRESET_HARDCODE = {
         'write_tracts': False,
         'write_section_numbers': True,
         'write_lot_numbers': False,
+        'lots_only_for_queue': False,
     },
 
     'square_m': {
@@ -408,6 +415,7 @@ PRESET_HARDCODE = {
         'write_tracts': False,
         'write_section_numbers': True,
         'write_lot_numbers': False,
+        'lots_only_for_queue': False,
     },
 
     'square_s': {
@@ -459,6 +467,7 @@ PRESET_HARDCODE = {
         'write_tracts': False,
         'write_section_numbers': True,
         'write_lot_numbers': False,
+        'lots_only_for_queue': False,
     },
 
     'square_tiny': {
@@ -510,5 +519,6 @@ PRESET_HARDCODE = {
         'write_tracts': False,
         'write_section_numbers': True,
         'write_lot_numbers': False,
+        'lots_only_for_queue': False,
     },
 }

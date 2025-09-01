@@ -178,6 +178,8 @@ class Settings:
             'Whether to write section numbers',
         'write_lot_numbers':
             'Whether to write lot numbers',
+        'lots_only_for_queue':
+            'Limit the written lot numbers to sections in the queue.'
     }
 
     def __init__(self):
@@ -248,6 +250,7 @@ class Settings:
         self.write_tracts = True
         self.write_section_numbers = True
         self.write_lot_numbers = False
+        self.lots_only_for_queue = False
 
     def get(self, att, default=None):
         """Get an attribute by its name."""
