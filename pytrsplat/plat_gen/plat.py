@@ -913,9 +913,10 @@ class PlatBody(SettingsOwned, ImageOwned):
         Draw the boundary around the township.
         """
         stn = self.settings
-        lines = get_box_outline(xy=self.xy, dim=stn.sec_length_px * 6)
         width = stn.line_stroke[-1]
         fill = stn.line_rgba[-1]
+        lines = get_box_outline(
+            xy=self.xy, dim=stn.sec_length_px * 6, extend_px=width // 2 - 1)
         draw = self.get_layer_draw('twp_border')
         for line in lines:
             draw.line(line, fill=fill, width=width)

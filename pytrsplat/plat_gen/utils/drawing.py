@@ -29,13 +29,28 @@ def get_box(xy: tuple[int, int], dim: int) -> list[tuple[int, int]]:
     return box
 
 
-def get_box_outline(xy: tuple[int, int], dim: int) -> list[list[tuple[int, int]]]:
-    """Get the lines that make up the outline of a box."""
+def get_box_outline(
+        xy: tuple[int, int], dim: int, extend_px=0) -> list[list[tuple[int, int]]]:
+    """
+    Get the lines that make up the outline of a box.
+    :param xy: Top-left coord.
+    :param dim: Dimensions of the box.
+    :param extend_px: (Optional) Number of px to extend the lines at
+        each corner. Defaults to ``0``.
+    """
     x, y = xy
-    box = [
-        [(x, y), (x + dim, y)],                 # top
-        [(x, y), (x, y + dim)],                 # left
-        [(x + dim, y), (x + dim, y + dim)],     # right
-        [(x, y + dim), (x + dim, y + dim)],     # bottom
-    ]
+    if extend_px == 0:
+        box = [
+            [(x, y), (x + dim, y)],                 # top
+            [(x, y), (x, y + dim)],                 # left
+            [(x + dim, y), (x + dim, y + dim)],     # right
+            [(x, y + dim), (x + dim, y + dim)],     # bottom
+        ]
+    else:
+        box = [
+            [(x - extend_px, y), (x + dim + extend_px, y)],                     # top
+            [(x, y - extend_px), (x, y + dim + extend_px)],                     # left
+            [(x + dim, y - extend_px), (x + dim, y + dim + extend_px + 1)],     # right
+            [(x - extend_px, y + dim), (x + dim + extend_px + 1, y + dim)],     # bottom
+        ]
     return box
