@@ -529,7 +529,7 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
         """
         return self.sec_length_px // (2 ** self.depth)
 
-    def configure(
+    def _configure(
             self,
             parent_xy: tuple[int, int] = None
     ):
@@ -559,7 +559,7 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
             return None
         for label, child_node in self.children.items():
             child_node.owner = self.owner
-            child_node.configure(parent_xy=self.xy)
+            child_node._configure(parent_xy=self.xy)
         return None
 
     def fill(self, rgba: tuple[int, int, int, int] = None):
@@ -641,7 +641,7 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
     def _is_dummy(self):
         return self.grid_offset is None
 
-    def configure(self, grid_xy):
+    def _configure(self, grid_xy):
         """
         Configure this section and its subordinates.
 
@@ -661,7 +661,7 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         self.xy = (x, y)
         self.draw_lines()
         self.clear_center()
-        self.aliquot_tree.configure(parent_xy=self.xy)
+        self.aliquot_tree._configure(parent_xy=self.xy)
 
     def draw_lines(self):
         """
@@ -758,7 +758,7 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
                 warning = UndefinedLotWarning.from_tract(tract)
                 warn(warning)
         if len(platted_aliquots) > 0:
-            self.aliquot_tree.configure()
+            self.aliquot_tree._configure()
             self.aliquot_tree.fill()
         return unplattable_tracts
 
@@ -776,7 +776,7 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
                 definitions, parse_qq=True, config=f"clean_qq,qq_depth.{at_depth}")
             ilot = int(lot.split('L')[-1])
             self.lot_writer.register_all_aliquots(tract.qqs, ilot)
-        self.lot_writer.configure(parent_xy=self.xy)
+        self.lot_writer._configure(parent_xy=self.xy)
         self.lot_writer.write_lot_numbers(at_depth)
         return None
 
@@ -849,7 +849,7 @@ class PlatBody(SettingsOwned, ImageOwned):
                 output.append(sec_num)
         return output
 
-    def configure(self, xy: tuple[int, int] = None, twp: str = None, rge: str = None):
+    def _configure(self, xy: tuple[int, int] = None, twp: str = None, rge: str = None):
         """
         Enact the settings to configure this plat body.
 
@@ -869,7 +869,7 @@ class PlatBody(SettingsOwned, ImageOwned):
             rge = self.rge
         for sec_num, plat_sec in self.plat_secs.items():
             plat_sec.trs = pytrs.TRS.from_twprgesec(twp, rge, sec_num)
-            plat_sec.configure(grid_xy=xy)
+            plat_sec._configure(grid_xy=xy)
         return None
 
     def add_tract(self, tract: pytrs.Tract):
@@ -1043,7 +1043,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
         self._text_line_height = None
         self._trs_indent = None
 
-    def configure(self):
+    def _configure(self):
         """
         Enact the settings to configure this plat footer.
         """
@@ -1280,7 +1280,7 @@ class Plat(IPlatOwner, QueueSingle):
                 ' Change the settings in the owner object instead.'
             )
         self._settings = new_settings
-        self.configure()
+        self._configure()
 
     @property
     def lot_definer(self):
@@ -1319,11 +1319,11 @@ class Plat(IPlatOwner, QueueSingle):
         if self.owner is None:
             self._all_lot_defs_cached = new_cached
 
-    def configure(self):
+    def _configure(self):
         """Configure this plat and its subordinates."""
         self._create_default_layers(dim=self.settings.dim)
-        self.body.configure(twp=self.twp, rge=self.rge)
-        self.footer.configure()
+        self.body._configure(twp=self.twp, rge=self.rge)
+        self.footer._configure()
         return None
 
     def execute_queue(self, prompt_define=False) -> pytrs.TractList:
@@ -1338,7 +1338,7 @@ class Plat(IPlatOwner, QueueSingle):
         """
         if prompt_define:
             self.prompt_define()
-        self.configure()
+        self._configure()
         twprge = f"{self.twp}{self.rge}"
         self.queue.custom_sort()
         if self.owner is None:
@@ -1477,7 +1477,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
         """
         self._settings = new_settings
         for plat in self.plats.values():
-            plat.configure()
+            plat._configure()
 
     def register_plat(self, twp: str, rge: str) -> Plat:
         """
@@ -1494,7 +1494,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
         if twprge in self.plats:
             raise KeyError(f"Duplicate Twp/Rge {twprge!r} cannot registered.")
         self.plats[trs.twprge] = plat
-        plat.configure()
+        plat._configure()
         return plat
 
     def add_tract(self, tract: pytrs.Tract) -> None:
@@ -1693,9 +1693,9 @@ class MegaPlat(IPlatOwner, QueueMany):
         self.max_dim = max_dim
         self.image_layers: list[Image.Image] = []
         self.latest_subplats: dict[str, PlatBody] = {}
-        self.configure()
+        self._configure()
 
-    def configure(self):
+    def _configure(self):
         """
         Configure this ``MegaPlat`` and subordinates.
         """
@@ -1800,7 +1800,7 @@ class MegaPlat(IPlatOwner, QueueMany):
                 f"Configured max dimensions {self.max_dim} exceeded: {self.dim}")
 
         # Create the images here, because `self.dim` was just calculated.
-        self.configure()
+        self._configure()
 
         sample_tract = queue[0]
         ns = sample_tract.ns
@@ -1820,7 +1820,7 @@ class MegaPlat(IPlatOwner, QueueMany):
                 subplat_header.write_header(twp, rge, xy=header_xy, align='center_center')
                 # Create and configure the grid itself.
                 subplat = PlatBody(twp, rge, owner=self)
-                subplat.configure(xy=subplat_topleft)
+                subplat._configure(xy=subplat_topleft)
                 subplat.draw_outline()
                 self.latest_subplats[twprge] = subplat
                 # Store Twp/Rge/topleft_xy for lotwriters.
