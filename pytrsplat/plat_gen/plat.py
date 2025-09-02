@@ -332,13 +332,13 @@ class ImageOwner:
 
     ``._active_layer`` - The name of the currently active layer.
 
-    ``.image`` - A property to return the ``Image.Image`` of the current
-        active layer.
+    And methods:
+    ``.get_layer_image()`` - Get the ``Image.Image`` of the layer.
 
-    ``.draw`` - A property to return the ``ImageDraw.Draw`` of the
-        current active layer.
+    ``.get_layer_draw()`` - Get the ``ImageDraw.Draw`` of the layer.
 
-    And ``._create_layer()`` and ``.output()`` methods.
+    And ``._create_layer()``, ``._create_default_layers()`` and
+    ``.output()`` methods.
     """
     _DEFAULT_LAYER_NAMES = (
         'background',
