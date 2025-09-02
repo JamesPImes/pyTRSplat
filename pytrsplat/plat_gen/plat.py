@@ -321,6 +321,9 @@ class ImageOwner:
     """
     Interface for a class that has the following attributes:
 
+    ``.DEFAULT_LAYER_NAMES`` (class attribute) - A list of standard
+        layer names, in the standard output order (bottom-up).
+
     ``._layers`` - A dict of images (``Image.Image``), keyed by layer
         name.
 
@@ -328,7 +331,7 @@ class ImageOwner:
         name.
 
     ``.output_layer_names`` - A list of layer names to be written to
-        the merged output image, in the order of bottom-to-top.
+        the merged output image, in bottom-up order.
 
     ``._active_layer`` - The name of the currently active layer.
 
@@ -346,6 +349,7 @@ class ImageOwner:
         'footer',
         'inner_lines',
         'aliquot_fill',
+        'sec_nums',
         'lot_nums',
         'sec_border',
         'twp_border',
@@ -715,6 +719,7 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         font = settings.secfont
         fill = settings.secfont_rgba
         txt = str(self.trs.sec_num)
+        draw = self.get_layer_draw('sec_nums')
         _, _, w, h = draw.textbbox(xy=(0, 0), text=txt, font=font)
         # Force a slight upward shift of the section text. Looks wrong otherwise.
         horizontal_tweak_pct = 1.2
