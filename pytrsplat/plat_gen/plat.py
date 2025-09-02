@@ -327,7 +327,7 @@ class ImageOwner:
     ``._draws`` - A dict of draws (``ImageDraw.Draw``), keyed by layer
         name.
 
-    ``._output_layer_names`` - A list of layer names to be written to
+    ``.output_layer_names`` - A list of layer names to be written to
         the merged output image, in the order of bottom-to-top.
 
     ``._active_layer`` - The name of the currently active layer.
@@ -340,7 +340,7 @@ class ImageOwner:
     And ``._create_layer()``, ``._create_default_layers()`` and
     ``.output()`` methods.
     """
-    _DEFAULT_LAYER_NAMES = (
+    DEFAULT_LAYER_NAMES = (
         'background',
         'header',
         'footer',
@@ -352,12 +352,12 @@ class ImageOwner:
     )
     _images: dict[str, Image.Image]
     _draws: dict[str, ImageDraw.Draw]
-    _output_layer_names: list[str]
+    output_layer_names: list[str]
 
     def __init__(self):
         self._images = {}
         self._draws = {}
-        self._output_layer_names = list(self._DEFAULT_LAYER_NAMES)
+        self.output_layer_names = list(self.DEFAULT_LAYER_NAMES)
 
     def get_layer_draw(self, layer_name: str):
         return self._draws.get(layer_name)
@@ -379,11 +379,15 @@ class ImageOwner:
 
     def _create_default_layers(self, dim: tuple[int, int]):
         """Register all default layers, with size ``dim``."""
-        for layer_name in self._DEFAULT_LAYER_NAMES:
+        for layer_name in self.DEFAULT_LAYER_NAMES:
             self._create_layer(layer_name, dim)
 
     def output(
-            self, fp: Union[str, Path] = None, image_format: str = None, **_kw
+            self,
+            fp: Union[str, Path] = None,
+            image_format: str = None,
+            layers: list[str] = None,
+            **_kw
     ) -> Union[Image.Image, None]:
         """
         Compile and return the merged image of the plat. Optionally
@@ -395,14 +399,22 @@ class ImageOwner:
         :param image_format: (Optional) Override the image format of the
             file specified in ``fp``. If not provided, will defer to the
             file extension in ``fp``. (Only relevant if saving to file.)
+        :param layers: (Optional) Choose which image layers (in
+            bottom-up order) to include in the output. (See
+            ``Plat.DEFAULT_LAYER_NAMES`` for the standard layer names.)
+            Nonexistent or empty layers will be ignored.
         :param _kw: No effect. (Included to mirror ``.output()`` of
             other classes.)
-        :return: The generated image. If ``.image_layers`` contains no
-            images, will return ``None`` instead.
+        :return: The generated image. If no layers have been configured
+            and/or ``layers`` contains only layers that are nonexistent
+            or empty, will return ``None`` instead.
         """
-        selected_layers = self._output_layer_names
-        if self._output_layer_names is None:
-            selected_layers = self._DEFAULT_LAYER_NAMES
+        selected_layers = self.output_layer_names
+        if selected_layers is None:
+            selected_layers = self.DEFAULT_LAYER_NAMES
+        if layers is not None:
+            # Param `layers` overrides attributes.
+            selected_layers = layers
         selected_layer_ims = []
         for layer_name in selected_layers:
             im = self.get_layer_image(layer_name)
@@ -1554,7 +1566,8 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
             fp: Union[str, Path] = None,
             image_format: str = None,
             stack=None,
-            subset_twprges: list[str] = None
+            subset_twprges: list[str] = None,
+            layers: list[str] = None
     ) -> list[Image.Image]:
         """
         Compile and return the merged image of the plats. Optionally
@@ -1589,6 +1602,11 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
             other format will result in separate images.
         :param subset_twprges: (Optional) Output the plats only for the
             selected Twp/Rges (formatted as ``['154n97w', '12s58e']``).
+        :param layers: (Optional) Choose which image layers (in
+            bottom-up order) to include in the output. (See
+            ``Plat.DEFAULT_LAYER_NAMES`` for the standard layer names.)
+            Nonexistent or empty layers will be ignored.
+        :return: The resulting plat image(s) as a list of images.
         """
         results = []
         written_twprges = []
@@ -1597,7 +1615,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
             twprges = subset_twprges
         for twprge in twprges:
             plat = self.plats[twprge]
-            results.append(plat.output())
+            results.append(plat.output(layers=layers))
             written_twprges.append(twprge)
         if fp is not None:
             save_output_images(results, fp, image_format, stack, written_twprges)
@@ -1677,7 +1695,7 @@ class MegaPlat(IPlatOwner, QueueMany):
         Configure this ``MegaPlat`` and subordinates.
         """
         skip_layers = ['footer']
-        for layer_name in self._DEFAULT_LAYER_NAMES:
+        for layer_name in self.DEFAULT_LAYER_NAMES:
             if layer_name in skip_layers:
                 continue
             self._create_layer(layer_name, dim=self.dim)
