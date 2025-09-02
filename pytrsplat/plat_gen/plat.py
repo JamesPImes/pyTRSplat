@@ -1654,6 +1654,7 @@ class MegaPlat(IPlatOwner, QueueMany):
             may be generated. If exceeded, a ``RuntimeError`` will be
             raised prior to plat generation.
         """
+        super().__init__()
         self.queue = pytrs.TractList()
         if settings is None:
             settings = DEFAULT_MEGAPLAT_SETTINGS
@@ -1675,22 +1676,12 @@ class MegaPlat(IPlatOwner, QueueMany):
         """
         Configure this ``MegaPlat`` and subordinates.
         """
-        self.background = Image.new('RGBA', self.dim, Settings.RGBA_WHITE)
-        self.image = Image.new('RGBA', self.dim, (0, 0, 0, 0))
-        self.draw = ImageDraw.Draw(self.image, 'RGBA')
-        self.header_image = Image.new('RGBA', self.dim, (0, 0, 0, 0))
-        self.header_draw = ImageDraw.Draw(self.header_image, 'RGBA')
-        self.overlay_image = Image.new('RGBA', self.dim, (255, 255, 255, 0))
-        self.overlay_draw = ImageDraw.Draw(self.overlay_image, 'RGBA')
-        # No footer to a MegaPlat.
-        self.footer_image = None
-        self.footer_draw = None
-        self.image_layers = [
-            self.background,
-            self.header_image,
-            self.image,
-            self.overlay_image,
-        ]
+        skip_layers = ['footer']
+        for layer_name in self._DEFAULT_LAYER_NAMES:
+            if layer_name in skip_layers:
+                continue
+            self._create_layer(layer_name, dim=self.dim)
+        return None
 
     def _clean_queue(self, queue=None) -> (pytrs.TractList, pytrs.TractList):
         """
