@@ -1,4 +1,5 @@
 from __future__ import annotations
+from functools import wraps
 from typing import Union
 from warnings import warn
 from pathlib import Path
@@ -321,29 +322,59 @@ class ImageOwner:
     """
     Interface for a class that has the following attributes:
 
-    ``.background``  (``PIL.Image.Image``)
-    ``.image``  (``PIL.Image.Image``)
-    ``.draw``  (``ImageDraw.Draw``)
-    ``.header_image``  (``PIL.Image.Image``)
-    ``.header_draw``  (``ImageDraw.Draw``)
-    ``.overlay_image``  (``PIL.Image.Image``)
-    ``.overlay_draw``  (``ImageDraw.Draw``)
-    ``.footer_image``  (``PIL.Image.Image``)
-    ``.footer_draw``  (``ImageDraw.Draw``)
-    ``.image_layers``  (list of ``PIL.Image.Image`` objects)
+    ``._layers`` - A dict of images (``Image.Image``), keyed by layer
+        name.
 
-    And an ``.output()`` method.
+    ``._draws`` - A dict of draws (``ImageDraw.Draw``), keyed by layer
+        name.
+
+    ``._output_layer_names`` - A list of layer names to be written to
+        the merged output image, in the order of bottom-to-top.
+
+    ``._active_layer`` - The name of the currently active layer.
+
+    ``.image`` - A property to return the ``Image.Image`` of the current
+        active layer.
+
+    ``.draw`` - A property to return the ``ImageDraw.Draw`` of the
+        current active layer.
+
+    And ``._create_layer()`` and ``.output()`` methods.
     """
-    background: Image.Image
-    image: Image.Image
-    draw: ImageDraw.Draw
-    header_image: Image.Image
-    header_draw: ImageDraw.Draw
-    overlay_image: Image.Image
-    overlay_draw: ImageDraw.Draw
-    footer_image: Image.Image
-    footer_draw: ImageDraw.Draw
-    image_layers: list[Image.Image]
+    _layers: dict[str, Image.Image]
+    _draws: dict[str, ImageDraw.Draw]
+    _active_layer_name: Union[str, None]
+    _output_layer_names = list[str]
+    _default_layer_names = (
+        'background',
+        'header',
+        'footer',
+        'quarter_lines',
+        'aliquots',
+        'lots',
+        'sec_border',
+        'twp_border',
+    )
+
+    @property
+    def image(self):
+        return self._layers[self._active_layer_name]
+
+    @property
+    def draw(self):
+        return self._draws[self._active_layer_name]
+
+    def _create_layer(self, layer_name: str, dim: tuple[int, int], rgba=None):
+        """Register a layer of size ``dim``, with name ``layer_name``."""
+        if rgba is None:
+            rgba = (0, 0, 0, 0)
+            if layer_name == 'background':
+                rgba = Settings.RGBA_WHITE
+        im = Image.new('RGBA', dim, rgba)
+        draw = ImageDraw.Draw(im, 'RGBA')
+        self._layers[layer_name] = im
+        self._draws[layer_name] = draw
+        return None
 
     def output(
             self, fp: Union[str, Path] = None, image_format: str = None, **_kw
@@ -363,13 +394,22 @@ class ImageOwner:
         :return: The generated image. If ``.image_layers`` contains no
             images, will return ``None`` instead.
         """
-        if not self.image_layers:
+        selected_layers = self._output_layer_names
+        if self._output_layer_names is None:
+            selected_layers = self._default_layer_names
+        selected_layer_ims = []
+        for layer_name in selected_layers:
+            im = self._layers.get(layer_name)
+            if im is None:
+                continue
+            selected_layer_ims.append(im)
+        if not selected_layer_ims:
             return None
-        if len(self.image_layers) == 1:
-            return self.image_layers[0]
-        merged = Image.alpha_composite(*self.image_layers[:2])
-        for i in range(2, len(self.image_layers)):
-            merged = Image.alpha_composite(merged, self.image_layers[i])
+        elif len(selected_layer_ims) == 1:
+            return selected_layer_ims[0]
+        merged = Image.alpha_composite(*selected_layer_ims[:2])
+        for i in range(2, len(selected_layer_ims)):
+            merged = Image.alpha_composite(merged, selected_layer_ims[i])
         merged = merged.convert('RGB')
         if fp is not None:
             save_output_images([merged], fp, image_format)
@@ -426,37 +466,34 @@ class ImageOwned:
     """
     owner: ImageOwner
 
+    def _activate_layer(self, layer_name: str):
+        """
+        Decorator to activate the specified layer for a given method,
+        then restore it to its original setting.
+        """
+
+        def decorator(func):
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                """Set active_layer, then restore it later."""
+                original_layer = self.owner._active_layer_name
+                self.owner._active_layer_name = layer_name
+                try:
+                    return func(*args, **kwargs)
+                finally:
+                    self.owner._active_layer_name = original_layer
+
+            return wrapper
+
+        return decorator
+
     @property
     def image(self):
-        return self.owner.image
+        return self.owner._layers[self.owner._active_layer_name]
 
     @property
     def draw(self):
-        return self.owner.draw
-
-    @property
-    def header_image(self):
-        return self.owner.header_image
-
-    @property
-    def header_draw(self):
-        return self.owner.header_draw
-
-    @property
-    def overlay_image(self):
-        return self.owner.overlay_image
-
-    @property
-    def overlay_draw(self):
-        return self.owner.overlay_draw
-
-    @property
-    def footer_image(self):
-        return self.owner.footer_image
-
-    @property
-    def footer_draw(self):
-        return self.owner.footer_draw
+        return self.owner._draws[self.owner._active_layer_name]
 
 
 class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
