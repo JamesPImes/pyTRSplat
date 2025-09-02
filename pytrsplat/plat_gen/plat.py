@@ -341,28 +341,30 @@ class ImageOwner:
 
     And ``._create_layer()`` and ``.output()`` methods.
     """
-    _layers: dict[str, Image.Image]
-    _draws: dict[str, ImageDraw.Draw]
-    _active_layer_name: Union[str, None]
-    _output_layer_names = list[str]
-    _default_layer_names = (
+    _DEFAULT_LAYER_NAMES = (
         'background',
         'header',
         'footer',
-        'quarter_lines',
-        'aliquots',
-        'lots',
+        'inner_lines',
+        'aliquot_fill',
+        'lot_nums',
         'sec_border',
         'twp_border',
     )
+    _images: dict[str, Image.Image]
+    _draws: dict[str, ImageDraw.Draw]
+    _output_layer_names: list[str]
 
-    @property
-    def image(self):
-        return self._layers[self._active_layer_name]
+    def __init__(self):
+        self._images = {}
+        self._draws = {}
+        self._output_layer_names = list(self._DEFAULT_LAYER_NAMES)
 
-    @property
-    def draw(self):
-        return self._draws[self._active_layer_name]
+    def get_layer_draw(self, layer_name: str):
+        return self._draws.get(layer_name)
+
+    def get_layer_image(self, layer_name: str):
+        return self._images.get(layer_name)
 
     def _create_layer(self, layer_name: str, dim: tuple[int, int], rgba=None):
         """Register a layer of size ``dim``, with name ``layer_name``."""
@@ -372,9 +374,14 @@ class ImageOwner:
                 rgba = Settings.RGBA_WHITE
         im = Image.new('RGBA', dim, rgba)
         draw = ImageDraw.Draw(im, 'RGBA')
-        self._layers[layer_name] = im
+        self._images[layer_name] = im
         self._draws[layer_name] = draw
         return None
+
+    def _create_default_layers(self, dim: tuple[int, int]):
+        """Register all default layers, with size ``dim``."""
+        for layer_name in self._DEFAULT_LAYER_NAMES:
+            self._create_layer(layer_name, dim)
 
     def output(
             self, fp: Union[str, Path] = None, image_format: str = None, **_kw
@@ -396,10 +403,10 @@ class ImageOwner:
         """
         selected_layers = self._output_layer_names
         if self._output_layer_names is None:
-            selected_layers = self._default_layer_names
+            selected_layers = self._DEFAULT_LAYER_NAMES
         selected_layer_ims = []
         for layer_name in selected_layers:
-            im = self._layers.get(layer_name)
+            im = self.get_layer_image(layer_name)
             if im is None:
                 continue
             selected_layer_ims.append(im)
@@ -466,34 +473,11 @@ class ImageOwned:
     """
     owner: ImageOwner
 
-    def _activate_layer(self, layer_name: str):
-        """
-        Decorator to activate the specified layer for a given method,
-        then restore it to its original setting.
-        """
+    def get_layer_draw(self, layer_name: str):
+        return self.owner.get_layer_draw(layer_name)
 
-        def decorator(func):
-            @wraps(func)
-            def wrapper(*args, **kwargs):
-                """Set active_layer, then restore it later."""
-                original_layer = self.owner._active_layer_name
-                self.owner._active_layer_name = layer_name
-                try:
-                    return func(*args, **kwargs)
-                finally:
-                    self.owner._active_layer_name = original_layer
-
-            return wrapper
-
-        return decorator
-
-    @property
-    def image(self):
-        return self.owner._layers[self.owner._active_layer_name]
-
-    @property
-    def draw(self):
-        return self.owner._draws[self.owner._active_layer_name]
+    def get_layer_image(self, layer_name: str):
+        return self.owner.get_layer_image(layer_name)
 
 
 class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
@@ -574,7 +558,8 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
             rgba = cf.qq_fill_rgba
         if self.is_leaf():
             box = get_box(self.xy, dim=self.square_dim)
-            self.overlay_draw.polygon(box, rgba)
+            draw = self.get_layer_draw('aliquot_fill')
+            draw.polygon(box, rgba)
         for child in self.children.values():
             child.fill(rgba)
         return None
@@ -591,7 +576,7 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
         if self.depth == at_depth:
             lot_txt = ', '.join(str(l) for l in sorted(self.sources))
             stn = self.settings
-            draw = self.draw
+            draw = self.get_layer_draw('lot_nums')
             font = stn.lotfont
             fill = stn.lotfont_rgba
             offset = stn.lot_num_offset_px
@@ -690,8 +675,10 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
                 ew = ((x, y + div_sec_len * i), (x + sec_len, y + div_sec_len * i))
                 depth_lines[depth].append(ew)
 
-        draw = self.draw
         for depth in reversed(depth_lines.keys()):
+            draw = self.get_layer_draw('inner_lines')
+            if depth == 0:
+                draw = self.get_layer_draw('sec_border')
             lines = depth_lines[depth]
             width = settings.line_stroke.get(depth, settings.line_stroke[None])
             fill = settings.line_rgba.get(depth, settings.line_rgba[None])
@@ -705,7 +692,7 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         section number there.
         """
         settings = self.settings
-        draw = self.draw
+        draw = self.get_layer_draw('inner_lines')
         # Draw middle white space.
         cb_dim = settings.centerbox_dim
         x_center, y_center = calc_midpt(xy=self.xy, square_dim=self.sec_length_px)
@@ -930,8 +917,9 @@ class PlatBody(SettingsOwned, ImageOwned):
         lines = get_box_outline(xy=self.xy, dim=stn.sec_length_px * 6)
         width = stn.line_stroke[-1]
         fill = stn.line_rgba[-1]
+        draw = self.get_layer_draw('twp_border')
         for line in lines:
-            self.draw.line(line, fill=fill, width=width)
+            draw.line(line, fill=fill, width=width)
 
 
 class PlatHeader(SettingsOwned, ImageOwned):
@@ -1004,10 +992,11 @@ class PlatHeader(SettingsOwned, ImageOwned):
             header = trs.pretty_twprge(**kw)
         font = self.settings.headerfont
         fill = self.settings.headerfont_rgba
-        draw = self.header_draw
+        draw = self.get_layer_draw('header')
+        im_width = self.get_layer_image('header').width
         _, _, w, h = draw.textbbox(xy=(0, 0), text=header, font=font)
         if xy is None and align == 'default':
-            x = (self.image.width - w) // 2
+            x = (im_width - w) // 2
             y = self.settings.body_marg_top_y - h - self.settings.header_px_above_body
         else:
             x, y = xy
@@ -1047,7 +1036,8 @@ class PlatFooter(SettingsOwned, ImageOwned):
         self._x, self._y = (x, y)
         sample_trs = 'XXXzXXXzXX:'
         font = stn.footerfont
-        _, _, w, h = self.draw.textbbox(xy=(0, 0), text=sample_trs, font=font)
+        draw = self.get_layer_draw('footer')
+        _, _, w, h = draw.textbbox(xy=(0, 0), text=sample_trs, font=font)
         self._text_line_height = h
         self._trs_indent = x + w
 
@@ -1065,7 +1055,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
         font = stn.footerfont
         if fill is None:
             fill = stn.footerfont_rgba
-        draw = self.footer_draw
+        draw = self.get_layer_draw('footer')
         draw.text(xy=(x, self._y), text=text, font=font, fill=fill)
         self._y += self._text_line_height + stn.footer_px_between_lines
         return None
@@ -1170,7 +1160,6 @@ class PlatFooter(SettingsOwned, ImageOwned):
             the original tract will be returned.
         """
         stn = self.settings
-        draw = self.footer_draw
         font = stn.footerfont
         fill = stn.footerfont_rgba
         if font_rgba is not None:
@@ -1188,6 +1177,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
             # If no description for this tract, we still want to move the cursor down.
             writable_lines.append('')
         # TRS is written separately.
+        draw = self.get_layer_draw('footer')
         draw.text(xy=(self._x, self._y), text=f"{trs}:", font=font, fill=fill)
         # If any undefined lots, use the warning color for the desc of this tract.
         if hasattr(tract, 'undefined_lots') and len(tract.undefined_lots) > 0:
@@ -1235,20 +1225,10 @@ class Plat(IPlatOwner, QueueSingle):
             and appearance of this plat. (Will be overridden by the
             settings in ``owner``, if that is passed.)
         """
+        super().__init__()
         self.twp = twp
         self.rge = rge
         self.queue = pytrs.TractList()
-        self.background: Image.Image = None
-        # Main image and draw object.
-        self.image: Image.Image = None
-        self.draw: ImageDraw.Draw = None
-        # Overlays the main image with QQs, etc.
-        self.overlay_image: Image.Image = None
-        self.overlay_draw: ImageDraw.Draw = None
-        # Footer image and draw object.
-        self.footer_image: Image.Image = None
-        self.footer_draw: ImageDraw.Draw = None
-        self.image_layers: list[Image.Image] = []
         self.header = PlatHeader(owner=self)
         self.body = PlatBody(twp, rge, owner=self)
         self.footer = PlatFooter(owner=self)
@@ -1324,23 +1304,7 @@ class Plat(IPlatOwner, QueueSingle):
 
     def configure(self):
         """Configure this plat and its subordinates."""
-        self.background = Image.new('RGBA', self.settings.dim, Settings.RGBA_WHITE)
-        self.image = Image.new('RGBA', self.settings.dim, (0, 0, 0, 0))
-        self.draw = ImageDraw.Draw(self.image, 'RGBA')
-        self.header_image = Image.new('RGBA', self.settings.dim, (0, 0, 0, 0))
-        self.header_draw = ImageDraw.Draw(self.header_image, 'RGBA')
-        self.overlay_image = Image.new('RGBA', self.settings.dim, (255, 255, 255, 0))
-        self.overlay_draw = ImageDraw.Draw(self.overlay_image, 'RGBA')
-        self.footer_image = Image.new('RGBA', self.settings.dim, (255, 255, 255, 0))
-        self.footer_draw = ImageDraw.Draw(self.footer_image, 'RGBA')
-        # The images in the order that they should be stacked for output.
-        self.image_layers = [
-            self.background,
-            self.header_image,
-            self.footer_image,
-            self.image,
-            self.overlay_image,
-        ]
+        self._create_default_layers(dim=self.settings.dim)
         self.body.configure(twp=self.twp, rge=self.rge)
         self.footer.configure()
         return None
