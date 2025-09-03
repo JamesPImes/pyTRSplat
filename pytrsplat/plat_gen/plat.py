@@ -336,9 +336,9 @@ class ImageOwner:
     ``._active_layer`` - The name of the currently active layer.
 
     And methods:
-    ``.get_layer_image()`` - Get the ``Image.Image`` of the layer.
+    ``._get_layer_image()`` - Get the ``Image.Image`` of the layer.
 
-    ``.get_layer_draw()`` - Get the ``ImageDraw.Draw`` of the layer.
+    ``._get_layer_draw()`` - Get the ``ImageDraw.Draw`` of the layer.
 
     And ``._create_layer()``, ``._create_default_layers()`` and
     ``.output()`` methods.
@@ -357,20 +357,52 @@ class ImageOwner:
     _images: dict[str, Image.Image]
     _draws: dict[str, ImageDraw.Draw]
     output_layer_names: list[str]
+    dim: Union[tuple[int, int], None]
 
     def __init__(self):
         self._images = {}
         self._draws = {}
         self.output_layer_names = list(self.DEFAULT_LAYER_NAMES)
 
-    def get_layer_draw(self, layer_name: str):
-        return self._draws.get(layer_name)
+    def _get_layer_draw(
+            self, layer_name: str, create=False, dim: tuple[int, int] = None):
+        """
+        Get the ``ImageDraw.Draw`` for a given layer.
 
-    def get_layer_image(self, layer_name: str):
-        return self._images.get(layer_name)
+        :param layer_name: Name of the layer.
+        :param create: (Optional) If the layer doesn't exist, create it.
+        :param dim: (Optional) If creating the layer, use these
+            dimensions. If not specified here, will fall back to
+            ``.dim`` attribute.
+        """
+        draw = self._draws.get(layer_name)
+        if draw is None and create:
+            self._create_layer(layer_name, dim)
+            draw = self._draws.get(layer_name)
+        return draw
 
-    def _create_layer(self, layer_name: str, dim: tuple[int, int], rgba=None):
+    def _get_layer_image(
+            self, layer_name: str, create=False, dim: tuple[int, int] = None):
+        """
+        Get the ``Image.Image`` for a given layer.
+
+        :param layer_name: Name of the layer.
+        :param create: (Optional) If the layer doesn't exist, create it.
+        :param dim: (Optional) If creating the layer, use these
+            dimensions. If not specified here, will fall back to
+            ``.dim`` attribute.
+
+        """
+        image = self._images.get(layer_name)
+        if image is None and create:
+            self._create_layer(layer_name, dim)
+            image = self._images.get(layer_name)
+        return image
+
+    def _create_layer(self, layer_name: str, dim: tuple[int, int] = None, rgba=None):
         """Register a layer of size ``dim``, with name ``layer_name``."""
+        if dim is None:
+            dim = self.dim
         if rgba is None:
             rgba = (0, 0, 0, 0)
             if layer_name == 'background':
@@ -381,10 +413,21 @@ class ImageOwner:
         self._draws[layer_name] = draw
         return None
 
-    def _create_default_layers(self, dim: tuple[int, int]):
+    def _create_default_layers(self, dim: tuple[int, int] = None):
         """Register all default layers, with size ``dim``."""
+        if dim is None:
+            dim = self.dim
         for layer_name in self.DEFAULT_LAYER_NAMES:
             self._create_layer(layer_name, dim)
+
+    def _reset_layers(self, dim: tuple[int, int] = None):
+        """Discard all existing layers and create a new ``'background'``."""
+        layer_names = list(self._images.keys())
+        for layer_name in layer_names:
+            self._images.pop(layer_name)
+            self._draws.pop(layer_name)
+        self._create_layer('background', dim)
+        return None
 
     def output(
             self,
@@ -421,7 +464,7 @@ class ImageOwner:
             selected_layers = layers
         selected_layer_ims = []
         for layer_name in selected_layers:
-            im = self.get_layer_image(layer_name)
+            im = self._get_layer_image(layer_name)
             if im is None:
                 continue
             selected_layer_ims.append(im)
@@ -488,11 +531,21 @@ class ImageOwned:
     """
     owner: ImageOwner
 
-    def get_layer_draw(self, layer_name: str):
-        return self.owner.get_layer_draw(layer_name)
+    def _get_layer_draw(
+            self, layer_name: str, create=False, dim: tuple[int, int] = None):
+        """
+        Reference docs for ``ImageOwner._get_layer_draw()``. (Passed
+        through to ``._get_layer_draw()`` for ``.owner``.)
+        """
+        return self.owner._get_layer_draw(layer_name, create, dim)
 
-    def get_layer_image(self, layer_name: str):
-        return self.owner.get_layer_image(layer_name)
+    def _get_layer_image(
+            self, layer_name: str, create=False, dim: tuple[int, int] = None):
+        """
+        Reference docs for ``ImageOwner._get_layer_image()``. (Passed
+        through to ``._get_layer_image()`` for ``.owner``.)
+        """
+        return self.owner._get_layer_image(layer_name, create, dim)
 
 
 class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
@@ -573,7 +626,7 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
             rgba = cf.qq_fill_rgba
         if self.is_leaf():
             box = get_box(self.xy, dim=self.square_dim)
-            draw = self.get_layer_draw('aliquot_fill')
+            draw = self._get_layer_draw('aliquot_fill', create=True)
             draw.polygon(box, rgba)
         for child in self.children.values():
             child.fill(rgba)
@@ -591,7 +644,7 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
         if self.depth == at_depth:
             lot_txt = ', '.join(str(l) for l in sorted(self.sources))
             stn = self.settings
-            draw = self.get_layer_draw('lot_nums')
+            draw = self._get_layer_draw('lot_nums', create=True)
             font = stn.lotfont
             fill = stn.lotfont_rgba
             offset = stn.lot_num_offset_px
@@ -691,9 +744,9 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
                 depth_lines[depth].append(ew)
 
         for depth in reversed(depth_lines.keys()):
-            draw = self.get_layer_draw('inner_lines')
+            draw = self._get_layer_draw('inner_lines', create=True)
             if depth == 0:
-                draw = self.get_layer_draw('sec_border')
+                draw = self._get_layer_draw('sec_border', create=True)
             lines = depth_lines[depth]
             width = settings.line_stroke.get(depth, settings.line_stroke[None])
             fill = settings.line_rgba.get(depth, settings.line_rgba[None])
@@ -707,7 +760,7 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         section number there.
         """
         settings = self.settings
-        draw = self.get_layer_draw('inner_lines')
+        draw = self._get_layer_draw('inner_lines', create=True)
         # Draw middle white space.
         cb_dim = settings.centerbox_dim
         x_center, y_center = calc_midpt(xy=self.xy, square_dim=self.sec_length_px)
@@ -719,7 +772,7 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         font = settings.secfont
         fill = settings.secfont_rgba
         txt = str(self.trs.sec_num)
-        draw = self.get_layer_draw('sec_nums')
+        draw = self._get_layer_draw('sec_nums', create=True)
         _, _, w, h = draw.textbbox(xy=(0, 0), text=txt, font=font)
         # Force a slight upward shift of the section text. Looks wrong otherwise.
         horizontal_tweak_pct = 1.2
@@ -934,7 +987,7 @@ class PlatBody(SettingsOwned, ImageOwned):
         fill = stn.line_rgba[-1]
         lines = get_box_outline(
             xy=self.xy, dim=stn.sec_length_px * 6, extend_px=width // 2 - 1)
-        draw = self.get_layer_draw('twp_border')
+        draw = self._get_layer_draw('twp_border', create=True)
         for line in lines:
             draw.line(line, fill=fill, width=width)
 
@@ -1009,8 +1062,8 @@ class PlatHeader(SettingsOwned, ImageOwned):
             header = trs.pretty_twprge(**kw)
         font = self.settings.headerfont
         fill = self.settings.headerfont_rgba
-        draw = self.get_layer_draw('header')
-        im_width = self.get_layer_image('header').width
+        draw = self._get_layer_draw('header', create=True)
+        im_width = draw.im.size[0]
         _, _, w, h = draw.textbbox(xy=(0, 0), text=header, font=font)
         if xy is None and align == 'default':
             x = (im_width - w) // 2
@@ -1053,7 +1106,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
         self._x, self._y = (x, y)
         sample_trs = 'XXXzXXXzXX:'
         font = stn.footerfont
-        draw = self.get_layer_draw('footer')
+        draw = self._get_layer_draw('footer', create=True)
         _, _, w, h = draw.textbbox(xy=(0, 0), text=sample_trs, font=font)
         self._text_line_height = h
         self._trs_indent = x + w
@@ -1072,7 +1125,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
         font = stn.footerfont
         if fill is None:
             fill = stn.footerfont_rgba
-        draw = self.get_layer_draw('footer')
+        draw = self._get_layer_draw('footer', create=True)
         draw.text(xy=(x, self._y), text=text, font=font, fill=fill)
         self._y += self._text_line_height + stn.footer_px_between_lines
         return None
@@ -1194,7 +1247,7 @@ class PlatFooter(SettingsOwned, ImageOwned):
             # If no description for this tract, we still want to move the cursor down.
             writable_lines.append('')
         # TRS is written separately.
-        draw = self.get_layer_draw('footer')
+        draw = self._get_layer_draw('footer', create=True)
         draw.text(xy=(self._x, self._y), text=f"{trs}:", font=font, fill=fill)
         # If any undefined lots, use the warning color for the desc of this tract.
         if hasattr(tract, 'undefined_lots') and len(tract.undefined_lots) > 0:
@@ -1264,6 +1317,10 @@ class Plat(IPlatOwner, QueueSingle):
         self._all_lot_defs_cached = {}
 
     @property
+    def dim(self):
+        return self.settings.dim
+
+    @property
     def settings(self):
         if self.owner is not None:
             return self.owner.settings
@@ -1321,7 +1378,7 @@ class Plat(IPlatOwner, QueueSingle):
 
     def _configure(self):
         """Configure this plat and its subordinates."""
-        self._create_default_layers(dim=self.settings.dim)
+        self._reset_layers(dim=self.dim)
         self.body._configure(twp=self.twp, rge=self.rge)
         self.footer._configure()
         return None
@@ -1699,11 +1756,7 @@ class MegaPlat(IPlatOwner, QueueMany):
         """
         Configure this ``MegaPlat`` and subordinates.
         """
-        skip_layers = ['footer']
-        for layer_name in self.DEFAULT_LAYER_NAMES:
-            if layer_name in skip_layers:
-                continue
-            self._create_layer(layer_name, dim=self.dim)
+        self._reset_layers(dim=self.dim)
         return None
 
     def _clean_queue(self, queue=None) -> (pytrs.TractList, pytrs.TractList):
