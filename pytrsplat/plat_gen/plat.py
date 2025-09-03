@@ -434,6 +434,7 @@ class ImageOwner:
             fp: Union[str, Path] = None,
             image_format: str = None,
             layers: list[str] = None,
+            image_mode: str = 'RGB',
             **_kw
     ) -> Union[Image.Image, None]:
         """
@@ -450,6 +451,9 @@ class ImageOwner:
             bottom-up order) to include in the output. (See
             ``Plat.DEFAULT_LAYER_NAMES`` for the standard layer names.)
             Nonexistent or empty layers will be ignored.
+        :param image_mode: Specify which image mode to convert the
+            merged output to. Defaults to ``'RGB'``. (Reference
+            ``PIL.Image.Image.convert()`` for further details.)
         :param _kw: No effect. (Included to mirror ``.output()`` of
             other classes.)
         :return: The generated image. If no layers have been configured
@@ -475,7 +479,9 @@ class ImageOwner:
         merged = Image.alpha_composite(*selected_layer_ims[:2])
         for i in range(2, len(selected_layer_ims)):
             merged = Image.alpha_composite(merged, selected_layer_ims[i])
-        merged = merged.convert('RGB')
+        image_mode = image_mode.upper()
+        if image_mode != 'RGBA' and image_mode is not None:
+            merged = merged.convert(image_mode)
         if fp is not None:
             save_output_images([merged], fp, image_format)
         return merged
@@ -1629,7 +1635,8 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
             image_format: str = None,
             stack=None,
             subset_twprges: list[str] = None,
-            layers: list[str] = None
+            layers: list[str] = None,
+            image_mode: str = 'RGB',
     ) -> list[Image.Image]:
         """
         Compile and return the merged image of the plats. Optionally
@@ -1668,6 +1675,9 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
             bottom-up order) to include in the output. (See
             ``Plat.DEFAULT_LAYER_NAMES`` for the standard layer names.)
             Nonexistent or empty layers will be ignored.
+        :param image_mode: Specify which image mode to convert the
+            merged output to. Defaults to ``'RGB'``. (Reference
+            ``PIL.Image.Image.convert()`` for further details.)
         :return: The resulting plat image(s) as a list of images.
         """
         results = []
@@ -1677,7 +1687,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
             twprges = subset_twprges
         for twprge in twprges:
             plat = self.plats[twprge]
-            results.append(plat.output(layers=layers))
+            results.append(plat.output(layers=layers, image_mode=image_mode))
             written_twprges.append(twprge)
         if fp is not None:
             save_output_images(results, fp, image_format, stack, written_twprges)
