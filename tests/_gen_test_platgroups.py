@@ -85,7 +85,7 @@ def platgroup2tracts2twprges_nodefaults(fn: str, out_dir: Path = DEFAULT_OUT_DIR
 
 
 @add_docstring(
-    'PlatGroup - Two tracts, one Twp/Rge. 40-acre default lots (written).',
+    'PlatGroup - Two tracts, two Twp/Rge. 40-acre default lots (written).',
     DESC_1, DESC_3)
 def platgroup2tracts2twprges_lotnums_defaults40ac(fn: str, out_dir: Path = DEFAULT_OUT_DIR, override=False):
     settings = get_test_settings_for_plat()
