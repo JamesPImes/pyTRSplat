@@ -187,7 +187,7 @@ class Settings:
         self.dim = Settings.LETTER_200_PPI
         self.qq_fill_rgba = Settings.RGBA_BLUE_OVERLAY
         self.sec_length_px = 200
-        self.line_stroke: dict[int, int] = {
+        self.line_stroke: dict[Union[int, None], int] = {
             -1: 4,  # Township border
             0: 3,  # sec line
             1: 3,  # half line
@@ -196,7 +196,7 @@ class Settings:
             None: 1  # default for all others
         }
         # RGBA values for color of various sec/Q lines
-        self.line_rgba = {
+        self.line_rgba: dict[Union[int, None], tuple[int, int, int, int]] = {
             -1: Settings.RGBA_BLACK,  # Township border
             0: Settings.RGBA_BLACK,  # sec line
             1: Settings.RGBA_BLACK,  # half line
