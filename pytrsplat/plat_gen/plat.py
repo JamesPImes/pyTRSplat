@@ -628,8 +628,7 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
             is configured in the owner's settings.
         """
         if rgba is None:
-            cf = self.settings
-            rgba = cf.qq_fill_rgba
+            rgba = self.settings.qq_fill_rgba
         if self.is_leaf():
             box = get_box(self.xy, dim=self.square_dim)
             draw = self._get_layer_draw('aliquot_fill', create=True)
@@ -888,11 +887,7 @@ class PlatBody(SettingsOwned, ImageOwned):
             for j in range(sections_per_side):
                 sec_num = self.SEC_NUMS[k]
                 trs = pytrs.TRS.from_twprgesec(twp, rge, sec_num)
-                plat_sec = PlatSection(
-                    trs,
-                    grid_offset=(i, j),
-                    owner=self.owner
-                )
+                plat_sec = PlatSection(trs, grid_offset=(i, j), owner=self.owner)
                 self.plat_secs[sec_num] = plat_sec
                 k += 1
         # A dummy section, for tracts with undefined/error section number.
