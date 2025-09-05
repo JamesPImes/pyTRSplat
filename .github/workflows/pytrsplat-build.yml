@@ -40,4 +40,5 @@ jobs:
         
     - name: Unit tests with pytest
       run: |
+        # Various PlatWarning are expected/intended, so ignore them.
         pytest -W "ignore::pytrsplat.PlatWarning"
