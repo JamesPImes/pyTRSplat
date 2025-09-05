@@ -7,7 +7,8 @@ from typing import Union
 from pathlib import Path
 from hashlib import sha512
 
-from PIL import Image
+import numpy as np
+from PIL import Image, ImageChops
 
 try:
     from pytrsplat import Settings, Plat, PlatGroup, MegaPlat
@@ -89,11 +90,8 @@ def get_test_settings_for_megaplat():
 
 def images_match(im1: Image.Image, im2: Image.Image):
     """Check if the two images match."""
-    if None in (im1, im2):
-        return False
-    im1_hash = sha512(im1.tobytes()).hexdigest()
-    im2_hash = sha512(im2.tobytes()).hexdigest()
-    return im1_hash == im2_hash
+    diff = ImageChops.difference(im1, im2)
+    return np.sum(diff) == 0
 
 
 def image_matches_existing(fp: Path, image: Image.Image):
