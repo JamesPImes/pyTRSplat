@@ -38,32 +38,32 @@
       255
     ],
     "2": [
-      128,
-      128,
-      128,
-      140
+      64,
+      64,
+      64,
+      96
     ],
     "3": [
-      128,
-      128,
-      128,
-      60
+      64,
+      64,
+      64,
+      24
     ],
     "null": [
-      196,
-      196,
-      196,
-      100
+      230,
+      230,
+      230,
+      24
     ]
   },
   "min_depth": 2,
   "max_depth": null,
   "centerbox_dim": 38,
   "lot_num_offset_px": 6,
-  "headerfont_typeface": "_fonts\\LiberationMono-Bold.ttf",
-  "footerfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
-  "secfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
-  "lotfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
+  "headerfont_typeface": "_fonts/LiberationMono-Bold.ttf",
+  "footerfont_typeface": "_fonts/LiberationSans-Regular.ttf",
+  "secfont_typeface": "_fonts/LiberationSans-Regular.ttf",
+  "lotfont_typeface": "_fonts/LiberationSans-Regular.ttf",
   "headerfont_size": 72,
   "footerfont_size": 28,
   "secfont_size": 24,

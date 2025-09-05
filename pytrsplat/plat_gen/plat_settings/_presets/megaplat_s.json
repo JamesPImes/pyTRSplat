@@ -32,46 +32,46 @@
       255
     ],
     "1": [
-      0,
-      0,
-      0,
+      64,
+      64,
+      64,
       255
     ],
     "2": [
-      128,
-      128,
-      128,
-      140
+      64,
+      64,
+      64,
+      64
     ],
     "3": [
-      128,
-      128,
-      128,
-      60
+      64,
+      64,
+      64,
+      32
     ],
     "null": [
-      196,
-      196,
-      196,
-      100
+      230,
+      230,
+      230,
+      32
     ]
   },
   "min_depth": 2,
   "max_depth": null,
   "centerbox_dim": 20,
   "lot_num_offset_px": 6,
-  "headerfont_typeface": "_fonts\\LiberationMono-Bold.ttf",
-  "footerfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
-  "secfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
-  "lotfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
+  "headerfont_typeface": "_fonts/LiberationMono-Bold.ttf",
+  "footerfont_typeface": "_fonts/LiberationSans-Regular.ttf",
+  "secfont_typeface": "_fonts/LiberationSans-Regular.ttf",
+  "lotfont_typeface": "_fonts/LiberationSans-Regular.ttf",
   "headerfont_size": 48,
   "footerfont_size": 28,
   "secfont_size": 14,
   "lotfont_size": 14,
   "headerfont_rgba": [
-    192,
-    192,
-    192,
+    196,
+    196,
+    196,
     255
   ],
   "footerfont_rgba": [

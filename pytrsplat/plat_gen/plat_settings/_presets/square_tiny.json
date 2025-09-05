@@ -38,32 +38,32 @@
       255
     ],
     "2": [
-      230,
-      230,
-      230,
-      255
+      64,
+      64,
+      64,
+      48
     ],
     "3": [
-      230,
-      230,
-      230,
-      255
+      64,
+      64,
+      64,
+      32
     ],
     "null": [
       230,
       230,
       230,
-      255
+      32
     ]
   },
   "min_depth": 2,
   "max_depth": null,
   "centerbox_dim": 12,
   "lot_num_offset_px": 6,
-  "headerfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
-  "footerfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
-  "secfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
-  "lotfont_typeface": "_fonts\\LiberationSans-Regular.ttf",
+  "headerfont_typeface": "_fonts/LiberationSans-Regular.ttf",
+  "footerfont_typeface": "_fonts/LiberationSans-Regular.ttf",
+  "secfont_typeface": "_fonts/LiberationSans-Regular.ttf",
+  "lotfont_typeface": "_fonts/LiberationSans-Regular.ttf",
   "headerfont_size": 10,
   "footerfont_size": 8,
   "secfont_size": 10,
