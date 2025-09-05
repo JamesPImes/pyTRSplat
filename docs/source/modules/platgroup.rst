@@ -19,6 +19,10 @@ See
 :doc:`Settings <settings>`
 for how to work with the ``.settings`` attribute.
 
+See :doc:`this discussion on working with multiple layers<layers>`
+for using multiple colors for different tracts.
+
+
 Example Images
 --------------
 
