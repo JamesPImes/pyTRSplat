@@ -13,7 +13,7 @@ Use the ``layer='some_layer'`` parameter when adding lands to a ``Plat``, ``Plat
     plat.add_tract(any_tract, layer='some_third_layer')
 
 
-And set the fill color for a given layer, with the ``.settings.set_layer_fil()`` method:
+And set the fill color for a given layer, with the ``.settings.set_layer_fill()`` method:
 
 .. code-block:: python
 
