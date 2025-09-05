@@ -501,7 +501,7 @@ class ImageOwner(LayerOwner):
             and/or ``layers`` contains only layers that are nonexistent
             or empty, will return ``None`` instead.
         """
-        selected_layers = self.output_layer_names
+        selected_layers = self.output_layer_names.copy()
         if selected_layers is None:
             selected_layers = list(self.DEFAULT_LAYER_NAMES)
         custom_layers = [
