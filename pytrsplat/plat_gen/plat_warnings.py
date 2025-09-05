@@ -1,6 +1,7 @@
 """Custom warnings for situations encountered before or during platting."""
 
 __all__ = [
+    'PlatWarning',
     'UndefinedLotWarning',
     'UnplattableWarning',
 ]
@@ -8,7 +9,12 @@ __all__ = [
 import pytrs
 
 
-class UndefinedLotWarning(UserWarning):
+class PlatWarning(UserWarning):
+    """Generic warning that a plat was not completely successful."""
+    pass
+
+
+class UndefinedLotWarning(PlatWarning):
     """
     A ``pytrs.Tract`` has one or more lots that have not been defined,
     so at least some of its lands cannot be shown on the plat.
@@ -26,7 +32,7 @@ class UndefinedLotWarning(UserWarning):
         return cls(message)
 
 
-class UnplattableWarning(UserWarning):
+class UnplattableWarning(PlatWarning):
     """
     A ``pytrs.Tract`` is completely unplattable, for any of the
     following reasons:
