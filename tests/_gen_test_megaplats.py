@@ -41,6 +41,7 @@ __all__ = [
     'megaplat3twprge_ns_subset',
     'megaplat3twprge_ew_subset',
     'megaplat3twprge_single_subset',
+    'megaplat3tracts_separate_layers',
 ]
 
 DEFAULT_OUT_DIR = RESOURCES_DIR / 'expected_images' / 'megaplat'
@@ -176,7 +177,6 @@ def megaplat3twprge_ns_subset(
     return write_if_new_single(out_dir / fn, mega, override)
 
 
-
 @add_docstring(
     'MegaPlat - All 3 townships. 40-acre default lots (unwritten). '
     'Subset output: 154n96w + 154n97w.',
@@ -226,6 +226,25 @@ def megaplat3twprge_(
     mega.add_description(DESC_1)
     mega.add_description(DESC_2)
     mega.add_description(DESC_3)
+    mega.execute_queue()
+    return write_if_new_single(out_dir / fn, mega, override)
+
+
+@add_docstring(
+    'Plat - Three tracts. Tracts written to different layers (Sec 1 red; Sec 6 green; Sec 8 blue.)',
+    DESC_1, DESC_2, DESC_3)
+def megaplat3tracts_separate_layers(
+        fn: str, out_dir: Path = DEFAULT_OUT_DIR, override=False):
+    settings = get_test_settings_for_megaplat()
+    mega = MegaPlat(settings=settings)
+    mega.lot_definer.allow_defaults = True
+    mega.lot_definer.standard_lot_size = 40
+    mega.add_description(DESC_1, layer='red_layer')
+    mega.add_description(DESC_2, layer='green_layer')
+    # Default is blue.
+    mega.add_description(DESC_3)
+    mega.settings.set_layer_fill('red_layer', qq_fill_rgba=(255, 0, 0, 100))
+    mega.settings.set_layer_fill('green_layer', qq_fill_rgba=(0, 255, 0, 100))
     mega.execute_queue()
     return write_if_new_single(out_dir / fn, mega, override)
 

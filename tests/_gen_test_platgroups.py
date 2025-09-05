@@ -46,6 +46,7 @@ __all__ = [
     'platgroup2tracts_writetracts',
     'platgroup2tracts_writetracts_lotnums',
     'plat3tracts_writetracts_2written',
+    'platgroup3tracts_separate_layers',
 ]
 
 DEFAULT_OUT_DIR = RESOURCES_DIR / 'expected_images' / 'platgroup'
@@ -233,6 +234,24 @@ def plat3tracts_writetracts_2written(
     pg.execute_queue()
     return write_if_new_group(out_dir / fn, pg, override)
 
+
+@add_docstring(
+    'PlatGroup - Three tracts. Tracts written to different layers (Sec 1 red; Sec 6 green; Sec 12 blue.)',
+    DESC_1, DESC_2, DESC_4)
+def platgroup3tracts_separate_layers(
+        fn: str, out_dir: Path = DEFAULT_OUT_DIR, override=False):
+    settings = get_test_settings_for_plat()
+    pg = PlatGroup(settings=settings)
+    pg.lot_definer.allow_defaults = True
+    pg.lot_definer.standard_lot_size = 40
+    pg.add_description(DESC_1, layer='red_layer')
+    pg.add_description(DESC_2, layer='green_layer')
+    # Default is blue.
+    pg.add_description(DESC_4)
+    pg.settings.set_layer_fill('red_layer', qq_fill_rgba=(255, 0, 0, 100))
+    pg.settings.set_layer_fill('green_layer', qq_fill_rgba=(0, 255, 0, 100))
+    pg.execute_queue()
+    return write_if_new_group(out_dir / fn, pg, override)
 
 # Create a dict of .png filenames and their corresponding func, for all funcs.
 exclude = (
