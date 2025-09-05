@@ -5,7 +5,6 @@ import platform
 import webbrowser
 from typing import Union
 from pathlib import Path
-from hashlib import sha512
 
 import numpy as np
 from PIL import Image, ImageChops
