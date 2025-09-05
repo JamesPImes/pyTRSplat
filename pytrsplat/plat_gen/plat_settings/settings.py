@@ -200,9 +200,9 @@ class Settings:
             -1: Settings.RGBA_BLACK,  # Township border
             0: Settings.RGBA_BLACK,  # sec line
             1: Settings.RGBA_BLACK,  # half line
-            2: (128, 128, 128, 140),  # quarter line
-            3: (128, 128, 128, 60),  # quarter-quarter line
-            None: (196, 196, 196, 100)  # default for all others
+            2: (64, 64, 64, 96),  # quarter line
+            3: (64, 64, 64, 24),  # quarter-quarter line
+            None: (230, 230, 230, 24)  # default for all others
         }
         self.min_depth = 2
         self.max_depth = None
@@ -252,11 +252,33 @@ class Settings:
         self.write_lot_numbers = False
         self.lots_only_for_queue = False
 
-    def get(self, att, default=None):
-        """Get an attribute by its name."""
-        if hasattr(self, att):
-            return getattr(self, att)
-        return default
+        # This is not saved to .json, but is filled 'manually' if using layers.
+        self._layer_qq_fill_rgba: dict[str, tuple[int, int, int, int]] = {}
+
+    def _get_layer_qq_fill_rgba(self, layer_name: str) -> tuple[int, int, int, int]:
+        """
+        Get the fill RGBA for a given layer. If not found, use the
+        configured ``settings.qq_fill_rgba``.
+        """
+        default = self.qq_fill_rgba
+        return self._layer_qq_fill_rgba.get(layer_name, default)
+
+    def set_layer_fill(
+            self, layer_name: str, qq_fill_rgba: tuple[int, int, int, int]) -> None:
+        """
+        Set the aliquot fill color (RGBA) for a given layer.
+
+        .. note::
+
+            These values do not get saved with the ``.save_preset()``
+            method and must be configured individually each time.
+
+        :param layer_name: Name of the layer to set.
+        :param qq_fill_rgba: RGBA of the color to use for aliquots on
+            that layer.
+        """
+        self._layer_qq_fill_rgba[layer_name] = qq_fill_rgba
+        return None
 
     @property
     def grid_xy(self):
