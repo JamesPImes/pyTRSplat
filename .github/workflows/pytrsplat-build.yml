@@ -40,4 +40,4 @@ jobs:
         
     - name: Unit tests with pytest
       run: |
-        pytest -W "ignore::pytrsplat.UndefinedLotWarning" -W "ignore::pytrsplat.UnplattableWarning"
+        pytest -W "ignore::pytrsplat.PlatWarning"
