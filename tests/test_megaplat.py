@@ -53,7 +53,7 @@ class TestMegaPlatBehavior(unittest.TestCase):
 
     def test_init(self):
         megaplat = MegaPlat()
-        self.assertTrue(len(megaplat.queue) == 0)
+        self.assertTrue(len(megaplat._compile_entire_queue()) == 0)
 
     def test_save_output(self):
         settings = Settings.preset('megaplat_default')

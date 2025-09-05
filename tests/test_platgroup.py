@@ -52,7 +52,7 @@ class TestPlatGroupBehavior(unittest.TestCase):
 
     def test_init(self):
         plat_group = PlatGroup()
-        self.assertTrue(len(plat_group.queue) == 0)
+        self.assertTrue(len(plat_group._compile_entire_queue()) == 0)
 
     def test_save_output(self):
         settings = Settings.preset('square_s')
