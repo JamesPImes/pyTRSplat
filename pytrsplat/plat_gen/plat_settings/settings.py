@@ -281,7 +281,7 @@ class Settings:
         return None
 
     @property
-    def grid_xy(self):
+    def _grid_xy(self):
         """Get the top-left coord of the section grid (the body of a plat)."""
         twp_width_px = self.sec_length_px * 6
         w = self.dim[0]

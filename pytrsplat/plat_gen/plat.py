@@ -1009,7 +1009,7 @@ class PlatBody(SettingsOwned, ImageOwned):
             subplat. (If not specified, will remain unchanged.)
         """
         if xy is None:
-            xy = self.settings.grid_xy
+            xy = self.settings._grid_xy
         self.xy = xy
         if twp is None:
             twp = self.twp
