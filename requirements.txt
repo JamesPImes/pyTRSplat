@@ -1,3 +1,6 @@
 Pillow
 git+https://github.com/JamesPImes/pyTRS
+
+# For tests only
 pytest
+numpy
