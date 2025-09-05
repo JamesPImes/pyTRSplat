@@ -27,7 +27,12 @@ except (FileNotFoundError, KeyError):
     DEFAULT_MEGAPLAT_SETTINGS = Settings.preset('megaplat_default')
 
 
-class QueueSingle:
+class LayerOwner:
+    """Class that has a ``.layer_queues`` attribute."""
+    layer_queues: dict[str, pytrs.TractList]
+
+
+class QueueSingle(LayerOwner):
     """
     Class that can take in one or more ``pytrs.Tract`` objects or a raw
     PLSS description and add the results to the ``.queue`` (a
@@ -37,10 +42,16 @@ class QueueSingle:
     a ``ValueError`` will be raised when encountering a mismatched
     Twp/Rge.
     """
+    DEFAULT_LAYER = 'aliquot_fill'
 
-    queue: pytrs.TractList()
+    def _compile_entire_queue(self) -> pytrs.TractList:
+        """Get the full combined queue for all layers."""
+        out = pytrs.TractList()
+        for queue in self.layer_queues.values():
+            out.extend(queue)
+        return out
 
-    def add_tract(self, tract: pytrs.Tract):
+    def add_tract(self, tract: pytrs.Tract, layer: str = None) -> None:
         """
         Add a tract to the queue. If there are already tracts in the
         queue, this tract must match the existing Twp/Rge, or it will
@@ -54,27 +65,32 @@ class QueueSingle:
         :param tract: A ``pytrs.Tract`` that has been parsed into Lots
             and QQ's. (Its Twp/Rge must match what is already in the
             queue.)
+        :param layer: Name of the layer to add this tract to.
         :raise ValueError: If a Twp/Rge is added that does not share the
             same Twp/Rge of every other tract in the queue.
         """
-
+        if layer is None:
+            layer = self.DEFAULT_LAYER
+        self.layer_queues.setdefault(layer, pytrs.TractList())
+        layer_queue = self.layer_queues[layer]
         twp = None
         rge = None
         twprge_defined = False
+        all_queue = self._compile_entire_queue()
         if hasattr(self, 'twp') and hasattr(self, 'rge'):
             twp = self.twp
             rge = self.rge
             if twp is not None and rge is not None:
                 twprge_defined = True
-        elif self.queue:
-            sample_tract: pytrs.Tract = self.queue[0]
+        elif all_queue:
+            sample_tract: pytrs.Tract = all_queue[0]
             twp = sample_tract.twp
             rge = sample_tract.rge
             twprge_defined = True
         existing_twprge = pytrs.TRS.from_twprgesec(twp, rge).twprge
 
         if not twprge_defined or (tract.twprge == existing_twprge):
-            self.queue.append(tract)
+            layer_queue.append(tract)
             if hasattr(self, 'twp') and hasattr(self, 'rge'):
                 self.twp = tract.twp
                 self.rge = tract.rge
@@ -89,7 +105,9 @@ class QueueSingle:
         raise ValueError(msg)
 
     def add_tracts(
-            self, tracts: Union[list[pytrs.Tract], pytrs.TractList, pytrs.PLSSDesc]
+            self,
+            tracts: Union[list[pytrs.Tract], pytrs.TractList, pytrs.PLSSDesc],
+            layer: str = None,
     ) -> None:
         """
         Add multiple tracts to the queue. All tracts must share the same
@@ -112,14 +130,20 @@ class QueueSingle:
             such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any
             other iterable object that contains exclusively
             ``pytrs.Tract``.
+        :param layer: Name of the layer to add these tracts to.
         :raise ValueError: If a Twp/Rge is added that does not share the
             same Twp/Rge of every other tract in the queue.
         """
         for tract in tracts:
-            self.add_tract(tract)
+            self.add_tract(tract, layer)
         return None
 
-    def add_description(self, txt: str, config: str = None) -> pytrs.TractList:
+    def add_description(
+            self,
+            txt: str,
+            config: str = None,
+            layer: str = None,
+    ) -> pytrs.TractList:
         """
         Parse the land description and add the resulting tracts to the
         queue.
@@ -137,13 +161,14 @@ class QueueSingle:
         :param config: The config parameters for parsing, to be passed
             through to the ``pytrs`` library. (See pyTRS documentation
             for details.)
+        :param layer: Name of the layer to add this description to.
         :return: A ``pytrs.TractList`` containing the tracts in which
             the parser could NOT identify any lots or aliquots.
         :raise ValueError: If a Twp/Rge is added that does not share the
             same Twp/Rge of every other tract in the queue.
         """
         plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=config)
-        self.add_tracts(plssdesc)
+        self.add_tracts(plssdesc, layer)
         no_lots_qqs = pytrs.TractList()
         for tract in plssdesc:
             if not tract.lots_qqs:
@@ -160,7 +185,7 @@ class QueueMany(QueueSingle):
     This class allows any number of unique Twp/Rges.
     """
 
-    def add_tract(self, tract: pytrs.Tract):
+    def add_tract(self, tract: pytrs.Tract, layer: str = None):
         """
         Add a tract to the queue.
 
@@ -168,12 +193,21 @@ class QueueMany(QueueSingle):
 
             The tract must already be parsed for lots/QQs. (See
             ``pyTRS`` documentation for details.)
+
+        :param tract: ``pytrs.Tract`` to add to the queue.
+        :param layer: Name of the layer to add these tracts to.
         """
-        self.queue.append(tract)
+        if layer is None:
+            layer = self.DEFAULT_LAYER
+        self.layer_queues.setdefault(layer, pytrs.TractList())
+        layer_queue = self.layer_queues[layer]
+        layer_queue.append(tract)
         return None
 
     def add_tracts(
-            self, tracts: Union[list[pytrs.Tract], pytrs.TractList, pytrs.PLSSDesc]
+            self,
+            tracts: Union[list[pytrs.Tract], pytrs.TractList, pytrs.PLSSDesc],
+            layer=None,
     ) -> None:
         """
         Add multiple tracts to the queue.
@@ -187,12 +221,19 @@ class QueueMany(QueueSingle):
             such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any
             other iterable object that contains exclusively
             ``pytrs.Tract``.
+
+        :param layer: Name of the layer to add these tracts to.
         """
         for tract in tracts:
-            self.add_tract(tract)
+            self.add_tract(tract, layer)
         return None
 
-    def add_description(self, txt: str, config: str = None) -> pytrs.TractList:
+    def add_description(
+            self,
+            txt: str,
+            config: str = None,
+            layer: str = None
+    ) -> pytrs.TractList:
         """
         Parse the land description and add the resulting tracts to the
         plat group. If one or more Twp/Rge's are newly identified, plats
@@ -202,11 +243,12 @@ class QueueMany(QueueSingle):
         :param config: The config parameters for parsing, to be passed
             through to the ``pytrs`` library. (See pyTRS documentation
             for details.)
+        :param layer: Name of the layer to add this description to.
         :return: A ``pytrs.TractList`` containing the tracts in which
             the parser could not identify any lots or aliquots.
         """
         plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=config)
-        self.add_tracts(plssdesc)
+        self.add_tracts(plssdesc, layer)
         no_lots_qqs = pytrs.TractList()
         for tract in plssdesc:
             if not tract.lots_qqs:
@@ -257,7 +299,10 @@ class LotDefinerOwner(QueueSingle):
             values are a sorted list of lots for that Twp/Rge/Sec.
         """
         return self.lot_definer.find_undefined_lots(
-            tracts=self.queue, allow_defaults=allow_defaults, fp=fp, **headers)
+            tracts=self._compile_entire_queue(),
+            allow_defaults=allow_defaults,
+            fp=fp,
+            **headers)
 
     def prompt_define(self, allow_defaults: bool = None):
         """
@@ -275,7 +320,8 @@ class LotDefinerOwner(QueueSingle):
             will use whatever is configured in the
             ``.lot_definer.allow_defaults`` attribute.
         """
-        return self.lot_definer.prompt_define(self.queue, allow_defaults)
+        return self.lot_definer.prompt_define(
+            self._compile_entire_queue(), allow_defaults)
 
     def find_unplattable_tracts(self, allow_defaults: bool = None) -> pytrs.TractList:
         """
@@ -296,9 +342,10 @@ class LotDefinerOwner(QueueSingle):
             ``lot_definer.allow_defaults`` attribute.
         """
         unplattable_tracts = pytrs.TractList()
-        if not self.queue:
+        all_layers_queue = self._compile_entire_queue()
+        if not all_layers_queue:
             return unplattable_tracts
-        for tract in self.queue:
+        for tract in all_layers_queue:
             converted_aliquots, undefined_lots = self.lot_definer.process_tract(
                 tract,
                 allow_defaults=allow_defaults,
@@ -317,55 +364,45 @@ class SettingsOwner:
     settings: Settings
 
 
-class ImageOwner:
+class ImageOwner(LayerOwner):
     """
-    Interface for a class that has the following attributes:
+    Class that owns the ``Image.Image`` and ``ImageDraw.Draw`` objects.
+    They are stored in ``._layers`` (for images) and ``._draws`` (for
+    draws). Use ``._get_layer_image()`` and ``._get_layer_draw()`` to
+    access the images and draws for a given layer.
 
-    ``.DEFAULT_LAYER_NAMES`` (class attribute) - A list of standard
-        layer names, in the standard output order (bottom-up).
-
-    ``._layers`` - A dict of images (``Image.Image``), keyed by layer
-        name.
-
-    ``._draws`` - A dict of draws (``ImageDraw.Draw``), keyed by layer
-        name.
-
-    ``.output_layer_names`` - A list of layer names to be written to
-        the merged output image, in bottom-up order.
-
-    ``._active_layer`` - The name of the currently active layer.
-
-    And methods:
-    ``._get_layer_image()`` - Get the ``Image.Image`` of the layer.
-
-    ``._get_layer_draw()`` - Get the ``ImageDraw.Draw`` of the layer.
-
-    And ``._create_layer()``, ``._create_default_layers()`` and
-    ``.output()`` methods.
+    Also handles merging the layers into an output image. The layers
+    that should be included for a given subclass should be stored in
+    ``.output_layer_names`` in bottom-up order (``'background'`` on the
+    bottom).
     """
+
     DEFAULT_LAYER_NAMES = (
         'background',
         'header',
         'footer',
+        'aliquot_fill',
         'inner_lines',
         'sec_nums',
-        'aliquot_fill',
         'lot_nums',
         'sec_border',
         'twp_border',
     )
     _images: dict[str, Image.Image]
     _draws: dict[str, ImageDraw.Draw]
+    _layer_qq_fill_rgba: dict[str, tuple[int, int, int, int]]
     output_layer_names: list[str]
     dim: Union[tuple[int, int], None]
 
     def __init__(self):
         self._images = {}
         self._draws = {}
+        self._layer_qq_fill_rgba = {}
         self.output_layer_names = list(self.DEFAULT_LAYER_NAMES)
 
     def _get_layer_draw(
-            self, layer_name: str, create=False, dim: tuple[int, int] = None):
+            self, layer_name: str, create=False, dim: tuple[int, int] = None
+    ) -> Union[ImageDraw.Draw, None]:
         """
         Get the ``ImageDraw.Draw`` for a given layer.
 
@@ -382,7 +419,8 @@ class ImageOwner:
         return draw
 
     def _get_layer_image(
-            self, layer_name: str, create=False, dim: tuple[int, int] = None):
+            self, layer_name: str, create=False, dim: tuple[int, int] = None
+    ) -> Union[Image.Image, None]:
         """
         Get the ``Image.Image`` for a given layer.
 
@@ -391,7 +429,6 @@ class ImageOwner:
         :param dim: (Optional) If creating the layer, use these
             dimensions. If not specified here, will fall back to
             ``.dim`` attribute.
-
         """
         image = self._images.get(layer_name)
         if image is None and create:
@@ -399,7 +436,8 @@ class ImageOwner:
             image = self._images.get(layer_name)
         return image
 
-    def _create_layer(self, layer_name: str, dim: tuple[int, int] = None, rgba=None):
+    def _create_layer(
+            self, layer_name: str, dim: tuple[int, int] = None, rgba=None) -> None:
         """Register a layer of size ``dim``, with name ``layer_name``."""
         if dim is None:
             dim = self.dim
@@ -413,14 +451,14 @@ class ImageOwner:
         self._draws[layer_name] = draw
         return None
 
-    def _create_default_layers(self, dim: tuple[int, int] = None):
+    def _create_default_layers(self, dim: tuple[int, int] = None) -> None:
         """Register all default layers, with size ``dim``."""
         if dim is None:
             dim = self.dim
         for layer_name in self.DEFAULT_LAYER_NAMES:
             self._create_layer(layer_name, dim)
 
-    def _reset_layers(self, dim: tuple[int, int] = None):
+    def _reset_layers(self, dim: tuple[int, int] = None) -> None:
         """Discard all existing layers and create a new ``'background'``."""
         layer_names = list(self._images.keys())
         for layer_name in layer_names:
@@ -450,7 +488,10 @@ class ImageOwner:
         :param layers: (Optional) Choose which image layers (in
             bottom-up order) to include in the output. (See
             ``Plat.DEFAULT_LAYER_NAMES`` for the standard layer names.)
-            Nonexistent or empty layers will be ignored.
+            Nonexistent or empty layers will be ignored. Any custom
+            layers created by ``.add_description(..., layer=<name>)``
+            (and similar methods) will be included by default, unless
+            the ``layers=`` parameter is used here.
         :param image_mode: Specify which image mode to convert the
             merged output to. Defaults to ``'RGB'``. (Reference
             ``PIL.Image.Image.convert()`` for further details.)
@@ -462,7 +503,18 @@ class ImageOwner:
         """
         selected_layers = self.output_layer_names
         if selected_layers is None:
-            selected_layers = self.DEFAULT_LAYER_NAMES
+            selected_layers = list(self.DEFAULT_LAYER_NAMES)
+        custom_layers = [
+            layer for layer in reversed(self.layer_queues.keys())
+            if layer != QueueSingle.DEFAULT_LAYER
+        ]
+        try:
+            i = selected_layers.index(QueueSingle.DEFAULT_LAYER)
+        except ValueError:
+            # Default to putting it just above background.
+            i = 1
+        for layer in custom_layers:
+            selected_layers.insert(i + 1, layer)
         if layers is not None:
             # Param `layers` overrides attributes.
             selected_layers = layers
@@ -489,16 +541,18 @@ class ImageOwner:
 
 class IPlatOwner(SettingsOwner, ImageOwner, LotDefinerOwner):
     """
-    Composite interface for a class that incorporates all necessary
-    interfaces necessary for platting.
+    Composite class that incorporates all subclasses necessary for
+    platting.
     """
-    pass
+
+    def __init__(self):
+        super().__init__()
 
 
 class ISettingsLotDefinerOwner(SettingsOwner, LotDefinerOwner):
     """
-    Composite interface for a class that incorporates ``SettingsOwner``
-    and ``LotDefinerOwner``.
+    Composite class that incorporates ``SettingsOwner`` and
+    ``LotDefinerOwner``. (Included for type hinting purposes.)
     """
     pass
 
@@ -506,12 +560,14 @@ class ISettingsLotDefinerOwner(SettingsOwner, LotDefinerOwner):
 class LotDefinerOwned:
     """
     Class with an ``owner`` (``LotDefinerOwner``) that has a
-    ``.lot_definer`` attribute.
+    ``.lot_definer`` attribute to be passed down as a ``.lot_definer``
+    property.
     """
     owner: LotDefinerOwner
 
     @property
     def lot_definer(self):
+        """Pass down owner's ``.lot_definer``."""
         return self.owner.lot_definer
 
 
@@ -525,6 +581,7 @@ class SettingsOwned:
 
     @property
     def settings(self):
+        """Pass down owner's ``.settings``."""
         if self.owner is not None:
             return self.owner.settings
         return DEFAULT_SETTINGS
@@ -558,10 +615,16 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
     """
     INTERNAL USE:
 
-    Subclass to extend pytrs's ``AliquotNode`` for platting.
+    Extension of pyTRS's ``AliquotNode`` for platting.
     """
 
-    def __init__(self, parent=None, label=None, owner: IPlatOwner = None):
+    def __init__(
+            self,
+            parent=None,
+            label=None,
+            owner: IPlatOwner = None,
+            layer_name: str = QueueSingle.DEFAULT_LAYER,
+    ):
         """
         :param owner: The ``Plat`` object that is the ultimate owner of
             this node. (Controls the settings that dictate platting
@@ -571,9 +634,9 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
         super().__init__(parent=parent, label=label)
         # Coord of top-left of this square.
         self.xy: tuple[int, int] = None
-        # `.owner` must have .settings, .image, .draw, .header_image, .header_draw,
-        #   .overlay_image, .overlay_draw
         self.owner: IPlatOwner = owner
+        self.qq_fill_rgba: Union[tuple[int, int, int, int], None] = None
+        self.layer_name: str = layer_name
 
     @property
     def sec_length_px(self):
@@ -590,7 +653,8 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
 
     def _configure(
             self,
-            parent_xy: tuple[int, int] = None
+            parent_xy: tuple[int, int] = None,
+            qq_fill_rgba: tuple[int, int, int, int] = None,
     ):
         """
         Retrofit this node and all its children for platting, using the
@@ -598,8 +662,14 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
 
         :param parent_xy: The top-left coord of the parent node (or for
             the root node, the section's top-left coord).
+        :param qq_fill_rgba: Set the RGBA for filling in aliquots. If
+            not specified here, will fall back to
+            ``settings.qq_fill_rgba``.
         """
         stn = self.settings
+        if qq_fill_rgba is None:
+            qq_fill_rgba = stn.qq_fill_rgba
+        self.qq_fill_rgba = qq_fill_rgba
         if parent_xy is None:
             parent_xy = self.xy
         x, y = parent_xy
@@ -618,7 +688,8 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
             return None
         for label, child_node in self.children.items():
             child_node.owner = self.owner
-            child_node._configure(parent_xy=self.xy)
+            child_node.layer_name = self.layer_name
+            child_node._configure(parent_xy=self.xy, qq_fill_rgba=qq_fill_rgba)
         return None
 
     def fill(self, rgba: tuple[int, int, int, int] = None):
@@ -627,11 +698,14 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
         :param rgba: The RGBA value to use. If not passed, will use what
             is configured in the owner's settings.
         """
+        # Use the RGBA configured for this node. If not configured, use settings.
+        if rgba is None:
+            rgba = self.qq_fill_rgba
         if rgba is None:
             rgba = self.settings.qq_fill_rgba
         if self.is_leaf():
             box = get_box(self.xy, dim=self.square_dim)
-            draw = self._get_layer_draw('aliquot_fill', create=True)
+            draw = self._get_layer_draw(self.layer_name, create=True)
             draw.polygon(box, rgba)
         for child in self.children.values():
             child.fill(rgba)
@@ -686,14 +760,14 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         self.aliquot_tree = PlatAliquotNode(owner=owner)
         # Lot definitions will be written separately to the `.lot_writer` aliquot tree.
         self.lot_writer = PlatAliquotNode(owner=owner)
-        self.queue = pytrs.TractList()
         self.square_dim: int = None
         # Coord of top-left of this square.
         self.xy: tuple[int, int] = None
         self.sec_length_px: int = None
         self.grid_offset: tuple[int, int] = grid_offset
-        # `.owner` must have .settings, .image, .draw, .overlay_image, .overlay_draw
         self.owner: IPlatOwner = owner
+        self.layer_aliquot_trees: dict[str, PlatAliquotNode] = {}
+        self._register_layer(QueueSingle.DEFAULT_LAYER)
 
     @property
     def _is_dummy(self):
@@ -719,7 +793,17 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         self.xy = (x, y)
         self.draw_lines()
         self.clear_center()
-        self.aliquot_tree._configure(parent_xy=self.xy)
+
+    def _register_layer(self, layer_name: str = None):
+        """
+        Register a layer and create the components necessary for adding
+        lands to the plat. If it already exists, do nothing.
+        """
+        if layer_name is None:
+            layer_name = QueueSingle.DEFAULT_LAYER
+        self.layer_aliquot_trees.setdefault(
+            layer_name, PlatAliquotNode(owner=self.owner, layer_name=layer_name))
+        return None
 
     def draw_lines(self):
         """
@@ -780,26 +864,38 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         draw = self._get_layer_draw('sec_nums', create=True)
         _, _, w, h = draw.textbbox(xy=(0, 0), text=txt, font=font)
         # Force a slight upward shift of the section text. Looks wrong otherwise.
-        horizontal_tweak_pct = 1.2
-        sec_topleft = (x_center - w // 2, y_center - int((h // 2) * horizontal_tweak_pct))
+        vert_tweak_pct = 1.35
+        sec_topleft = (x_center - w // 2, y_center - int((h // 2) * vert_tweak_pct))
         draw.text(xy=sec_topleft, text=txt, font=font, fill=fill)
         return None
 
-    def execute_queue(self) -> pytrs.TractList:
+    def fill_tracts(
+            self, queue: pytrs.TractList, layer_name: str = None) -> pytrs.TractList:
         """
-        Execute the queue of tracts to fill in the plat.
+        Fill in the tracts in the plat within this section.
+
+        :param queue: The ``TractList`` containing tracts to depict.
+        :param layer_name: The name of the layer to depict them on.
+            (Defaults to ``'aliquot_fill'``.)
         """
         unplattable_tracts = pytrs.TractList()
-        if not self.queue:
+        if not queue:
             return unplattable_tracts
         elif self._is_dummy:
-            for tract in self.queue:
+            for tract in queue:
                 warning = UnplattableWarning.unclear_trs(tract)
                 warn(warning)
                 unplattable_tracts.append(tract)
             return unplattable_tracts
         platted_aliquots = set()
-        for tract in self.queue:
+        if layer_name is None:
+            layer_name = QueueSingle.DEFAULT_LAYER
+        self._register_layer(layer_name)
+        aliq_tree = self.layer_aliquot_trees[layer_name]
+        qq_fill_rgba = self.settings._get_layer_qq_fill_rgba(layer_name)
+        aliq_tree._configure(parent_xy=self.xy, qq_fill_rgba=qq_fill_rgba)
+
+        for tract in queue:
             self.lot_definer.process_tract(tract, commit=True)
             if not tract.qqs and not tract.lots_as_qqs:
                 if len(tract.undefined_lots) > 0:
@@ -808,16 +904,16 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
                     warning = UnplattableWarning.no_lots_qqs(tract)
                 warn(warning)
                 unplattable_tracts.append(tract)
-            self.aliquot_tree.register_all_aliquots(tract.qqs)
+            aliq_tree.register_all_aliquots(tract.qqs)
             platted_aliquots.update(tract.qqs)
-            self.aliquot_tree.register_all_aliquots(tract.lots_as_qqs)
+            aliq_tree.register_all_aliquots(tract.lots_as_qqs)
             platted_aliquots.update(tract.lots_as_qqs)
             if tract.undefined_lots:
                 warning = UndefinedLotWarning.from_tract(tract)
                 warn(warning)
         if len(platted_aliquots) > 0:
-            self.aliquot_tree._configure()
-            self.aliquot_tree.fill()
+            aliq_tree._configure(parent_xy=self.xy, qq_fill_rgba=qq_fill_rgba)
+            aliq_tree.fill(rgba=qq_fill_rgba)
         return unplattable_tracts
 
     def write_lot_numbers(self, at_depth=2):
@@ -926,37 +1022,22 @@ class PlatBody(SettingsOwned, ImageOwned):
             plat_sec._configure(grid_xy=xy)
         return None
 
-    def add_tract(self, tract: pytrs.Tract):
+    def fill_tracts(self, queue: pytrs.TractList, layer_name: str = None):
         """
-        Add a tract to the queue of the appropriate subordinate
-        ``PlatSec``.
+        Fill in the tracts in the plat.
 
-        .. note::
-
-            This assumes that the Twp/Rge of the ``tract`` already
-            matches the Twp/Rge of this ``PlatBody``, or that Twp/Rge is
-            irrelevant.
-
-        :param tract: A ``pytrs.Tract`` that has been parsed into Lots
-            and QQ's.
-        """
-        # tracts with sec_num that is `None` or otherwise not found in the `.plat_secs`
-        # dict (e.g., nonsense "Section 0" or "Section 37" or higher) will get
-        # added to the queue for the dummy plat_sec -- i.e., `.plat_secs[None]`.
-        plat_sec = self.plat_secs.get(tract.sec_num, self.plat_secs[None])
-        plat_sec.queue.append(tract)
-        return None
-
-    def execute_subordinate_queues(self) -> pytrs.TractList:
-        """
-        Execute the queue in each subordinate ``PlatSec``.
-
+        :param queue: A ``TractList`` of tracts to depict.
+        :param layer_name: The layer on which to depict them. (Defaults
+            to ``'aliquot_fill'``.)
         :return: A ``pytrs.TractList`` containing all tracts that could
             not be platted (no lots or aliquots identified).
         """
         unplattable_tracts = pytrs.TractList()
-        for plat_sec in self.plat_secs.values():
-            unplattable = plat_sec.execute_queue()
+        grouped = queue.group_by('sec_num')
+        for sec_num, sub_queue in grouped.items():
+            # Dummy plat_sec (key `None`) is the garbage dump for unclear Twp/Rge/Sec.
+            plat_sec = self.plat_secs.get(sec_num, self.plat_secs[None])
+            unplattable = plat_sec.fill_tracts(sub_queue, layer_name)
             unplattable_tracts.extend(unplattable)
         return unplattable_tracts
 
@@ -1299,7 +1380,7 @@ class Plat(IPlatOwner, QueueSingle):
         super().__init__()
         self.twp = twp
         self.rge = rge
-        self.queue = pytrs.TractList()
+        self.layer_queues: dict[str, pytrs.TractList] = {}
         self.header = PlatHeader(owner=self)
         self.body = PlatBody(twp, rge, owner=self)
         self.footer = PlatFooter(owner=self)
@@ -1398,19 +1479,23 @@ class Plat(IPlatOwner, QueueSingle):
             self.prompt_define()
         self._configure()
         twprge = f"{self.twp}{self.rge}"
-        self.queue.custom_sort()
         if self.owner is None:
             cached = self.lot_definer.get_all_definitions(mandatory_twprges=[twprge])
             self.all_lot_defs_cached = cached
-        for tract in self.queue:
-            if self.twp is None:
-                self.twp = tract.twp
-            if self.rge is None:
-                self.rge = tract.rge
-            self.body.add_tract(tract)
-        unplattable_tracts = self.body.execute_subordinate_queues()
+        unplattable_tracts = pytrs.TractList()
+        for layer_name, layer_queue in self.layer_queues.items():
+            layer_queue.custom_sort()
+            for tract in layer_queue:
+                if self.twp is None:
+                    self.twp = tract.twp
+                if self.rge is None:
+                    self.rge = tract.rge
+                unplattable = self.body.fill_tracts(layer_queue, layer_name)
+                unplattable_tracts.extend(unplattable)
         if self.settings.write_tracts:
-            for tract in self.queue:
+            all_queue = self._compile_entire_queue()
+            all_queue.custom_sort()
+            for tract in all_queue:
                 tractfont_rgba = self.settings.footerfont_rgba
                 if tract in unplattable_tracts:
                     tractfont_rgba = self.settings.warningfont_rgba
@@ -1462,7 +1547,8 @@ class Plat(IPlatOwner, QueueSingle):
         if only_for_queue is None:
             only_for_queue = self.settings.lots_only_for_queue
         if only_for_queue:
-            subset_sec_nums = sorted(set([tract.sec_num for tract in self.queue]))
+            all_layers_queue = self._compile_entire_queue()
+            subset_sec_nums = sorted(set([tract.sec_num for tract in all_layers_queue]))
         if not self.all_lot_defs_cached and self.owner is None:
             twprge = f"{self.twp}{self.rge}"
             cached = self.lot_definer.get_all_definitions(mandatory_twprges=[twprge])
@@ -1481,7 +1567,7 @@ class Plat(IPlatOwner, QueueSingle):
         Write all the tract descriptions in the footer.
         """
         if tracts is None:
-            tracts = self.queue
+            tracts = self._compile_entire_queue()
         return self.footer.write_tracts(tracts)
 
     def write_footer_text(self, txt: str, write_partial=False):
@@ -1518,7 +1604,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
         if lot_definer is None:
             lot_definer = LotDefiner()
         self.lot_definer: LotDefiner = lot_definer
-        self.queue = pytrs.TractList()
+        self.layer_queues: dict[str, pytrs.TractList] = {}
         self.plats: dict[str, Plat] = {}
         # Cache of lot definitions (including defaults). Gets used while
         # executing queue, then cleared.
@@ -1537,7 +1623,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
         for plat in self.plats.values():
             plat._configure()
 
-    def register_plat(self, twp: str, rge: str) -> Plat:
+    def _register_plat(self, twp: str, rge: str) -> Plat:
         """
         Register a new plat for the specified ``twp`` and ``rge``. If
         a plat already exists for the Twp/Rge, this will raise a
@@ -1555,7 +1641,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
         plat._configure()
         return plat
 
-    def add_tract(self, tract: pytrs.Tract) -> None:
+    def add_tract(self, tract: pytrs.Tract, layer: str = None) -> None:
         """
         Add a tract to the queue. If no plat yet exists for the Twp/Rge
         of this tract, one will be created.
@@ -1564,15 +1650,19 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
 
             The tract must already be parsed for lots/QQs. (See
             ``pyTRS`` documentation for details.)
+
+        :param tract: A ``pytrs.Tract`` that has been parsed into Lots
+            and QQ's.
+        :param layer: Name of the layer to add this tract to.
         """
         # Add tract to own queue.
-        self.queue.append(tract)
+        super().add_tract(tract, layer)
         # Create plat if necessary.
         plat = self.plats.get(tract.twprge)
         if plat is None:
-            plat = self.register_plat(tract.twp, tract.rge)
+            plat = self._register_plat(tract.twp, tract.rge)
         # Add tract to that plat's queue.
-        plat.add_tract(tract)
+        plat.add_tract(tract, layer)
         return None
 
     def execute_queue(
@@ -1596,14 +1686,12 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
             mandatory_twprges=list(self.plats.keys())
         )
         all_unplattable = pytrs.TractList()
-        selected_tracts = self.queue
-        if subset_twprges is None:
-            subset_twprges = sorted(self.plats.keys())
-        else:
-            selected_tracts = self.queue.filter(lambda t: t.twprge in subset_twprges)
-        if prompt_define:
-            self.lot_definer.prompt_define(tracts=selected_tracts)
-        for twprge in subset_twprges:
+        all_queue_grouped = self._compile_entire_queue().group_by('twprge')
+        for twprge, tracts_in_twprge in all_queue_grouped.items():
+            if subset_twprges is not None and twprge not in subset_twprges:
+                continue
+            if prompt_define:
+                self.lot_definer.prompt_define(tracts=tracts_in_twprge)
             plat = self.plats[twprge]
             unplattable = plat.execute_queue()
             all_unplattable.extend(unplattable)
@@ -1740,7 +1828,7 @@ class MegaPlat(IPlatOwner, QueueMany):
             raised prior to plat generation.
         """
         super().__init__()
-        self.queue = pytrs.TractList()
+        self.layer_queues: dict[str, pytrs.TractList] = {}
         if settings is None:
             settings = DEFAULT_MEGAPLAT_SETTINGS
         self.settings: Settings = settings
@@ -1774,7 +1862,7 @@ class MegaPlat(IPlatOwner, QueueMany):
         out_queue = pytrs.TractList()
         unplattable_tracts = pytrs.TractList()
         if queue is None:
-            queue = self.queue
+            queue = self._compile_entire_queue()
         if not queue:
             return out_queue
         queue.custom_sort()
@@ -1911,7 +1999,8 @@ class MegaPlat(IPlatOwner, QueueMany):
         for twprge, subplat in self.latest_subplats.items():
             subset_sec_nums = None
             if only_for_queue:
-                relevant_tracts = self.queue.filter(key=lambda tr: tr.twprge == twprge)
+                all_queue = self._compile_entire_queue()
+                relevant_tracts = all_queue.filter(key=lambda tr: tr.twprge == twprge)
                 subset_sec_nums = sorted(set([tr.sec_num for tr in relevant_tracts]))
             subplat.write_lot_numbers(
                 at_depth=at_depth, subset_sec_nums=subset_sec_nums)
@@ -1934,24 +2023,34 @@ class MegaPlat(IPlatOwner, QueueMany):
         :return: A ``pytrs.TractList`` containing all tracts that could
             not be platted.
         """
-        queue = self.queue
-        if subset_twprges is not None:
-            queue = queue.filter(key=lambda tract: tract.twprge in subset_twprges)
         if prompt_define:
             self.prompt_define()
+
+        # Must first use all layers to determine the dimensions of this MegaPlat
+        # and generate the subplats. But will eventually only plat tracts per layer.
+        all_layers_queue = self._compile_entire_queue()
+        if subset_twprges is not None:
+            all_layers_queue = all_layers_queue.filter(
+                key=lambda tr: tr.twprge in subset_twprges)
         # Confirm all tracts are valid.
-        queue, unplattable_tracts = self._clean_queue(queue)
+        queue, unplattable_tracts = self._clean_queue(all_layers_queue)
         if not queue:
             return unplattable_tracts
-
         # Generate subplats. Also determines the `.dim` of our output.
-        subplats = self._gen_subplats(queue)
+        subplats = self._gen_subplats(all_layers_queue)
 
-        for tract in queue:
-            self.lot_definer.process_tract(tract, commit=True)
-            subplat = subplats[tract.twprge]
-            subplat.add_tract(tract)
-        for subplat in subplats.values():
-            unplattable = subplat.execute_subordinate_queues()
+        # Reset unplattable_tracts.
+        unplattable_tracts = pytrs.TractList()
+        for layer, layer_queue in self.layer_queues.items():
+            for tract in layer_queue:
+                self.lot_definer.process_tract(tract, commit=True)
+            layer_queue, unplattable = self._clean_queue(layer_queue)
             unplattable_tracts.extend(unplattable)
+            layer_queue_grouped = layer_queue.group_by('twprge')
+            for twprge, tracts_in_twprge in layer_queue_grouped.items():
+                subplat = subplats.get(twprge)
+                if subplat is None:
+                    continue
+                unplattable = subplat.fill_tracts(tracts_in_twprge, layer)
+                unplattable_tracts.extend(unplattable)
         return unplattable_tracts
