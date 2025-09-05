@@ -35,8 +35,7 @@ class LayerOwner:
 class QueueSingle(LayerOwner):
     """
     Class that can take in one or more ``pytrs.Tract`` objects or a raw
-    PLSS description and add the results to the ``.queue`` (a
-    ``pytrs.TractList``).
+    PLSS description and add the results to the queue.
 
     This class mandates that all tracts lie within the same Twp/Rge, and
     a ``ValueError`` will be raised when encountering a mismatched
@@ -179,8 +178,7 @@ class QueueSingle(LayerOwner):
 class QueueMany(QueueSingle):
     """
     Class that can take in one or more ``pytrs.Tract`` objects or a raw
-    PLSS description and add the results to the ``.queue`` (a
-    ``pytrs.TractList``).
+    PLSS description and add the results to the queue.
 
     This class allows any number of unique Twp/Rges.
     """
@@ -307,8 +305,8 @@ class LotDefinerOwner(QueueSingle):
     def prompt_define(self, allow_defaults: bool = None):
         """
         Prompt the user in console to define all lots that have not yet
-        been defined for tracts in the ``.queue``. Any new lot
-        definitions will be added to the ``.lot_definer``.
+        been defined for tracts in the queue. Any new lot definitions
+        will be added to the ``.lot_definer``.
 
         (You may wish to save the results with
         ``.lot_definer.save_to_csv()`` so that they can be loaded and
@@ -1539,8 +1537,7 @@ class Plat(IPlatOwner, QueueSingle):
         :param at_depth: Depth at which to write the lots. Default is 2
             (i.e., quarter-quarters).
         :param only_for_queue: (Optional) If ``True``, only write
-            section numbers for those sections that appear in the
-            ``.queue``.
+            section numbers for those sections that appear in the queue.
         """
         subset_sec_nums = None
         clear_cache_after = False
@@ -1705,8 +1702,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
         :param at_depth: Depth at which to write the lots. Default is 2
             (i.e., quarter-quarters).
         :param only_for_queue: (Optional) If ``True``, only write
-            section numbers for those sections that appear in the
-            ``.queue``.
+            section numbers for those sections that appear in the queue.
         """
         for plat in self.plats.values():
             plat.write_lot_numbers(at_depth=at_depth, only_for_queue=only_for_queue)
@@ -1988,8 +1984,7 @@ class MegaPlat(IPlatOwner, QueueMany):
         :param at_depth: Depth at which to write the lots. Default is 2
             (i.e., quarter-quarters).
         :param only_for_queue: (Optional) If ``True``, only write
-            section numbers for those sections that appear in the
-            ``.queue``.
+            section numbers for those sections that appear in the queue.
         """
         mandated = list(self.latest_subplats.keys())
         all_defs = self.lot_definer.get_all_definitions(mandatory_twprges=mandated)
