@@ -17,8 +17,8 @@ Feel free to reach out via
 with feedback or inquiries, or to let me know if you run into any
 issues.
 
-.. image:: _images/megaplat_153n96w-154n97w.png
-    :width: 600px
+.. image:: _images/sample_megaplat.png
+    :width: 400px
 
 
 Bird's-Eye View
@@ -65,3 +65,8 @@ These are custom warnings (subclasses of ``UserWarning``):
 
 .. toctree::
     modules/warnings
+
+This is a guide to using multiple layers:
+
+.. toctree::
+    modules/layers

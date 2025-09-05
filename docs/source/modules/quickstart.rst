@@ -13,6 +13,8 @@ lots in a :ref:`csv file and load them <lot_defs_csv>`. Alternatively,
 you can use the :ref:`prompt_define=True <prompt_define>` parameter to
 ask the user to define them individually in the console.
 
+To use multiple colors for different tracts, reference :doc:`this discussion on working with multiple layers<layers>`.
+
 
 Typical Workflow
 ----------------
