@@ -137,22 +137,27 @@ user in the console to define them individually.
 
 Alternatively, if we want to prompt the user to define lots separately
 from executing the queue, by calling ``.prompt_define()`` on a ``LotDefiner``
-object, and passing to it the list of ``pytrs.Tract`` objects (e.g., a
-plat's ``.queue`` attribute).
+object, and passing to it the list of ``pytrs.Tract`` objects.
 
 .. code-block:: python
 
     import pytrsplat
 
+    some_list_of_tracts = pytrs.TractList()
+    # <fill some_list_of_tracts with pytrs.Tract objects>
+    # ...
+
     some_lot_definer = pytrsplat.LotDefiner()
-    plat = pytrs.Plat(twp='154n', rge='97w', lot_definer=some_lot_definer)
-    plat.add_description('T154N-R97W Sec 1: Lots 1 and 2')
-    some_lot_definer.prompt_define(plat.queue)
+    some_lot_definer.prompt_define(some_list_of_tracts)
     # <Do whatever we want with the lot definitions.>
     some_lot_definer.save_to_csv(r'some/path/manually_defined_lots.csv')
+
     # ...
-    # And eventually, execute the queue:
+    # And eventually, generate the plat.
+    plat = pytrs.Plat(twp='154n', rge='97w', lot_definer=some_lot_definer)
+    plat.add_tracts(some_list_of_tracts)
     plat.execute_queue()
+    plat.output(fp=r"some/path/image.png")
 
 
 Undefined Lots
