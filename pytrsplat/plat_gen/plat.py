@@ -718,8 +718,25 @@ class PlatAliquotNode(AliquotNode, SettingsOwned, ImageOwned):
             Default is 2 (i.e., quarter-quarters), specified above in
             the stack.
         """
+        # Here's an explanation, because most of this is happening in the pyTRS
+        # library's AliquotNode, and not directly within this code base...
+        #
+        # Previously in the call stack, the lot definition aliquots were parsed
+        # to the exact specified depth `at_depth` (2 by default -- i.e.,
+        # quarter-quarters; and discarding anything deeper). The lot definitions
+        # for a given lot were then added to this PlatAliquotNode tree --
+        # specifically at `PlatSection.write_lot_numbers()`. At that time, the
+        # corresponding lot number was passed as the `source`, which gets added
+        # to the `.sources` attribute of the deepest node, while registering
+        # each aliquot.
+        #
+        # Here, to actually write the lot numbers, we traverse to each node at
+        # the specified depth, collect the lot numbers that have been registered
+        # in that node's `.sources`, combine them into a single string (for each
+        # node at that depth), and write that to that node's (x, y) coord, but
+        # offset rightward and down as configured in settings.lot_num_offset_px.
         if self.depth == at_depth:
-            lot_txt = ', '.join(str(l) for l in sorted(self.sources))
+            lot_txt = ', '.join(str(lot_num) for lot_num in sorted(self.sources))
             stn = self.settings
             draw = self._get_layer_draw('lot_nums', create=True)
             font = stn.lotfont
@@ -922,11 +939,22 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         """
         ld = self.owner.all_lot_defs_cached
         lots_definitions = ld.get(self.trs.trs, {})
+        # We'll use pyTRS to convert the lot definition into a list of QQs for
+        # each lot. And we specify 'qq_depth.<at_depth>' to ensure the QQs are
+        # the precise depth we need (corresponding to the resulting depth of the
+        # aliquot tree in `.lot_writer`).
+        pytrs_config = f"clean_qq,qq_depth.{at_depth}"
         for lot, definitions in lots_definitions.items():
             tract = pytrs.Tract(
-                definitions, parse_qq=True, config=f"clean_qq,qq_depth.{at_depth}")
+                definitions, parse_qq=True, config=pytrs_config)
+            # Extract the numerical component of the lot. (i.e., 'L1' -> 1)
             ilot = int(lot.split('L')[-1])
-            self.lot_writer.register_all_aliquots(tract.qqs, ilot)
+            # `source=ilot` stores the lot number(s) at the deepest node in the
+            # `lot_writer` tree for each aliquot added here. See lengthy comment
+            # in `PlatAliquotNode.write_lot_numbers()` for more details on how
+            # it gets used, and why we parsed the definitions to an exact
+            # 'qq_depth' of the specified `at_depth` (2 by default).
+            self.lot_writer.register_all_aliquots(tract.qqs, source=ilot)
         self.lot_writer._configure(parent_xy=self.xy)
         self.lot_writer.write_lot_numbers(at_depth)
         return None
