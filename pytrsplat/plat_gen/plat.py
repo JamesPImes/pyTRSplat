@@ -755,7 +755,6 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         if trs is not None:
             trs = pytrs.TRS(trs)
         self.trs: pytrs.TRS = trs
-        self.aliquot_tree = PlatAliquotNode(owner=owner)
         # Lot definitions will be written separately to the `.lot_writer` aliquot tree.
         self.lot_writer = PlatAliquotNode(owner=owner)
         self.square_dim: int = None
@@ -988,14 +987,6 @@ class PlatBody(SettingsOwned, ImageOwned):
         self.plat_secs[None] = PlatSection(None, grid_offset=None, owner=self.owner)
         # Coord of top-left of the grid.
         self.xy: tuple[int, int] = None
-
-    def nonempty_sections(self):
-        """Get a list of any sections that have aliquots to be platted."""
-        output = []
-        for sec_num, plat_sec in self.plat_secs.items():
-            if not plat_sec.aliquot_tree.is_leaf():
-                output.append(sec_num)
-        return output
 
     def _configure(self, xy: tuple[int, int] = None, twp: str = None, rge: str = None):
         """
