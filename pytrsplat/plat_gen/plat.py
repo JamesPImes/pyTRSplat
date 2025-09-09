@@ -28,8 +28,15 @@ except (FileNotFoundError, KeyError):
 
 
 class LayerOwner:
-    """Class that has a ``.layer_queues`` attribute."""
+    """
+    Class that has ``.layer_queues`` and ``.layer_carveouts``
+    attributes.
+    """
     layer_queues: dict[str, pytrs.TractList]
+    layer_carveouts: dict[str, pytrs.TractList]
+
+    def _list_registered_layers(self):
+        return list(self.layer_queues.keys())
 
 
 class QueueSingle(LayerOwner):
@@ -43,12 +50,60 @@ class QueueSingle(LayerOwner):
     """
     DEFAULT_LAYER = 'aliquot_fill'
 
-    def _compile_entire_queue(self) -> pytrs.TractList:
-        """Get the full combined queue for all layers."""
+    def _compile_entire_queue(self, include_carveouts=False) -> pytrs.TractList:
+        """
+        Get the full combined queue for all layers.
+
+        :param include_carveouts: (Optional, off by default) Include
+            tracts that have been added to the carve-outs.
+        """
         out = pytrs.TractList()
         for queue in self.layer_queues.values():
             out.extend(queue)
+        if include_carveouts:
+            for queue in self.layer_carveouts.values():
+                out.extend(queue)
         return out
+
+    def _verify_legal_twprge(self, tract) -> bool:
+        """
+        INTERNAL USE:
+
+        Verify that the tract Twp/Rge is legal for the owner of this
+        queue. If the ``.twp`` and ``.rge`` (if they exist) hvae not yet
+        been set, set them now.
+        :return: True, if the Twp/Rge is legal.
+        :raises ValueError: If the Twp/Rge is illegal.
+        """
+        twp = None
+        rge = None
+        twprge_defined = False
+        if hasattr(self, 'twp') and hasattr(self, 'rge'):
+            twp = self.twp
+            rge = self.rge
+            if twp is not None and rge is not None:
+                twprge_defined = True
+        if not twprge_defined:
+            all_queue = self._compile_entire_queue()
+            if all_queue:
+                sample_tract: pytrs.Tract = all_queue[0]
+                twp = sample_tract.twp
+                rge = sample_tract.rge
+                twprge_defined = True
+        existing = pytrs.TRS.from_twprgesec(twp, rge, sec=None)
+        if twprge_defined and (tract.twp != existing.twp or tract.rge != existing.rge):
+            msg = (
+                f"Mismatched Twp/Rge: {tract.twprge!r} does not match existing "
+                f"{existing.twprge!r}.\n"
+                "Consider using platting class that will accept multiple Twp/Rges "
+                " (e.g., `PlatGroup` or `MegaPlat`)."
+            )
+            raise ValueError(msg)
+        # Set the Twp/Rge now, if applicable.
+        if not twprge_defined and hasattr(self, 'twp') and hasattr(self, 'rge'):
+            self.twp = tract.twp
+            self.rge = tract.rge
+        return True
 
     def add_tract(self, tract: pytrs.Tract, layer: str = None) -> None:
         """
@@ -68,40 +123,14 @@ class QueueSingle(LayerOwner):
         :raise ValueError: If a Twp/Rge is added that does not share the
             same Twp/Rge of every other tract in the queue.
         """
+        # Would raise a ValueError if not legal.
+        self._verify_legal_twprge(tract)
         if layer is None:
             layer = self.DEFAULT_LAYER
         self.layer_queues.setdefault(layer, pytrs.TractList())
         layer_queue = self.layer_queues[layer]
-        twp = None
-        rge = None
-        twprge_defined = False
-        all_queue = self._compile_entire_queue()
-        if hasattr(self, 'twp') and hasattr(self, 'rge'):
-            twp = self.twp
-            rge = self.rge
-            if twp is not None and rge is not None:
-                twprge_defined = True
-        elif all_queue:
-            sample_tract: pytrs.Tract = all_queue[0]
-            twp = sample_tract.twp
-            rge = sample_tract.rge
-            twprge_defined = True
-        existing_twprge = pytrs.TRS.from_twprgesec(twp, rge).twprge
-
-        if not twprge_defined or (tract.twprge == existing_twprge):
-            layer_queue.append(tract)
-            if hasattr(self, 'twp') and hasattr(self, 'rge'):
-                self.twp = tract.twp
-                self.rge = tract.rge
-            return None
-
-        msg = (
-            f"Mismatched Twp/Rge: {tract.twprge!r} does not match existing "
-            f"{existing_twprge!r}.\n"
-            "Consider using platting class that will accept multiple Twp/Rges "
-            " (e.g., `PlatGroup` or `MegaPlat`)."
-        )
-        raise ValueError(msg)
+        layer_queue.append(tract)
+        return None
 
     def add_tracts(
             self,
@@ -135,6 +164,32 @@ class QueueSingle(LayerOwner):
         """
         for tract in tracts:
             self.add_tract(tract, layer)
+        return None
+
+    def clear_layer_queue(self, layer: str = None, include_carveouts=False):
+        """
+        Clear the contents of the queue for the specified ``'layer'``.
+
+        :param layer: Name of the layer to clear the queue for.
+        :param include_carveouts: (Optional) Also clear any carve-outs
+            for this layer.
+        """
+        if layer is None:
+            layer = QueueSingle.DEFAULT_LAYER
+        self.layer_queues[layer] = pytrs.TractList()
+        if include_carveouts:
+            self.clear_layer_carveouts(layer)
+        return None
+
+    def clear_layer_carveouts(self, layer: str = None):
+        """
+        Clear the carve-outs for the specified ``'layer'``.
+
+        :param layer: Name of the layer to clear the carve-outs for.
+        """
+        if layer is None:
+            layer = QueueSingle.DEFAULT_LAYER
+        self.layer_carveouts[layer] = pytrs.TractList()
         return None
 
     def add_description(
@@ -174,6 +229,140 @@ class QueueSingle(LayerOwner):
                 no_lots_qqs.append(tract)
         return no_lots_qqs
 
+    def carve_tract(self, tract: pytrs.Tract, layer: str = None) -> None:
+        """
+        Carve out lands (single tract) from the queue, so that they do
+        not appear on the resulting plat.
+
+        (Affects only which lands get filled in on the plat. This
+        carve-out will NOT prevent tracts from being written to the
+        footer, if so configured.)
+
+        .. note::
+
+            The tract must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
+
+        .. note::
+
+            All carve-outs override the queue for a given layer. In
+            other words, when the queue is executed, all added lands
+            will be platted for that layer, then all carved-out lands
+            will be removed from that layer. This means that carved-out
+            lands **cannot** be re-added to the queue for that same
+            layer. They **can** be added to the queue for a different
+            layer.
+
+        .. warning::
+
+            **Any** lots or aliquots identified in this tract will be
+            removed from the queue. Be careful to use a 'clean'
+            description that will not remove lands that should be kept.
+
+        :param tract: A ``pytrs.Tract`` that has been parsed into Lots
+            and QQ's. (Its Twp/Rge must match what is already in the
+            queue.)
+        :param layer: Name of the layer to carve this tract from.
+        """
+        self._verify_legal_twprge(tract)
+        if layer is None:
+            layer = self.DEFAULT_LAYER
+        self.layer_carveouts.setdefault(layer, pytrs.TractList())
+        layer_carveouts = self.layer_carveouts[layer]
+        layer_carveouts.append(tract)
+        return None
+
+    def carve_tracts(
+            self,
+            tracts: Union[list[pytrs.Tract], pytrs.TractList, pytrs.PLSSDesc],
+            layer: str = None,
+    ) -> None:
+        """
+        Carve out lands (multiple tracts) from the plat, so that they do
+        not appear on the resulting plat.
+
+        (Affects only which lands get filled in on the plat. This
+        carve-out will NOT prevent tracts from being written to the
+        footer, if so configured.)
+
+        .. note::
+
+            The tracts must already be parsed for lots/QQs. (See
+            ``pyTRS`` documentation for details.)
+
+        .. note::
+
+            All carve-outs override the queue for a given layer. In
+            other words, when the queue is executed, all added lands
+            will be platted for that layer, then all carved-out lands
+            will be removed from that layer. This means that carved-out
+            lands **cannot** be re-added to the queue for that same
+            layer. They **can** be added to the queue for a different
+            layer.
+
+        .. warning::
+
+            **Any** lots or aliquots identified in these tracts will be
+            removed from the queue. Be careful to use 'clean'
+            descriptions that will not remove lands that should be kept.
+
+        :param tracts: A collection of ``pytrs.Tract`` objects,
+            such as a ``pytrs.PLSSDesc``, ``pytrs.TractList``, or any
+            other iterable object that contains exclusively
+            ``pytrs.Tract``.
+        :param layer: Name of the layer to carve these tracts from.
+        """
+        for tract in tracts:
+            self.carve_tract(tract, layer)
+        return None
+
+    def carve_description(
+            self,
+            txt: str,
+            config: str = None,
+            layer: str = None,
+    ) -> pytrs.TractList:
+        """
+        Parse the land description and carve out the resulting tracts
+        from the queue, so that they do not appear on the resulting
+        plat.
+
+        (Affects only which lands get filled in on the plat. This
+        carve-out will NOT prevent tracts from being written to the
+        footer, if so configured.)
+
+        .. note::
+
+            All carve-outs override the queue for a given layer. In
+            other words, when the queue is executed, all added lands
+            will be platted for that layer, then all carved-out lands
+            will be removed from that layer. This means that carved-out
+            lands **cannot** be re-added to the queue for that same
+            layer. They **can** be added to the queue for a different
+            layer.
+
+        .. warning::
+
+            **Any** lots or aliquots identified in this description will
+            be removed from the queue. Be careful to use a 'clean'
+            description that will not remove lands that should be kept.
+
+        :param txt: The land description.
+        :param config: The config parameters for parsing, to be passed
+            through to the ``pytrs`` library. (See pyTRS documentation
+            for details.)
+        :param layer: Name of the layer to carve this description from.
+        :return: A ``pytrs.TractList`` containing the tracts in which
+            the parser could NOT identify any lots or aliquots.
+        """
+        plssdesc = pytrs.PLSSDesc(txt, parse_qq=True, config=config)
+        self.carve_tracts(plssdesc, layer)
+        no_lots_qqs = pytrs.TractList()
+        for tract in plssdesc:
+            if not tract.lots_qqs:
+                no_lots_qqs.append(tract)
+        return no_lots_qqs
+
 
 class QueueMany(QueueSingle):
     """
@@ -182,6 +371,10 @@ class QueueMany(QueueSingle):
 
     This class allows any number of unique Twp/Rges.
     """
+
+    def _verify_legal_twprge(self, tract: pytrs.Tract) -> bool:
+        """No effect in ``QueueMany``. (All Twp/Rge are legal.)"""
+        return True
 
     def add_tract(self, tract: pytrs.Tract, layer: str = None):
         """
@@ -319,7 +512,7 @@ class LotDefinerOwner(QueueSingle):
             ``.lot_definer.allow_defaults`` attribute.
         """
         return self.lot_definer.prompt_define(
-            self._compile_entire_queue(), allow_defaults)
+            self._compile_entire_queue(include_carveouts=True), allow_defaults)
 
     def find_unplattable_tracts(self, allow_defaults: bool = None) -> pytrs.TractList:
         """
@@ -884,24 +1077,52 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         return None
 
     def fill_tracts(
-            self, queue: pytrs.TractList, layer_name: str = None) -> pytrs.TractList:
+            self,
+            queue: pytrs.TractList,
+            layer_name: str = None,
+            carveouts: pytrs.TractList = None,
+    ) -> pytrs.TractList:
         """
         Fill in the tracts in the plat within this section.
 
         :param queue: The ``TractList`` containing tracts to depict.
         :param layer_name: The name of the layer to depict them on.
             (Defaults to ``'aliquot_fill'``.)
+        :param carveouts: A ``TractList`` of tracts NOT to depict.
+            (If used, will completely override any tracts in ``queue``.)
         """
+
+        def prep_tract(tract_: pytrs.Tract, unplattable_into: pytrs.TractList):
+            """
+            Helper func to prep tract, generate an appropriate
+            ``PlatWarning``, etc.
+            """
+            self.lot_definer.process_tract(tract_, commit=True)
+            # `.lots_as_qqs` is ad-hoc attribute added in `.process_tract()`
+            if not tract_.qqs and not tract_.lots_as_qqs:
+                if len(tract_.undefined_lots) > 0:
+                    warning = UnplattableWarning.only_undefined_lots(tract_)
+                else:
+                    warning = UnplattableWarning.no_lots_qqs(tract_)
+                warn(warning)
+                unplattable_into.append(tract_)
+            elif tract_.undefined_lots:
+                warning = UndefinedLotWarning.from_tract(tract_)
+                warn(warning)
+            return tract_
+
         unplattable_tracts = pytrs.TractList()
         if not queue:
             return unplattable_tracts
+        if carveouts is None:
+            carveouts = pytrs.TractList()
         elif self._is_dummy:
             for tract in queue:
                 warning = UnplattableWarning.unclear_trs(tract)
                 warn(warning)
                 unplattable_tracts.append(tract)
             return unplattable_tracts
-        platted_aliquots = set()
+
         if layer_name is None:
             layer_name = QueueSingle.DEFAULT_LAYER
         self._register_layer(layer_name)
@@ -909,23 +1130,24 @@ class PlatSection(SettingsOwned, ImageOwned, LotDefinerOwned):
         qq_fill_rgba = self.settings._get_layer_qq_fill_rgba(layer_name)
         aliq_tree._configure(parent_xy=self.xy, qq_fill_rgba=qq_fill_rgba)
 
+        platted_aliquots = set()
         for tract in queue:
-            self.lot_definer.process_tract(tract, commit=True)
-            if not tract.qqs and not tract.lots_as_qqs:
-                if len(tract.undefined_lots) > 0:
-                    warning = UnplattableWarning.only_undefined_lots(tract)
-                else:
-                    warning = UnplattableWarning.no_lots_qqs(tract)
-                warn(warning)
-                unplattable_tracts.append(tract)
+            tract = prep_tract(tract, unplattable_into=unplattable_tracts)
             aliq_tree.register_all_aliquots(tract.qqs)
             platted_aliquots.update(tract.qqs)
+            # `.lots_as_qqs` is ad-hoc attribute added in `.process_tract()`
             aliq_tree.register_all_aliquots(tract.lots_as_qqs)
             platted_aliquots.update(tract.lots_as_qqs)
-            if tract.undefined_lots:
-                warning = UndefinedLotWarning.from_tract(tract)
-                warn(warning)
-        if len(platted_aliquots) > 0:
+        carved_aliquots = set()
+        for tract_carve in carveouts:
+            tract_carve = prep_tract(tract_carve, unplattable_into=unplattable_tracts)
+            aliq_tree.remove_all_aliquots(tract_carve.qqs)
+            carved_aliquots.update(tract_carve.qqs)
+            # `.lots_as_qqs` is ad-hoc attribute added in `.process_tract()`
+            aliq_tree.remove_all_aliquots(tract_carve.lots_as_qqs)
+            carved_aliquots.update(tract_carve.lots_as_qqs)
+        resulting_aliquots = platted_aliquots - carved_aliquots
+        if len(resulting_aliquots) > 0:
             aliq_tree._configure(parent_xy=self.xy, qq_fill_rgba=qq_fill_rgba)
             aliq_tree.fill(rgba=qq_fill_rgba)
         return unplattable_tracts
@@ -998,6 +1220,10 @@ class PlatBody(SettingsOwned, ImageOwned):
             will be drawn on.)
         """
         self.owner: IPlatOwner = owner
+        if twp is not None and rge is not None:
+            trs = pytrs.TRS.from_twprgesec(twp, rge, sec=None)
+            twp = trs.twp
+            rge = trs.rge
         self.twp = twp
         self.rge = rge
         self.plat_secs: dict[Union[int, None], PlatSection] = {}
@@ -1039,13 +1265,20 @@ class PlatBody(SettingsOwned, ImageOwned):
             plat_sec._configure(grid_xy=xy)
         return None
 
-    def fill_tracts(self, queue: pytrs.TractList, layer_name: str = None):
+    def fill_tracts(
+            self,
+            queue: pytrs.TractList,
+            layer_name: str = None,
+            carveouts: pytrs.TractList = None
+    ):
         """
         Fill in the tracts in the plat.
 
         :param queue: A ``TractList`` of tracts to depict.
         :param layer_name: The layer on which to depict them. (Defaults
             to ``'aliquot_fill'``.)
+        :param carveouts: A ``TractList`` of tracts NOT to depict.
+            (If used, will completely override any tracts in ``queue``.)
         :return: A ``pytrs.TractList`` containing all tracts that could
             not be platted (no lots or aliquots identified).
         """
@@ -1054,7 +1287,7 @@ class PlatBody(SettingsOwned, ImageOwned):
         for sec_num, sub_queue in grouped.items():
             # Dummy plat_sec (key `None`) is the garbage dump for unclear Twp/Rge/Sec.
             plat_sec = self.plat_secs.get(sec_num, self.plat_secs[None])
-            unplattable = plat_sec.fill_tracts(sub_queue, layer_name)
+            unplattable = plat_sec.fill_tracts(sub_queue, layer_name, carveouts)
             unplattable_tracts.extend(unplattable)
         return unplattable_tracts
 
@@ -1395,9 +1628,14 @@ class Plat(IPlatOwner, QueueSingle):
             settings in ``owner``, if that is passed.)
         """
         super().__init__()
+        if twp is not None and rge is not None:
+            trs = pytrs.TRS.from_twprgesec(twp, rge, sec=None)
+            twp = trs.twp
+            rge = trs.rge
         self.twp = twp
         self.rge = rge
         self.layer_queues: dict[str, pytrs.TractList] = {}
+        self.layer_carveouts: dict[str, pytrs.TractList] = {}
         self.header = PlatHeader(owner=self)
         self.body = PlatBody(twp, rge, owner=self)
         self.footer = PlatFooter(owner=self)
@@ -1502,13 +1740,9 @@ class Plat(IPlatOwner, QueueSingle):
         unplattable_tracts = pytrs.TractList()
         for layer_name, layer_queue in self.layer_queues.items():
             layer_queue.custom_sort()
-            for tract in layer_queue:
-                if self.twp is None:
-                    self.twp = tract.twp
-                if self.rge is None:
-                    self.rge = tract.rge
-                unplattable = self.body.fill_tracts(layer_queue, layer_name)
-                unplattable_tracts.extend(unplattable)
+            layer_carve = self.layer_carveouts.get(layer_name)
+            unplattable = self.body.fill_tracts(layer_queue, layer_name, layer_carve)
+            unplattable_tracts.extend(unplattable)
         if self.settings.write_tracts:
             all_queue = self._compile_entire_queue()
             all_queue.custom_sort()
@@ -1621,6 +1855,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
             lot_definer = LotDefiner()
         self.lot_definer: LotDefiner = lot_definer
         self.layer_queues: dict[str, pytrs.TractList] = {}
+        self.layer_carveouts: dict[str, pytrs.TractList] = {}
         self.plats: dict[str, Plat] = {}
         # Cache of lot definitions (including defaults). Gets used while
         # executing queue, then cleared.
@@ -1676,9 +1911,37 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
         # Create plat if necessary.
         plat = self.plats.get(tract.twprge)
         if plat is None:
-            plat = self._register_plat(tract.twp, tract.rge)
-        # Add tract to that plat's queue.
-        plat.add_tract(tract, layer)
+            self._register_plat(tract.twp, tract.rge)
+        return None
+
+    def _hand_down_queues_and_carveouts(self):
+        """
+        INTERNAL USE:
+
+        For each plat in this ``PlatGroup``, clear the previous queues
+        and hand down the relevant tracts in the queue and carved-out
+        tracts.
+        """
+        for layer in self._list_registered_layers():
+            layqueue = self.layer_queues.get(layer)
+            if layqueue is None:
+                return None
+            layqueue_grouped = layqueue.group_by('twprge')
+            laycarve = self.layer_carveouts.get(layer, pytrs.TractList())
+            laycarve_grouped = laycarve.group_by('twprge')
+            for twprge, lq_tracts in layqueue_grouped.items():
+                plat = self.plats.get(twprge)
+                if plat is None:
+                    sample_tract = lq_tracts[0]
+                    plat = self._register_plat(sample_tract.twp, sample_tract.rge)
+                # Clear previous.
+                plat.clear_layer_queue(layer)
+                plat.clear_layer_carveouts(layer)
+                # Add current.
+                plat.add_tracts(lq_tracts, layer)
+                laycarve_tracts = laycarve_grouped.get(twprge)
+                if laycarve_tracts is not None:
+                    plat.carve_tracts(laycarve_tracts, layer)
         return None
 
     def execute_queue(
@@ -1701,14 +1964,21 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
         self.all_lot_defs_cached = self.lot_definer.get_all_definitions(
             mandatory_twprges=list(self.plats.keys())
         )
+        self._hand_down_queues_and_carveouts()
         all_unplattable = pytrs.TractList()
-        all_queue_grouped = self._compile_entire_queue().group_by('twprge')
+        # This all_queue is only used for prompt_define(). Individual queues and
+        # carveouts have already been passed to each plat by `_hand_down...()`.
+        all_queue = self._compile_entire_queue(include_carveouts=True)
+        all_queue_grouped = all_queue.group_by('twprge')
         for twprge, tracts_in_twprge in all_queue_grouped.items():
             if subset_twprges is not None and twprge not in subset_twprges:
                 continue
             if prompt_define:
                 self.lot_definer.prompt_define(tracts=tracts_in_twprge)
-            plat = self.plats[twprge]
+            plat = self.plats.get(twprge)
+            if plat is None:
+                # Might encounter a Twp/Rge with no plat if using carveouts.
+                continue
             unplattable = plat.execute_queue()
             all_unplattable.extend(unplattable)
         self.all_lot_defs_cached = {}
@@ -1844,6 +2114,7 @@ class MegaPlat(IPlatOwner, QueueMany):
         """
         super().__init__()
         self.layer_queues: dict[str, pytrs.TractList] = {}
+        self.layer_carveouts: dict[str, pytrs.TractList] = {}
         if settings is None:
             settings = DEFAULT_MEGAPLAT_SETTINGS
         self.settings: Settings = settings
@@ -2056,15 +2327,27 @@ class MegaPlat(IPlatOwner, QueueMany):
         # Reset unplattable_tracts.
         unplattable_tracts = pytrs.TractList()
         for layer, layer_queue in self.layer_queues.items():
+            # Scrub queue.
             for tract in layer_queue:
                 self.lot_definer.process_tract(tract, commit=True)
             layer_queue, unplattable = self._clean_queue(layer_queue)
             unplattable_tracts.extend(unplattable)
+
+            # Scrub carveouts.
+            layer_carveout = self.layer_carveouts.get(layer, pytrs.TractList())
+            for tract in layer_carveout:
+                self.lot_definer.process_tract(tract, commit=True)
+            layer_carveout, unplattable_carveout = self._clean_queue(layer_carveout)
+            unplattable_tracts.extend(unplattable_carveout)
+
+            # Plat each Twp/Rge.
             layer_queue_grouped = layer_queue.group_by('twprge')
+            layer_carveout_grouped = layer_carveout.group_by('twprge')
             for twprge, tracts_in_twprge in layer_queue_grouped.items():
                 subplat = subplats.get(twprge)
                 if subplat is None:
                     continue
-                unplattable = subplat.fill_tracts(tracts_in_twprge, layer)
+                carve = layer_carveout_grouped.get(twprge)
+                unplattable = subplat.fill_tracts(tracts_in_twprge, layer, carve)
                 unplattable_tracts.extend(unplattable)
         return unplattable_tracts
