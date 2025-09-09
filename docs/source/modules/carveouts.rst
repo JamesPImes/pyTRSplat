@@ -77,8 +77,8 @@ Each layer has its own carve-outs that do not affect one another.
     plat.add_description('T154N-R97W Sec 14: W/2', layer='other_layer')
 
     # Use different color for each layer.
-    plat.set_layer_fill('some_layer', qq_fill_rgba=(255, 0, 0, 100))
-    plat.set_layer_fill('other_layer', qq_fill_rgba=(0, 255, 0, 100))
+    plat.settings.set_layer_fill('some_layer', qq_fill_rgba=(255, 0, 0, 100))
+    plat.settings.set_layer_fill('other_layer', qq_fill_rgba=(0, 255, 0, 100))
 
     plat.execute_queue()
     plat.output(fp=r"some/file/path.png")
