@@ -2149,8 +2149,6 @@ class MegaPlat(IPlatOwner, QueueMany):
         unplattable_tracts = pytrs.TractList()
         if queue is None:
             queue = self._compile_entire_queue()
-        if not queue:
-            return out_queue
         queue.custom_sort()
         for tract in queue:
             if not tract.trs_is_undef(sec=False) and not tract.trs_is_error(sec=False):
