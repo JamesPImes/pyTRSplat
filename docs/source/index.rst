@@ -66,7 +66,8 @@ These are custom warnings (subclasses of ``UserWarning``):
 .. toctree::
     modules/warnings
 
-This is a guide to using multiple layers:
+These are guides to using multiple layers:
 
 .. toctree::
     modules/layers
+    modules/carveouts
