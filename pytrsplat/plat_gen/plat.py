@@ -1293,10 +1293,14 @@ class PlatBody(SettingsOwned, ImageOwned):
         """
         unplattable_tracts = pytrs.TractList()
         grouped = queue.group_by('sec_num')
+        if carveouts is None:
+            carveouts = pytrs.TractList()
+        carveouts_by_sec = carveouts.group_by('sec_num')
         for sec_num, sub_queue in grouped.items():
             # Dummy plat_sec (key `None`) is the garbage dump for unclear Twp/Rge/Sec.
             plat_sec = self.plat_secs.get(sec_num, self.plat_secs[None])
-            unplattable = plat_sec.fill_tracts(sub_queue, layer_name, carveouts)
+            sec_carvouts = carveouts_by_sec.get(sec_num)
+            unplattable = plat_sec.fill_tracts(sub_queue, layer_name, sec_carvouts)
             unplattable_tracts.extend(unplattable)
         return unplattable_tracts
 
