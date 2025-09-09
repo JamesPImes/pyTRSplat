@@ -253,10 +253,13 @@ class QueueSingle(LayerOwner):
             layer. They **can** be added to the queue for a different
             layer.
 
+            Carve-outs for any given layer can be cleared with
+            ``.clear_layer_carveouts(layer=<name>)``.
+
         .. warning::
 
             **Any** lots or aliquots identified in this tract will be
-            removed from the queue. Be careful to use a 'clean'
+            removed from the layer. Be careful to use a 'clean'
             description that will not remove lands that should be kept.
 
         :param tract: A ``pytrs.Tract`` that has been parsed into Lots
@@ -300,10 +303,13 @@ class QueueSingle(LayerOwner):
             layer. They **can** be added to the queue for a different
             layer.
 
+            Carve-outs for any given layer can be cleared with
+            ``.clear_layer_carveouts(layer=<name>)``.
+
         .. warning::
 
             **Any** lots or aliquots identified in these tracts will be
-            removed from the queue. Be careful to use 'clean'
+            removed from the layer. Be careful to use 'clean'
             descriptions that will not remove lands that should be kept.
 
         :param tracts: A collection of ``pytrs.Tract`` objects,
@@ -341,10 +347,13 @@ class QueueSingle(LayerOwner):
             layer. They **can** be added to the queue for a different
             layer.
 
+            Carve-outs for any given layer can be cleared with
+            ``.clear_layer_carveouts(layer=<name>)``.
+
         .. warning::
 
             **Any** lots or aliquots identified in this description will
-            be removed from the queue. Be careful to use a 'clean'
+            be removed from the layer. Be careful to use a 'clean'
             description that will not remove lands that should be kept.
 
         :param txt: The land description.
