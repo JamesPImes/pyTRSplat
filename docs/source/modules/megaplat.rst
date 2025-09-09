@@ -92,7 +92,7 @@ This results in the image above.
 
 
 Methods and Attributes
-______________________
+----------------------
 
 .. autoclass:: pytrsplat.MegaPlat
     :members:

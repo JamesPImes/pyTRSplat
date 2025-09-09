@@ -187,7 +187,7 @@ as :ref:`mentioned above <prompt_define>`.
 
 
 Methods and Attributes
-______________________
+----------------------
 
 .. autoclass:: pytrsplat.LotDefiner
     :members:

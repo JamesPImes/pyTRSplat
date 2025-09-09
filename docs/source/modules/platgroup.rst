@@ -103,7 +103,7 @@ This results in the images above.
 
 
 Methods and Attributes
-______________________
+----------------------
 
 .. autoclass:: pytrsplat.PlatGroup
     :members:
