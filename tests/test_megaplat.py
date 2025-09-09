@@ -118,6 +118,32 @@ class TestMegaPlatBehavior(unittest.TestCase):
         )
         self.assertEqual(im.size, expected_dims)
 
+    def test_carveout(self):
+        desc = 'T154N-R97W Sec 1: NE/4'
+        carve = 'T154N-R97W Sec 1: NW/4NE/4'
+        stn = get_test_settings_for_megaplat()
+        mega_nocarve = MegaPlat(settings=stn)
+        mega_nocarve.add_description(desc, layer='test_layer_1')
+        mega_nocarve.execute_queue()
+        mega_nocarve_output = mega_nocarve.output()
+
+        # Images should match when carve-out appears on different layer.
+        mega_withcarve_noeffect = MegaPlat(settings=stn)
+        mega_withcarve_noeffect.add_description(desc, layer='test_layer_1')
+        mega_withcarve_noeffect.carve_description(carve, layer='wrong_layer')
+        mega_withcarve_noeffect.execute_queue()
+        mega_withcarve_noeffect_output = mega_withcarve_noeffect.output()
+        self.assertTrue(
+            images_match(mega_nocarve_output, mega_withcarve_noeffect_output))
+        # Images should NOT match when carve-out appears on SAME layer.
+        mega_withcarve_effective = MegaPlat(settings=stn)
+        mega_withcarve_effective.add_description(desc, layer='test_layer_1')
+        mega_withcarve_effective.carve_description(carve, layer='test_layer_1')
+        mega_withcarve_effective.execute_queue()
+        mega_withcarve_effective_output = mega_withcarve_effective.output()
+        self.assertFalse(
+            images_match(mega_nocarve_output, mega_withcarve_effective_output))
+
     def test_write_lot_numbers(self):
         settings = get_test_settings_for_megaplat()
         settings.write_lot_numbers = False

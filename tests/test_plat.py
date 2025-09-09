@@ -151,6 +151,32 @@ class TestPlatBehavior(unittest.TestCase):
         im = plat.output()
         self.assertEqual(im.size, settings.dim)
 
+    def test_carveout(self):
+        desc = 'T154N-R97W Sec 1: NE/4'
+        carve = 'T154N-R97W Sec 1: NW/4NE/4'
+        stn = get_test_settings_for_plat()
+        plat_nocarve = Plat(settings=stn)
+        plat_nocarve.add_description(desc, layer='test_layer_1')
+        plat_nocarve.execute_queue()
+        plat_nocarve_output = plat_nocarve.output()
+
+        # Images should match when carve-out appears on different layer.
+        plat_withcarve_noeffect = Plat(settings=stn)
+        plat_withcarve_noeffect.add_description(desc, layer='test_layer_1')
+        plat_withcarve_noeffect.carve_description(carve, layer='wrong_layer')
+        plat_withcarve_noeffect.execute_queue()
+        plat_withcarve_noeffect_output = plat_withcarve_noeffect.output()
+        self.assertTrue(
+            images_match(plat_nocarve_output, plat_withcarve_noeffect_output))
+        # Images should NOT match when carve-out appears on SAME layer.
+        plat_withcarve_effective = Plat(settings=stn)
+        plat_withcarve_effective.add_description(desc, layer='test_layer_1')
+        plat_withcarve_effective.carve_description(carve, layer='test_layer_1')
+        plat_withcarve_effective.execute_queue()
+        plat_withcarve_effective_output = plat_withcarve_effective.output()
+        self.assertFalse(
+            images_match(plat_nocarve_output, plat_withcarve_effective_output))
+
     def test_write_lot_numbers(self):
         settings = get_test_settings_for_plat()
         settings.write_lot_numbers = False

@@ -102,6 +102,32 @@ class TestPlatGroupBehavior(unittest.TestCase):
         im = images[0]
         self.assertEqual(im.size, settings.dim)
 
+    def test_carveout(self):
+        desc = 'T154N-R97W Sec 1: NE/4'
+        carve = 'T154N-R97W Sec 1: NW/4NE/4'
+        stn = get_test_settings_for_plat()
+        pg_nocarve = PlatGroup(settings=stn)
+        pg_nocarve.add_description(desc, layer='test_layer_1')
+        pg_nocarve.execute_queue()
+        pg_nocarve_output = pg_nocarve.output()
+
+        # Images should match when carve-out appears on different layer.
+        pg_withcarve_noeffect = PlatGroup(settings=stn)
+        pg_withcarve_noeffect.add_description(desc, layer='test_layer_1')
+        pg_withcarve_noeffect.carve_description(carve, layer='wrong_layer')
+        pg_withcarve_noeffect.execute_queue()
+        pg_withcarve_noeffect_output = pg_withcarve_noeffect.output()
+        self.assertTrue(
+            images_match(pg_nocarve_output[0], pg_withcarve_noeffect_output[0]))
+        # Images should NOT match when carve-out appears on SAME layer.
+        pg_withcarve_effective = PlatGroup(settings=stn)
+        pg_withcarve_effective.add_description(desc, layer='test_layer_1')
+        pg_withcarve_effective.carve_description(carve, layer='test_layer_1')
+        pg_withcarve_effective.execute_queue()
+        pg_withcarve_effective_output = pg_withcarve_effective.output()
+        self.assertFalse(
+            images_match(pg_nocarve_output[0], pg_withcarve_effective_output[0]))
+
     def test_write_lot_numbers(self):
         settings = get_test_settings_for_plat()
         settings.write_lot_numbers = False
