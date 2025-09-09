@@ -52,6 +52,7 @@ __all__ = [
     'plat3tracts_writetracts_2written',
     'plat1tract_noheader',
     'plat3tracts_separate_layers',
+    'plat2tracts_carveout',
 ]
 
 DEFAULT_OUT_DIR = RESOURCES_DIR / 'expected_images' / 'plat'
@@ -225,6 +226,27 @@ def plat3tracts_separate_layers(
     plat.execute_queue()
     return write_if_new_single(out_dir / fn, plat, override)
 
+
+@add_docstring(
+    'Plat - Two tracts with different colors. Red Tract 1 (Sec 1) has SE/4NE/4 carve-out.',
+    DESC_1, DESC_3)
+def plat2tracts_carveout(
+        fn: str, out_dir: Path = DEFAULT_OUT_DIR, override=False):
+    settings = get_test_settings_for_plat()
+    plat = Plat(settings=settings)
+    plat.lot_definer.allow_defaults = True
+    plat.lot_definer.standard_lot_size = 40
+    plat.add_description(DESC_1, layer='red_layer')
+    plat.add_description(DESC_3, layer='green_layer')
+    carveout_red = 'T154N-R97W Sec 1: SE/4NE/4'
+    plat.carve_description(carveout_red, layer='red_layer')
+    # Sec 8 carve-out should have no effect, because it's on different layer.
+    carveout_noeffect = 'T154N-R97W Sec 8: NW/4'
+    plat.carve_description(carveout_noeffect, layer='wrong_layer')
+    plat.settings.set_layer_fill('red_layer', qq_fill_rgba=(255, 0, 0, 100))
+    plat.settings.set_layer_fill('green_layer', qq_fill_rgba=(0, 255, 0, 100))
+    plat.execute_queue()
+    return write_if_new_single(out_dir / fn, plat, override)
 
 # Create a dict of .png filenames and their corresponding func, for all funcs.
 exclude = (

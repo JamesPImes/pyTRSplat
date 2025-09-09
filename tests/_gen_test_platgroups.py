@@ -47,6 +47,7 @@ __all__ = [
     'platgroup2tracts_writetracts_lotnums',
     'plat3tracts_writetracts_2written',
     'platgroup3tracts_separate_layers',
+    'platgroup2tracts_carveout',
 ]
 
 DEFAULT_OUT_DIR = RESOURCES_DIR / 'expected_images' / 'platgroup'
@@ -252,6 +253,29 @@ def platgroup3tracts_separate_layers(
     pg.settings.set_layer_fill('green_layer', qq_fill_rgba=(0, 255, 0, 100))
     pg.execute_queue()
     return write_if_new_group(out_dir / fn, pg, override)
+
+@add_docstring(
+    'PlatGroup - Two tracts with different colors. Red Tract 1 (Sec 1) has SE/4NE/4 carve-out.',
+    DESC_1, DESC_3)
+def platgroup2tracts_carveout(
+        fn: str, out_dir: Path = DEFAULT_OUT_DIR, override=False):
+    settings = get_test_settings_for_plat()
+    pg = PlatGroup(settings=settings)
+    pg.lot_definer.allow_defaults = True
+    pg.lot_definer.standard_lot_size = 40
+    pg.add_description(DESC_1, layer='red_layer')
+    pg.add_description(DESC_3, layer='green_layer')
+    carveout_red = 'T154N-R97W Sec 1: SE/4NE/4'
+    pg.carve_description(carveout_red, layer='red_layer')
+    # Sec 8 carve-out should have no effect, because it's on different layer.
+    carveout_noeffect = 'T154N-R96W Sec 8: NW/4'
+    pg.carve_description(carveout_noeffect, layer='wrong_layer')
+    pg.settings.set_layer_fill('red_layer', qq_fill_rgba=(255, 0, 0, 100))
+    pg.settings.set_layer_fill('green_layer', qq_fill_rgba=(0, 255, 0, 100))
+    pg.execute_queue()
+    return write_if_new_group(out_dir / fn, pg, override)
+
+
 
 # Create a dict of .png filenames and their corresponding func, for all funcs.
 exclude = (

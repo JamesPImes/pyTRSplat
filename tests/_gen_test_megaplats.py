@@ -42,6 +42,7 @@ __all__ = [
     'megaplat3twprge_ew_subset',
     'megaplat3twprge_single_subset',
     'megaplat3tracts_separate_layers',
+    'megaplat2tracts_carveout',
 ]
 
 DEFAULT_OUT_DIR = RESOURCES_DIR / 'expected_images' / 'megaplat'
@@ -243,6 +244,28 @@ def megaplat3tracts_separate_layers(
     mega.add_description(DESC_2, layer='green_layer')
     # Default is blue.
     mega.add_description(DESC_3)
+    mega.settings.set_layer_fill('red_layer', qq_fill_rgba=(255, 0, 0, 100))
+    mega.settings.set_layer_fill('green_layer', qq_fill_rgba=(0, 255, 0, 100))
+    mega.execute_queue()
+    return write_if_new_single(out_dir / fn, mega, override)
+
+
+@add_docstring(
+    'Plat - Two tracts with different colors. Red Tract 1 (Sec 1) has SE/4NE/4 carve-out.',
+    DESC_1, DESC_3)
+def megaplat2tracts_carveout(
+        fn: str, out_dir: Path = DEFAULT_OUT_DIR, override=False):
+    settings = get_test_settings_for_megaplat()
+    mega = MegaPlat(settings=settings)
+    mega.lot_definer.allow_defaults = True
+    mega.lot_definer.standard_lot_size = 40
+    mega.add_description(DESC_1, layer='red_layer')
+    mega.add_description(DESC_3, layer='green_layer')
+    carveout_red = 'T154N-R97W Sec 1: SE/4NE/4'
+    mega.carve_description(carveout_red, layer='red_layer')
+    # Sec 8 carve-out should have no effect, because it's on different layer.
+    carveout_noeffect = 'T154N-R96W Sec 8: NW/4'
+    mega.carve_description(carveout_noeffect, layer='wrong_layer')
     mega.settings.set_layer_fill('red_layer', qq_fill_rgba=(255, 0, 0, 100))
     mega.settings.set_layer_fill('green_layer', qq_fill_rgba=(0, 255, 0, 100))
     mega.execute_queue()
