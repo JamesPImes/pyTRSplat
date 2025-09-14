@@ -1,5 +1,6 @@
-Pillow
-git+https://github.com/JamesPImes/pyTRS
+Pillow>=11.0.0
+# Requires >= v2.2.1 of pyTRS. @main should always work.
+git+https://github.com/JamesPImes/pyTRS@v2.2.1
 
 # For tests only
 pytest

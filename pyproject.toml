@@ -14,8 +14,9 @@ license = { file = "LICENSE.txt" }
 keywords = ["PLSS", "survey", "land", "water", "gis", "plat", "platting"]
 
 dependencies = [
-    "Pillow",
-    "pyTRS @ git+https://github.com/JamesPImes/pyTRS",
+    "Pillow>=11.0.0",
+    # Any pyTRS version >= 2.2.1 should work.
+    "pyTRS @ git+https://github.com/JamesPImes/pyTRS@v2.2.1",
 ]
 
 [project.urls]
