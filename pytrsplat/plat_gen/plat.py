@@ -2016,7 +2016,7 @@ class PlatGroup(ISettingsLotDefinerOwner, QueueMany):
             self,
             fp: Union[str, Path] = None,
             image_format: str = None,
-            stack=None,
+            stack: bool = None,
             subset_twprges: list[str] = None,
             layers: list[str] = None,
             image_mode: str = 'RGB',
