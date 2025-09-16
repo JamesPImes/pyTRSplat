@@ -27,10 +27,9 @@ except (FileNotFoundError, KeyError):
     DEFAULT_MEGAPLAT_SETTINGS = Settings.preset('megaplat_default')
 
 
-class LayerOwner:
+class LayerQueueOwner:
     """
-    Class that has ``.layer_queues`` and ``.layer_carveouts``
-    attributes.
+    Class that owns queues for layers and carve-outs.
     """
     layer_queues: dict[str, pytrs.TractList]
     layer_carveouts: dict[str, pytrs.TractList]
@@ -39,7 +38,7 @@ class LayerOwner:
         return list(self.layer_queues.keys())
 
 
-class QueueSingle(LayerOwner):
+class QueueSingle(LayerQueueOwner):
     """
     Class that can take in one or more ``pytrs.Tract`` objects or a raw
     PLSS description and add the results to the queue.
@@ -564,7 +563,7 @@ class SettingsOwner:
     settings: Settings
 
 
-class ImageOwner(LayerOwner):
+class ImageOwner(LayerQueueOwner):
     """
     Class that owns the ``Image.Image`` and ``ImageDraw.Draw`` objects.
     They are stored in ``._layers`` (for images) and ``._draws`` (for
