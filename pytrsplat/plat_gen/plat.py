@@ -701,23 +701,26 @@ class ImageOwner(LayerOwner):
             and/or ``layers`` contains only layers that are nonexistent
             or empty, will return ``None`` instead.
         """
-        selected_layers = self.output_layer_names.copy()
-        if selected_layers is None:
-            selected_layers = list(self.DEFAULT_LAYER_NAMES)
-        custom_layers = [
-            layer for layer in reversed(self.layer_queues.keys())
-            if layer != QueueSingle.DEFAULT_LAYER
-        ]
-        try:
-            i = selected_layers.index(QueueSingle.DEFAULT_LAYER)
-        except ValueError:
-            # Default to putting it just above background.
-            i = 1
-        for layer in custom_layers:
-            selected_layers.insert(i + 1, layer)
         if layers is not None:
-            # Param `layers` overrides attributes.
+            # Parameter `layers` overrides attributes.
             selected_layers = layers
+        else:
+            selected_layers = self.output_layer_names
+            if selected_layers is None:
+                selected_layers = list(self.DEFAULT_LAYER_NAMES)
+            selected_layers = selected_layers.copy()
+            try:
+                # Put custom layers just above default layer.
+                i = selected_layers.index(QueueSingle.DEFAULT_LAYER)
+            except ValueError:
+                # Fall back to putting custom layers just above background.
+                i = 0
+            # Insert custom layers.
+            for layer in self._list_registered_layers():
+                if layer == QueueSingle.DEFAULT_LAYER:
+                    continue
+                selected_layers.insert(i + 1, layer)
+                i += 1
         selected_layer_ims = []
         for layer_name in selected_layers:
             im = self._get_layer_image(layer_name)
