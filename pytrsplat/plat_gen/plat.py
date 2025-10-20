@@ -2174,52 +2174,79 @@ class MegaPlat(IPlatOwner, QueueMany):
                 warn(warning)
         return out_queue, unplattable_tracts
 
-    def _get_twprge_spans(self, queue: pytrs.TractList):
+    def _get_twprge_spans(self, queue: pytrs.TractList) -> (list[str], list[str]):
         """
-        Get a list of Twp numbers and a list of Rge numbers that
-        encompass the entirety of the tracts in the ``queue``.
+        Get a list of Twp numbers (with 'n' and/or 's') and a list of
+        Rge numbers (with 'e' or 'w') that encompass the entirety of the
+        tracts in the ``queue``.
 
-        If the townships are "North", they will be sorted largest to
-        smallest (so that the highest number appears at the top of the
-        eventual plat); and vice versa for "South".
+        Townships are sorted such that they will be platted north-to-
+        south.
 
-        If the ranges are "West", they will be sorted largest to
-        smallest (so that the highest number appears at the left of the
-        eventual plat); and vice versa for "East".
+        Ranges are sorted such that they will be platted west-to-east.
 
-        :return: Two lists: One of Twp numbers, and another for Rge
+        :return: Two lists: One of Twp numbers, and another of Rge
             numbers.
         """
         if not queue:
             return [], []
         # Find the boundaries.
         tract = queue[0]
-        ns = tract.ns
-        ew = tract.ew
-        min_twp_tract = tract
-        max_twp_tract = tract
-        min_rge_tract = tract
-        max_rge_tract = tract
+        allowed_ew = tract.ew
+        rge_min = float('inf')
+        rge_max = float('-inf')
+        ns_seen = set()
+        twp_minmax = {
+            'n': {
+                'min': float('inf'),
+                'max': float('-inf'),
+            },
+            's': {
+                'min': float('inf'),
+                'max': float('-inf'),
+            }
+        }
         for tract in queue:
-            if tract.ns != ns:
-                raise ValueError('Township N/S must all be the same.')
-            if tract.ew != ew:
+            if tract.ew != allowed_ew:
                 raise ValueError('Range E/W must all be the same.')
-            if tract.twp_num < min_twp_tract.twp_num:
-                min_twp_tract = tract
-            if tract.twp_num > max_twp_tract.twp_num:
-                max_twp_tract = tract
-            if tract.rge_num < min_rge_tract.rge_num:
-                min_rge_tract = tract
-            if tract.rge_num > max_rge_tract.rge_num:
-                max_rge_tract = tract
-        needed_twp_nums = list(range(min_twp_tract.twp_num, max_twp_tract.twp_num + 1))
-        needed_rge_nums = list(range(min_rge_tract.rge_num, max_rge_tract.rge_num + 1))
-        if ns == 'n':
-            needed_twp_nums.reverse()
-        if ew == 'w':
-            needed_rge_nums.reverse()
-        return needed_twp_nums, needed_rge_nums
+            ns = tract.ns
+            ns_seen.add(ns)
+            twp_num = tract.twp_num
+            rge_num = tract.rge_num
+            if twp_num < twp_minmax[ns]['min']:
+                twp_minmax[ns]['min'] = twp_num
+            if twp_num > twp_minmax[ns]['max']:
+                twp_minmax[ns]['max'] = twp_num
+            if rge_num < rge_min:
+                rge_min = rge_num
+            if rge_num > rge_max:
+                rge_max = rge_num
+
+        # Fill in all twps and rges within that range.
+        needed_twps = []
+        if len(ns_seen) == 2:
+            # If there are both North and South townships, span that entire gap.
+            twp_minmax['n']['min'] = 1
+            twp_minmax['s']['min'] = 1
+        if 'n' in ns_seen:
+            twps = [
+                f"{tw}n"
+                for tw in range(twp_minmax['n']['max'], twp_minmax['n']['min'] - 1, -1)
+            ]
+            needed_twps.extend(twps)
+        if 's' in ns_seen:
+            twps = [
+                f"{tw}s"
+                for tw in range(twp_minmax['n']['min'], twp_minmax['n']['max'] + 1)
+            ]
+            needed_twps.extend(twps)
+        needed_rges = [
+            f"{rg}{allowed_ew}"
+            for rg in range(rge_min, rge_max + 1)
+        ]
+        if allowed_ew == 'w':
+            needed_rges.reverse()
+        return needed_twps, needed_rges
 
     def _gen_subplats(self, queue: pytrs.TractList):
         """
@@ -2233,28 +2260,22 @@ class MegaPlat(IPlatOwner, QueueMany):
         topleft = (all_marg, all_marg)
         sec_len = stn.sec_length_px
         twp_len = sec_len * 6
-        needed_twp_nums, needed_rge_nums = self._get_twprge_spans(queue)
+        needed_twps, needed_rges = self._get_twprge_spans(queue)
         self.dim = (
             # x is set by number of rge_nums (plus margins).
-            len(needed_rge_nums) * twp_len + all_marg * 2,
+            len(needed_rges) * twp_len + all_marg * 2,
             # y is set by number of twp_nums (plus margins).
-            len(needed_twp_nums) * twp_len + all_marg * 2
+            len(needed_twps) * twp_len + all_marg * 2
         )
         if self.dim[0] > self.max_dim[0] or self.dim[1] > self.max_dim[1]:
             raise RuntimeError(
                 f"Configured max dimensions {self.max_dim} exceeded: {self.dim}")
-
         # Create the images here, because `self.dim` was just calculated.
         self._configure()
 
-        sample_tract = queue[0]
-        ns = sample_tract.ns
-        ew = sample_tract.ew
         subplat_lotwriter_info = []
-        for i, twp_num in enumerate(needed_twp_nums):
-            for j, rge_num in enumerate(needed_rge_nums):
-                twp = f"{twp_num}{ns}"
-                rge = f"{rge_num}{ew}"
+        for i, twp in enumerate(needed_twps):
+            for j, rge in enumerate(needed_rges):
                 twprge = f"{twp}{rge}"
                 subplat_topleft = (topleft[0] + twp_len * j, topleft[1] + twp_len * i)
                 # Write the header before configuring the subplat itself, so that the
