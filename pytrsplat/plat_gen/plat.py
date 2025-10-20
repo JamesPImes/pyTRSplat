@@ -2103,11 +2103,16 @@ class MegaPlat(IPlatOwner, QueueMany):
 
     .. note::
 
-        This will not allow Townships in the queue to be both North and
-        South (i.e., ``'154n'`` and ``'27s'`` cannot coexist in the
-        queue). Similarly, Ranges may not be both East and West
-        (``'97w'`` and ``'58e'`` cannot coexist). If either condition is
-        violated, a ``ValueError`` will be raised.
+        This *will* allow Townships in the queue to be both North and
+        South (i.e., ``'154n'`` and ``'27s'`` *can* coexist in the
+        queue). However, huge plats can result if both North and South
+        are encountered and the corresponding numbers are large.
+        That is, ``T1N`` and ``T2S`` will only be a span of 3 townships,
+        but ``T5N`` and ``T5S`` will be a span of 10 townships.
+
+        However, Ranges may *not* be both East and West (``'97w'`` and
+        ``'58e'`` *cannot* coexist), and a ``ValueError`` will be raised
+        if both East and West are encountered.
     """
 
     def __init__(
